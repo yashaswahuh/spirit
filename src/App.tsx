@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db/dexie';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { PwaReloadPrompt } from './components/common/PwaReloadPrompt';
+import { I18nProvider } from './i18n';
 import { AppShell } from './components/layout/AppShell';
 import { NavTab } from './components/layout/BottomNav';
 import { OnboardingWizard } from './components/onboarding/OnboardingWizard';
@@ -12,29 +13,47 @@ import { AttendanceScreen } from './screens/AttendanceScreen';
 import { TimetableScreen } from './screens/TimetableScreen';
 import { GradesScreen } from './screens/GradesScreen';
 import { MoreScreen } from './screens/MoreScreen';
+import {
+  ThemePreference,
+  getThemePreference,
+  setThemePreference,
+  applyTheme,
+  getEffectiveThemeIsDark,
+} from './utils/preferences';
 
 const MainApp: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Dark mode state
-  const [isDark, setIsDark] = useState(() => {
-    return (
-      localStorage.getItem('spirit_theme') === 'dark' ||
-      (!('spirit_theme' in localStorage) &&
-        window.matchMedia('(prefers-color-scheme: dark)').matches)
-    );
-  });
+  // Dark mode state with system preference support
+  const [themePref, setThemePrefState] = useState<ThemePreference>(getThemePreference);
+  const [isDark, setIsDark] = useState<boolean>(() => getEffectiveThemeIsDark());
 
   useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-      localStorage.setItem('spirit_theme', 'dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-      localStorage.setItem('spirit_theme', 'light');
+    const effectiveDark = applyTheme(themePref);
+    setIsDark(effectiveDark);
+
+    // If preference is 'system', listen to system dark mode changes
+    if (themePref === 'system' && typeof window !== 'undefined' && window.matchMedia) {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleChange = (e: MediaQueryListEvent) => {
+        setIsDark(e.matches);
+        if (e.matches) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      };
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
     }
-  }, [isDark]);
+  }, [themePref]);
+
+  const handleToggleTheme = () => {
+    const nextPref: ThemePreference = isDark ? 'light' : 'dark';
+    setThemePreference(nextPref);
+    setThemePrefState(nextPref);
+  };
 
   // Check if profile exists
   const profiles = useLiveQuery(() => db.profile.filter(p => p.deleted_at === null).toArray());
@@ -91,7 +110,7 @@ const MainApp: React.FC = () => {
       title={headerInfo.title}
       subtitle={headerInfo.subtitle}
       isDark={isDark}
-      onToggleTheme={() => setIsDark(!isDark)}
+      onToggleTheme={handleToggleTheme}
       termName={activeTerm?.name}
     >
       <Routes>
@@ -100,7 +119,21 @@ const MainApp: React.FC = () => {
         <Route path="/attendance" element={<AttendanceScreen />} />
         <Route path="/timetable" element={<TimetableScreen />} />
         <Route path="/grades" element={<GradesScreen />} />
-        <Route path="/more" element={<MoreScreen isDark={isDark} onToggleTheme={() => setIsDark(!isDark)} onResetApp={() => navigate('/')} />} />
+        <Route
+          path="/more"
+          element={
+            <MoreScreen
+              isDark={isDark}
+              themePref={themePref}
+              onThemePrefChange={p => {
+                setThemePreference(p);
+                setThemePrefState(p);
+              }}
+              onToggleTheme={handleToggleTheme}
+              onResetApp={() => navigate('/')}
+            />
+          }
+        />
       </Routes>
     </AppShell>
   );
@@ -109,10 +142,12 @@ const MainApp: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <ErrorBoundary>
-      <HashRouter>
-        <MainApp />
-        <PwaReloadPrompt />
-      </HashRouter>
+      <I18nProvider>
+        <HashRouter>
+          <MainApp />
+          <PwaReloadPrompt />
+        </HashRouter>
+      </I18nProvider>
     </ErrorBoundary>
   );
 };

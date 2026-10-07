@@ -5,6 +5,7 @@ import {
   Trash2,
   Sun,
   Moon,
+  Monitor,
   ShieldCheck,
   User,
   CheckSquare,
@@ -12,10 +13,14 @@ import {
   Smartphone,
   Calendar,
   Database,
-  Download,
   CheckCircle2,
   Bell,
   Save,
+  Palette,
+  Clock,
+  Info,
+  Send,
+  CalendarDays,
 } from 'lucide-react';
 import { db } from '../db/dexie';
 import { seedDemoData, hasDemoData, clearDemoData, resetDatabase } from '../db/repositories/setup.repo';
@@ -26,6 +31,34 @@ import { DeviceTransferModal } from '../components/safety/DeviceTransferModal';
 import { DeleteDataModal } from '../components/safety/DeleteDataModal';
 import { InstallGuidanceModal } from '../components/safety/InstallGuidanceModal';
 import { PrivacyModal } from '../components/safety/PrivacyModal';
+import { PeriodTimingsModal } from '../components/timetable/PeriodTimingsModal';
+import { useI18n } from '../i18n';
+import {
+  ThemePreference,
+  AccentPreference,
+  ACCENT_COLORS,
+  getAccentPreference,
+  setAccentPreference,
+  WeekStartDay,
+  getWeekStartDay,
+  setWeekStartDay,
+  TimeFormat,
+  getTimeFormat,
+  setTimeFormat,
+  DateFormatPattern,
+  getDateFormat,
+  setDateFormat,
+} from '../utils/preferences';
+import {
+  getNotificationPermission,
+  requestNotificationPermission,
+  sendTestNotification,
+} from '../utils/notifications';
+import {
+  generateTimetableIcs,
+  generateTasksIcs,
+  downloadOrShareIcs,
+} from '../utils/ics';
 import {
   getLastBackupTimestamp,
   getChangesSinceBackup,
@@ -35,24 +68,30 @@ import {
   getBackupThresholds,
   setBackupThresholds,
   StorageEstimateInfo,
-} from '../../src/utils/storage';
+} from '../utils/storage';
 
 interface MoreScreenProps {
   isDark: boolean;
+  themePref: ThemePreference;
+  onThemePrefChange: (pref: ThemePreference) => void;
   onToggleTheme: () => void;
   onResetApp: () => void;
 }
 
 export const MoreScreen: React.FC<MoreScreenProps> = ({
-  isDark,
-  onToggleTheme,
+  themePref,
+  onThemePrefChange,
   onResetApp,
 }) => {
+  const { t } = useI18n();
   const profile = useLiveQuery(() => db.profile.filter(p => p.deleted_at === null).first());
   const program = useLiveQuery(() => db.program.filter(p => p.deleted_at === null).first());
   const activeTerm = useLiveQuery(() => db.term.filter(t => t.deleted_at === null && t.status === 'ongoing').first());
   const courses = useLiveQuery(() => db.course.filter(c => c.deleted_at === null).toArray()) || [];
-  
+  const slots = useLiveQuery(() => db.timetable_slot.filter(s => s.deleted_at === null).toArray()) || [];
+  const tasks = useLiveQuery(() => db.task.filter(t => t.deleted_at === null).toArray()) || [];
+  const gradingSchemes = useLiveQuery(() => db.grading_scheme.filter(g => g.deleted_at === null).toArray()) || [];
+
   // Modals state
   const [isTasksOpen, setIsTasksOpen] = useState(false);
   const [isBackupOpen, setIsBackupOpen] = useState(false);
@@ -60,6 +99,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isInstallOpen, setIsInstallOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
+  const [isPeriodTimingsOpen, setIsPeriodTimingsOpen] = useState(false);
 
   // Storage and Safety state
   const [isPersisted, setIsPersisted] = useState<boolean | null>(null);
@@ -67,6 +107,21 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   const [daysThreshold, setDaysThreshold] = useState<number>(7);
   const [changesThreshold, setChangesThreshold] = useState<number>(20);
   const [thresholdSaved, setThresholdSaved] = useState(false);
+
+  // Preference states
+  const [accent, setAccentState] = useState<AccentPreference>(getAccentPreference);
+  const [weekStart, setWeekStartState] = useState<WeekStartDay>(getWeekStartDay);
+  const [timeFormat, setTimeFormatState] = useState<TimeFormat>(getTimeFormat);
+  const [dateFormat, setDateFormatState] = useState<DateFormatPattern>(getDateFormat);
+
+  // Default target threshold state
+  const [defaultThreshold, setDefaultThreshold] = useState<number>(profile?.default_attendance_threshold || 75);
+  const [thresholdGoalSaved, setThresholdGoalSaved] = useState(false);
+
+  // Notification status
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>(getNotificationPermission);
+  const [isTestingNotif, setIsTestingNotif] = useState(false);
+  const [icsExporting, setIcsExporting] = useState<'timetable' | 'tasks' | null>(null);
 
   const lastBackupAt = getLastBackupTimestamp();
   const changesCount = getChangesSinceBackup();
@@ -80,6 +135,12 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
     setChangesThreshold(thresholds.changesThreshold);
   }, []);
 
+  useEffect(() => {
+    if (profile?.default_attendance_threshold) {
+      setDefaultThreshold(profile.default_attendance_threshold);
+    }
+  }, [profile?.default_attendance_threshold]);
+
   const handleRequestPersistence = async () => {
     const granted = await requestPersistentStorage();
     setIsPersisted(granted);
@@ -91,21 +152,111 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
     getStorageEstimate().then(setStorageInfo);
   };
 
-  const handleSaveThresholds = (e: React.FormEvent) => {
+  const handleSaveBackupThresholds = (e: React.FormEvent) => {
     e.preventDefault();
     setBackupThresholds(daysThreshold, changesThreshold);
     setThresholdSaved(true);
     setTimeout(() => setThresholdSaved(false), 2000);
   };
 
+  const handleSaveAttendanceGoal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profile) return;
+    await db.profile.update(profile.id, {
+      default_attendance_threshold: Number(defaultThreshold),
+      updated_at: new Date().toISOString(),
+    });
+    setThresholdGoalSaved(true);
+    setTimeout(() => setThresholdGoalSaved(false), 2000);
+  };
+
+  const handleGradingScaleChange = async (scaleId: string) => {
+    if (!program) return;
+    await db.program.update(program.id, {
+      grading_scheme_id: scaleId,
+      updated_at: new Date().toISOString(),
+    });
+  };
+
+  const handleAccentChange = (newAccent: AccentPreference) => {
+    setAccentPreference(newAccent);
+    setAccentState(newAccent);
+  };
+
+  const handleWeekStartChange = (day: WeekStartDay) => {
+    setWeekStartDay(day);
+    setWeekStartState(day);
+  };
+
+  const handleTimeFormatChange = (fmt: TimeFormat) => {
+    setTimeFormat(fmt);
+    setTimeFormatState(fmt);
+  };
+
+  const handleDateFormatChange = (fmt: DateFormatPattern) => {
+    setDateFormat(fmt);
+    setDateFormatState(fmt);
+  };
+
+  const handleRequestNotifPermission = async () => {
+    const res = await requestNotificationPermission();
+    setNotifPermission(res);
+  };
+
+  const handleSendTestNotification = async () => {
+    setIsTestingNotif(true);
+    try {
+      const sent = await sendTestNotification();
+      if (!sent && notifPermission === 'denied') {
+        alert('Notifications are blocked by your browser. Please enable notifications in your browser site permissions.');
+      }
+    } finally {
+      setIsTestingNotif(false);
+      setNotifPermission(getNotificationPermission());
+    }
+  };
+
+  const handleExportTimetableIcs = async () => {
+    if (!activeTerm) {
+      alert('No active semester found to export timetable.');
+      return;
+    }
+    setIcsExporting('timetable');
+    try {
+      const ics = generateTimetableIcs({
+        term: activeTerm,
+        slots,
+        courses,
+      });
+      const filename = `Spirit_Timetable_${activeTerm.name.replace(/\s+/g, '_')}.ics`;
+      await downloadOrShareIcs(filename, ics);
+    } finally {
+      setIcsExporting(null);
+    }
+  };
+
+  const handleExportTasksIcs = async () => {
+    setIcsExporting('tasks');
+    try {
+      const ics = generateTasksIcs({
+        tasks,
+        courses,
+      });
+      const filename = `Spirit_Exams_Deadlines_${new Date().toISOString().slice(0, 10)}.ics`;
+      await downloadOrShareIcs(filename, ics);
+    } finally {
+      setIcsExporting(null);
+    }
+  };
+
   const handleSeedDemo = async () => {
-    if (confirm('Load demo semester data? This will add sample subjects and attendance logs tagged as demo data.')) {
+    if (confirm('Load demo semester data? This will add sample subjects, timetable, and attendance logs tagged as demo data.')) {
       await seedDemoData();
     }
   };
 
   const handleClearDemo = async () => {
-    if (confirm('Clear all demo data? This will remove sample subjects and demo attendance records.')) {
+    if (confirm('Clear all demo data? This will remove sample subjects and demo attendance records while keeping any real data.')) {
       await clearDemoData();
     }
   };
@@ -119,17 +270,18 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
 
   return (
     <PageContainer maxWidth="xl" className="space-y-6 animate-fade-in">
+      {/* Header */}
       <div className="pb-2 border-b border-gray-100 dark:border-gray-800">
         <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight">
-          Settings & Data
+          {t.settings.title}
         </h2>
         <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-          Preferences, backup, and local storage management
+          Preferences, alarms, backup, and local storage management
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 items-start">
-        {/* Left Column: Profile & Preferences */}
+        {/* Left Column: Profile, Appearance & Preferences */}
         <div className="space-y-4 sm:space-y-6">
           {/* Profile Info Card */}
           <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
@@ -152,36 +304,181 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
                 <span className="text-gray-600 dark:text-gray-400">Semester</span>
                 <span className="font-semibold text-gray-900 dark:text-white">{activeTerm?.name || 'Semester 1'}</span>
               </div>
-              <div className="py-2.5 flex items-center justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Default Attendance Goal</span>
-                <span className="font-bold text-indigo-600 dark:text-indigo-400">
-                  {profile?.default_attendance_threshold || 75}%
-                </span>
-              </div>
             </div>
-          </div>
 
-          {/* Preferences Card */}
-          <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-3">
-            <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              Display Preferences
-            </h3>
-            <div className="flex items-center justify-between">
+            {/* Attendance Target Form */}
+            <form onSubmit={handleSaveAttendanceGoal} className="pt-2 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3">
               <div>
-                <span className="text-sm font-bold text-gray-800 dark:text-gray-200 block">Theme Mode</span>
-                <span className="text-xs text-gray-400">Switch between dark and light appearance</span>
+                <label className="text-xs font-bold text-gray-800 dark:text-gray-200 block">
+                  Default Target Threshold
+                </label>
+                <span className="text-[11px] text-gray-400">Required percentage for safe status</span>
               </div>
-              <button
-                onClick={onToggleTheme}
-                className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-                aria-label="Toggle theme"
-              >
-                {isDark ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-indigo-600" />}
-              </button>
-            </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="50"
+                  max="100"
+                  value={defaultThreshold}
+                  onChange={e => setDefaultThreshold(Number(e.target.value))}
+                  className="w-16 px-2.5 py-1.5 text-xs text-center font-bold rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <button
+                  type="submit"
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-sm flex items-center gap-1"
+                >
+                  {thresholdGoalSaved ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Save className="w-3.5 h-3.5" />}
+                  Save
+                </button>
+              </div>
+            </form>
           </div>
 
-          {/* Tasks & Deadlines Card */}
+          {/* Display & Appearance Card */}
+          <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
+            <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Palette className="w-3.5 h-3.5 text-indigo-600" />
+              {t.settings.display}
+            </h3>
+
+            {/* Theme Selector (Light / Dark / System) */}
+            <div className="space-y-1.5">
+              <span className="text-xs font-bold text-gray-700 dark:text-gray-300 block">
+                {t.settings.themeMode}
+              </span>
+              <div className="grid grid-cols-3 gap-2">
+                {(['light', 'dark', 'system'] as ThemePreference[]).map(mode => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => onThemePrefChange(mode)}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                      themePref === mode
+                        ? 'border-indigo-600 bg-indigo-50/60 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-600'
+                        : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-gray-300'
+                    }`}
+                  >
+                    {mode === 'light' && <Sun className="w-3.5 h-3.5 text-amber-500" />}
+                    {mode === 'dark' && <Moon className="w-3.5 h-3.5 text-indigo-500" />}
+                    {mode === 'system' && <Monitor className="w-3.5 h-3.5 text-gray-500" />}
+                    <span className="capitalize">{mode}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Accent Color Picker */}
+            <div className="space-y-1.5 pt-2 border-t border-gray-100 dark:border-gray-800">
+              <span className="text-xs font-bold text-gray-700 dark:text-gray-300 block">
+                {t.settings.accentColor}
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {(Object.keys(ACCENT_COLORS) as AccentPreference[]).map(accKey => {
+                  const info = ACCENT_COLORS[accKey];
+                  const isSelected = accent === accKey;
+                  return (
+                    <button
+                      key={accKey}
+                      type="button"
+                      onClick={() => handleAccentChange(accKey)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                        isSelected
+                          ? 'border-indigo-600 bg-gray-50 dark:bg-gray-800 ring-2 ring-indigo-600'
+                          : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/60 text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: info.hex }} />
+                      <span>{info.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Time & Date Format */}
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100 dark:border-gray-800">
+              <div>
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1">
+                  {t.settings.timeFormat}
+                </label>
+                <select
+                  value={timeFormat}
+                  onChange={e => handleTimeFormatChange(e.target.value as TimeFormat)}
+                  className="w-full px-2.5 py-1.5 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  <option value="12h">{t.settings.format12h}</option>
+                  <option value="24h">{t.settings.format24h}</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1">
+                  {t.settings.dateFormat}
+                </label>
+                <select
+                  value={dateFormat}
+                  onChange={e => handleDateFormatChange(e.target.value as DateFormatPattern)}
+                  className="w-full px-2.5 py-1.5 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  <option value="DD/MM/YYYY">DD/MM/YYYY (Indian)</option>
+                  <option value="YYYY-MM-DD">YYYY-MM-DD (ISO)</option>
+                  <option value="MM/DD/YYYY">MM/DD/YYYY (US)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Week Start Day & Period Timings */}
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100 dark:border-gray-800">
+              <div>
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1">
+                  {t.settings.weekStartDay}
+                </label>
+                <select
+                  value={weekStart}
+                  onChange={e => handleWeekStartChange(Number(e.target.value) as WeekStartDay)}
+                  className="w-full px-2.5 py-1.5 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  <option value={1}>{t.settings.monday}</option>
+                  <option value={0}>{t.settings.sunday}</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1">
+                  Period Timings
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsPeriodTimingsOpen(true)}
+                  className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1.5 min-h-[34px]"
+                >
+                  <Clock className="w-3.5 h-3.5 text-indigo-600" /> Configure
+                </button>
+              </div>
+            </div>
+
+            {/* Default Grading Scheme */}
+            {gradingSchemes.length > 0 && (
+              <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block mb-1">
+                  {t.settings.defaultGradingScheme}
+                </label>
+                <select
+                  value={program?.grading_scheme_id || gradingSchemes[0]?.id}
+                  onChange={e => handleGradingScaleChange(e.target.value)}
+                  className="w-full px-2.5 py-1.5 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                >
+                  {gradingSchemes.map((scheme: any) => (
+                    <option key={scheme.id} value={scheme.id}>
+                      {scheme.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* Tasks & Deadlines Manager Card */}
           <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-3">
             <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
               <CheckSquare className="w-3.5 h-3.5 text-indigo-600" />
@@ -192,36 +489,104 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
             </p>
             <button
               onClick={() => setIsTasksOpen(true)}
-              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-500 text-gray-800 dark:text-white font-semibold text-xs sm:text-sm transition-colors min-h-[44px]"
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-500 text-gray-800 dark:text-white font-semibold text-xs sm:text-sm transition-colors min-h-[44px]"
             >
               Open Tasks & Exams Manager
             </button>
           </div>
-
-          {/* Install Guidance Card */}
-          <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-3">
-            <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Download className="w-3.5 h-3.5 text-indigo-600" />
-              Install App & Offline Setup
-            </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Add Spirit to your Home Screen to unlock persistent offline storage and protect attendance from iOS 7-day eviction.
-            </p>
-            <button
-              onClick={() => setIsInstallOpen(true)}
-              className="w-full flex items-center justify-between py-2.5 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-semibold text-xs sm:text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors min-h-[44px]"
-            >
-              <span className="flex items-center gap-2">
-                <Smartphone className="w-4 h-4 text-indigo-600" />
-                View Installation Guidance
-              </span>
-              <span className="text-xs text-gray-400">&rarr;</span>
-            </button>
-          </div>
         </div>
 
-        {/* Right Column: Backup, Storage & Privacy */}
+        {/* Right Column: Reminders, Calendar Export, Data Safety & Privacy */}
         <div className="space-y-4 sm:space-y-6">
+          {/* Reminders & Calendar Export Card */}
+          <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Bell className="w-3.5 h-3.5 text-indigo-600" />
+                {t.reminders.title}
+              </h3>
+            </div>
+
+            {/* Honest Scope Callout */}
+            <div className="bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/40 rounded-2xl p-3.5 text-xs text-indigo-900 dark:text-indigo-200 space-y-1">
+              <div className="flex items-center gap-1.5 font-bold">
+                <Info className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+                <span>Honest Scope Notice</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-indigo-700 dark:text-indigo-300">
+                {t.reminders.honestScopeNotice}
+              </p>
+            </div>
+
+            {/* Browser Notifications Controls */}
+            <div className="space-y-2 pt-1">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <span className="text-xs font-bold text-gray-800 dark:text-gray-200 block">
+                    {t.reminders.browserNotifications}
+                  </span>
+                  <span className="text-[11px] text-gray-400">
+                    {notifPermission === 'granted'
+                      ? 'Alerts active while app is open'
+                      : notifPermission === 'denied'
+                      ? 'Blocked in browser permissions'
+                      : 'Permission not yet requested'}
+                  </span>
+                </div>
+                {notifPermission === 'granted' ? (
+                  <button
+                    type="button"
+                    onClick={handleSendTestNotification}
+                    disabled={isTestingNotif}
+                    className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+                  >
+                    <Send className="w-3 h-3 text-indigo-600" />
+                    {isTestingNotif ? 'Sending...' : 'Test Alert'}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleRequestNotifPermission}
+                    disabled={notifPermission === 'unsupported'}
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                  >
+                    Enable Alerts
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Phone Calendar Sync (.ics export) */}
+            <div className="pt-3 border-t border-gray-100 dark:border-gray-800 space-y-2">
+              <span className="text-xs font-bold text-gray-800 dark:text-gray-200 block">
+                Sync with Phone Calendar (.ics)
+              </span>
+              <p className="text-[11px] text-gray-400">
+                Export files directly to Google Calendar, Apple Calendar, or Outlook to get native system alarm notifications when Spirit is closed.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleExportTimetableIcs}
+                  disabled={icsExporting !== null}
+                  className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-semibold hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <CalendarDays className="w-3.5 h-3.5 text-indigo-600" />
+                  {icsExporting === 'timetable' ? 'Exporting...' : 'Timetable (.ics)'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportTasksIcs}
+                  disabled={icsExporting !== null}
+                  className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-semibold hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1.5"
+                >
+                  <CheckSquare className="w-3.5 h-3.5 text-emerald-600" />
+                  {icsExporting === 'tasks' ? 'Exporting...' : 'Exams (.ics)'}
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Backup & Restore Card */}
           <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
@@ -230,10 +595,17 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
                 Backup & Restore
               </h3>
               {lastBackupAt ? (
-                <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                  <Calendar className="w-3 h-3" />
-                  {new Date(lastBackupAt).toLocaleDateString()}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <Calendar className="w-3 h-3" />
+                    {new Date(lastBackupAt).toLocaleDateString()}
+                  </span>
+                  {changesCount > 0 && (
+                    <span className="text-[10px] bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-semibold px-1.5 py-0.5 rounded">
+                      {changesCount} new {changesCount === 1 ? 'change' : 'changes'}
+                    </span>
+                  )}
+                </div>
               ) : (
                 <span className="text-[11px] font-medium text-amber-500">
                   Not backed up
@@ -248,18 +620,18 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
             <div className="space-y-2.5">
               <button
                 onClick={() => setIsBackupOpen(true)}
-                className="w-full flex items-center justify-between py-3 px-4 rounded-xl border border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 font-bold text-xs sm:text-sm hover:bg-indigo-100/70 transition-colors min-h-[44px]"
+                className="w-full flex items-center justify-between py-2.5 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-semibold text-xs sm:text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors min-h-[44px]"
               >
                 <span className="flex items-center gap-2">
-                  <HardDriveDownload className="w-4 h-4" />
-                  Backup & Restore (JSON / CSV)
+                  <Database className="w-4 h-4 text-indigo-600" />
+                  Export & Import Data (JSON / CSV)
                 </span>
-                <span className="text-xs font-normal text-indigo-500">Open &rarr;</span>
+                <span className="text-xs text-gray-400">&rarr;</span>
               </button>
 
               <button
                 onClick={() => setIsTransferOpen(true)}
-                className="w-full flex items-center justify-between py-3 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-semibold text-xs sm:text-sm hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors min-h-[44px]"
+                className="w-full flex items-center justify-between py-2.5 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-semibold text-xs sm:text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors min-h-[44px]"
               >
                 <span className="flex items-center gap-2">
                   <Smartphone className="w-4 h-4 text-indigo-600" />
@@ -270,102 +642,72 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
             </div>
           </div>
 
-          {/* Storage & Persistence Status Card */}
+          {/* Storage Safety & Persistence Card */}
           <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
             <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Database className="w-3.5 h-3.5 text-indigo-600" />
-              Device Storage & Persistence
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-600" />
+              Device Storage Safety
             </h3>
 
-            {/* Persistence Status */}
-            <div className="p-3.5 bg-gray-50 dark:bg-gray-800/60 rounded-2xl flex items-center justify-between gap-3 text-xs">
-              <div>
-                <span className="font-bold text-gray-900 dark:text-white block">
-                  Storage Status
-                </span>
-                <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                  {isPersisted
-                    ? 'Persistent (protected from browser cache eviction)'
-                    : 'Best-effort (may be cleared if device runs low on disk space)'}
-                </span>
+            <div className="divide-y divide-gray-100 dark:divide-gray-800/80 text-xs">
+              <div className="py-2 flex items-center justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Persistent Storage Status</span>
+                {isPersisted ? (
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Granted (Safe from Eviction)
+                  </span>
+                ) : (
+                  <button
+                    onClick={handleRequestPersistence}
+                    className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    Request Persistence
+                  </button>
+                )}
               </div>
-              {isPersisted ? (
-                <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold flex items-center gap-1 shrink-0 text-[11px]">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Active
-                </span>
-              ) : (
-                <button
-                  onClick={handleRequestPersistence}
-                  className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition-colors shrink-0 text-xs shadow-xs min-h-[36px]"
-                >
-                  Enable
-                </button>
-              )}
-            </div>
 
-            {/* Storage Quota Usage */}
-            {storageInfo && (
-              <div className="space-y-1.5">
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-500 dark:text-gray-400">IndexedDB Usage</span>
-                  <span className="font-semibold text-gray-800 dark:text-gray-200">
+              {storageInfo && (
+                <div className="py-2 flex items-center justify-between">
+                  <span className="text-gray-600 dark:text-gray-400">Approximate Storage Used</span>
+                  <span className="font-mono text-gray-800 dark:text-gray-200">
                     {storageInfo.usageFormatted} of {storageInfo.quotaFormatted}
                   </span>
                 </div>
-                <div className="w-full bg-gray-100 dark:bg-gray-800 h-2 rounded-full overflow-hidden">
-                  <div
-                    className="bg-indigo-600 h-full rounded-full transition-all"
-                    style={{ width: `${Math.max(1, storageInfo.percentUsed)}%` }}
-                  />
-                </div>
-              </div>
-            )}
+              )}
+            </div>
 
-            {/* Backup Reminder Thresholds */}
-            <form onSubmit={handleSaveThresholds} className="pt-2 border-t border-gray-100 dark:border-gray-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
-                  <Bell className="w-3.5 h-3.5 text-amber-500" />
-                  Backup Reminder Rules
-                </span>
-                <span className="text-[10px] text-gray-400">
-                  {changesCount} unbacked edits
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-xs">
+            {/* Configurable Reminder Thresholds */}
+            <form onSubmit={handleSaveBackupThresholds} className="pt-2 border-t border-gray-100 dark:border-gray-800 space-y-3">
+              <span className="text-xs font-bold text-gray-800 dark:text-gray-200 block">
+                Backup Reminder Rules
+              </span>
+              <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
-                  <label className="text-[11px] text-gray-500 dark:text-gray-400 block mb-1">
-                    Days without backup
-                  </label>
+                  <label className="text-gray-500 dark:text-gray-400 block mb-1">Days without backup</label>
                   <input
                     type="number"
-                    min={1}
-                    max={60}
+                    min="1"
+                    max="90"
                     value={daysThreshold}
-                    onChange={(e) => setDaysThreshold(parseInt(e.target.value, 10) || 1)}
-                    className="w-full px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-1 focus:ring-indigo-500"
+                    onChange={e => setDaysThreshold(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] text-gray-500 dark:text-gray-400 block mb-1">
-                    Edits without backup
-                  </label>
+                  <label className="text-gray-500 dark:text-gray-400 block mb-1">Changes since backup</label>
                   <input
                     type="number"
-                    min={1}
-                    max={200}
+                    min="5"
+                    max="500"
                     value={changesThreshold}
-                    onChange={(e) => setChangesThreshold(parseInt(e.target.value, 10) || 1)}
-                    className="w-full px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-1 focus:ring-indigo-500"
+                    onChange={e => setChangesThreshold(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                   />
                 </div>
               </div>
-
               <button
                 type="submit"
-                className="w-full py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-semibold text-xs hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1.5 min-h-[38px]"
+                className="w-full py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-semibold text-xs hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1.5"
               >
                 {thresholdSaved ? (
                   <>
@@ -437,6 +779,12 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
               Read Plain-Language Privacy Policy &rarr;
             </span>
           </div>
+
+          {/* About / Version Footer */}
+          <div className="text-center text-[11px] text-gray-400 dark:text-gray-500 space-y-1">
+            <p className="font-semibold text-gray-600 dark:text-gray-400">Spirit v0.1.0 • Offline-First Academic Tracker</p>
+            <p>Built with Vite, React, TypeScript, Tailwind CSS, vitest & Dexie</p>
+          </div>
         </div>
       </div>
 
@@ -445,6 +793,13 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
           isOpen={isTasksOpen}
           onClose={() => setIsTasksOpen(false)}
           courses={courses}
+        />
+      )}
+
+      {isPeriodTimingsOpen && (
+        <PeriodTimingsModal
+          isOpen={isPeriodTimingsOpen}
+          onClose={() => setIsPeriodTimingsOpen(false)}
         />
       )}
 

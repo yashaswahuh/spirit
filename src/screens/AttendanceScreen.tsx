@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Plus, Search, Filter, CalendarCheck, Sparkles, LayoutGrid, CalendarDays } from 'lucide-react';
+import { Plus, Search, Filter, CalendarCheck, Sparkles, LayoutGrid, CalendarDays, FileText } from 'lucide-react';
 import { db } from '../db/dexie';
 import { Course, AttendanceStatus } from '../types';
 import { computeCourseAttendanceStats, countUnmarkedClasses } from '../engine/attendance';
@@ -11,6 +11,7 @@ import { DayPickerView } from '../components/attendance/DayPickerView';
 import { CatchUpModal } from '../components/attendance/CatchUpModal';
 import { WhatIfModal } from '../components/attendance/WhatIfModal';
 import { CourseCalendarModal } from '../components/attendance/CourseCalendarModal';
+import { AttendanceReportModal } from '../components/attendance/AttendanceReportModal';
 import { createCourse, updateCourse, deleteCourse } from '../db/repositories/course.repo';
 import { markAttendance } from '../db/repositories/attendance.repo';
 import { PageContainer } from '../components/layout/PageContainer';
@@ -34,6 +35,7 @@ export const AttendanceScreen: React.FC = () => {
   const [calendarCourse, setCalendarCourse] = useState<Course | undefined>();
   const [isCatchUpOpen, setIsCatchUpOpen] = useState(false);
   const [isWhatIfOpen, setIsWhatIfOpen] = useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -192,6 +194,16 @@ export const AttendanceScreen: React.FC = () => {
           >
             <Sparkles className="w-4 h-4 text-indigo-500" />
             What-If Planner
+          </button>
+
+          {/* Attendance Report */}
+          <button
+            type="button"
+            onClick={() => setIsReportOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-emerald-600 dark:text-emerald-400 hover:bg-gray-50 transition-all min-h-[42px]"
+          >
+            <FileText className="w-4 h-4 text-emerald-500" />
+            Report
           </button>
 
           {/* Add Subject */}
@@ -362,6 +374,14 @@ export const AttendanceScreen: React.FC = () => {
         courses={courses}
         profileThreshold={defaultThreshold}
       />
+
+      {/* Attendance Report Modal */}
+      {isReportOpen && (
+        <AttendanceReportModal
+          isOpen={isReportOpen}
+          onClose={() => setIsReportOpen(false)}
+        />
+      )}
     </PageContainer>
   );
 };
