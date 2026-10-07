@@ -201,3 +201,4 @@ export const CalendarEventModal: React.FC<CalendarEventModalProps> = ({
     </ResponsiveDialog>
   );
 };
+

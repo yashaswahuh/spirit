@@ -360,3 +360,4 @@ export const SlotModal: React.FC<SlotModalProps> = ({
     </ResponsiveDialog>
   );
 };
+

@@ -408,3 +408,4 @@ export function resolveDaySchedule(params: ResolveDayScheduleParams): DaySchedul
     total_periods: totalPeriods,
   };
 }
+

@@ -360,3 +360,4 @@ export const TermSettingsModal: React.FC<TermSettingsModalProps> = ({
     </ResponsiveDialog>
   );
 };
+

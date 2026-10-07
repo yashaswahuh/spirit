@@ -42,3 +42,4 @@ export async function updateTermSettings(
   await db.term.put(updated);
   return updated;
 }
+

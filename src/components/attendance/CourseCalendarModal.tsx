@@ -374,3 +374,4 @@ export const CourseCalendarModal: React.FC<CourseCalendarModalProps> = ({
     </ResponsiveDialog>
   );
 };
+

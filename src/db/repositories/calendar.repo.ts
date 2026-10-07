@@ -77,3 +77,4 @@ export async function bulkCreateHolidays(holidays: ParsedHoliday[]): Promise<Cal
   }
   return created;
 }
+

@@ -56,8 +56,22 @@
   - **Per-Subject Calendar & Term Heatmap (`CourseCalendarModal.tsx`)**: Monthly calendar matrix using icons and text indicators alongside colors (never color alone). Tapping any date opens a quick-log editor that recalculates statistics immediately. Includes chronological term attendance heatmap.
   - **Semester Attendance Projections**: Real-time projection strip on `CourseAttendanceCard.tsx` calculating best-case %, worst-case %, remaining scheduled classes count, and minimum classes needed to reach threshold based on timetable schedule to term end.
   - **What-If Attendance Planner (`WhatIfModal.tsx`)**: Three simulation modes: (1) Specific Dates to skip, (2) Recurring Weekday to skip until semester end, and (3) N Upcoming Consecutive Days. Shows exact percentage drops, safe bunks left, and must-attend warnings.
-  - **"Can I Skip Tomorrow?" Card (`CanISkipTomorrowCard.tsx`)**: Prominent card on Home dashboard answering yes/no/risky with next-day percentage forecasts and expandable per-course impacts.
   - **Engine & Testing**: Added unit tests for opening balances, slot weights, unmarked period counting, and `canISkipTomorrow` simulator. All 81 tests passing across 9 test files.
+
+### Schema Changes & Migration History (Dexie v1 -> v2)
+- **New Tables Added**:
+  - `timetable_version`: Stores semester timetable revisions (`id`, `user_id`, `term_id`, `name`, `effective_from`). Index: `&id, user_id, term_id, effective_from, updated_at, deleted_at`.
+  - `timetable_override`: Stores date-specific one-off adjustments (`id`, `user_id`, `term_id`, `date`, `action`, `original_slot_id`, `course_id`, `start_time`, `end_time`, `room`, `faculty`, `component_type`, `weight`, `note`). Index: `&id, user_id, term_id, date, course_id, updated_at, deleted_at`.
+- **Table Alterations & Data Preservation**:
+  - `timetable_slot`: Added `version_id` (nullable), `weight` (default 1), `period_name` (nullable). Existing rows backfilled via `Dexie.version(2).upgrade()` with `weight = 1`, `version_id = null`. Index updated to include `version_id`.
+  - `course`: Added opening balance fields `initial_attended`, `initial_conducted`, and `tracking_start_date`. Existing rows backfilled with defaults (`0`, `0`, `null`).
+  - `attendance_record`: Added `weight` (default 1) and `override_id` (nullable). Existing rows backfilled with `weight = 1`, `override_id = null`.
+  - `calendar_event`: Added `end_date` (for range holidays) and `swap_target_weekday` (for swap days). Existing rows backfilled with `null`.
+  - `term`: Added `working_days` (default `[1, 2, 3, 4, 5, 6]`) and `period_timings` (default `[]`). Existing rows preserved and backfilled.
+- **Specification & Type Synchronization**:
+  - `docs/SPEC.md` section 3 updated with all newly introduced entities and fields.
+  - `docs/types.ts` synced with `src/types/index.ts` containing strict TypeScript definitions.
+  - `src/db/schemas.ts` Zod validation schemas updated for all tables.
 
 ## Remaining
 - **Phase 4**: Per-Subject Calendar View & Past Attendance Logs Editing (integrated into Phase 3B; remaining deeper analytics and history export).

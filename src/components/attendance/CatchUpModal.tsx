@@ -254,3 +254,4 @@ export const CatchUpModal: React.FC<CatchUpModalProps> = ({
     </ResponsiveDialog>
   );
 };
+
