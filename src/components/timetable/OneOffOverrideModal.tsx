@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { Ban, RefreshCw, PlusCircle, MoveRight } from 'lucide-react';
-import { Course, TimetableOverride, OneOffOverrideAction, CourseType } from '../../types';
+import React, { useState, useMemo } from 'react';
+import { Ban, RefreshCw, PlusCircle, MoveRight, Clock, Check } from 'lucide-react';
+import { Course, TimetableOverride, OneOffOverrideAction, CourseType, PeriodTiming } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import { EffectiveSlot } from '../../engine/timetable';
+import { getPeriodTimings } from '../../utils/preferences';
 
 interface OneOffOverrideModalProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface OneOffOverrideModalProps {
   daySlots: EffectiveSlot[];
   courses: Course[];
   termId: string;
+  periodTimings?: PeriodTiming[];
   onSaveOverride: (data: Omit<TimetableOverride, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'deleted_at'>) => Promise<void>;
 }
 
@@ -21,6 +23,7 @@ export const OneOffOverrideModal: React.FC<OneOffOverrideModalProps> = ({
   daySlots,
   courses,
   termId,
+  periodTimings = [],
   onSaveOverride,
 }) => {
   const [action, setAction] = useState<OneOffOverrideAction>('cancel');
@@ -34,6 +37,25 @@ export const OneOffOverrideModal: React.FC<OneOffOverrideModalProps> = ({
   const [componentType, setComponentType] = useState<CourseType>('theory');
   const [note, setNote] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const effectivePeriodTimings = useMemo<PeriodTiming[]>(() => {
+    if (periodTimings && periodTimings.length > 0) {
+      return periodTimings;
+    }
+    const globalDefaults = getPeriodTimings();
+    return globalDefaults.map(p => ({
+      id: `p-${p.period}`,
+      name: p.name,
+      start_time: p.startTime,
+      end_time: p.endTime,
+      is_break: false,
+    }));
+  }, [periodTimings]);
+
+  const teachingPeriods = useMemo(
+    () => effectivePeriodTimings.filter(p => !p.is_break),
+    [effectivePeriodTimings]
+  );
 
   const selectedSlot = daySlots.find(s => s.slot_id === selectedSlotId);
 
@@ -256,30 +278,65 @@ export const OneOffOverrideModal: React.FC<OneOffOverrideModalProps> = ({
 
         {/* Reschedule or Extra Class Timings */}
         {(action === 'reschedule' || action === 'extra') && (
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
-                Start Time *
-              </label>
-              <input
-                type="time"
-                value={startTime}
-                onChange={e => setStartTime(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono text-sm"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
-                End Time *
-              </label>
-              <input
-                type="time"
-                value={endTime}
-                onChange={e => setEndTime(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono text-sm"
-                required
-              />
+          <div className="space-y-2">
+            {teachingPeriods.length > 0 && (
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1 flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-indigo-500" />
+                  Quick Period Timings:
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {teachingPeriods.map(p => {
+                    const isSelected = p.start_time === startTime;
+                    return (
+                      <button
+                        type="button"
+                        key={p.id}
+                        onClick={() => {
+                          setStartTime(p.start_time);
+                          setEndTime(p.end_time);
+                        }}
+                        className={`text-xs px-2.5 py-1 rounded-lg border transition-colors flex items-center gap-1 min-h-[36px] ${
+                          isSelected
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        <span className="font-bold">{p.name}</span>
+                        <span className="opacity-80 font-mono text-[11px]">({p.start_time})</span>
+                        {isSelected && <Check className="w-3 h-3 text-white" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  Start Time *
+                </label>
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={e => setStartTime(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono text-sm"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  End Time *
+                </label>
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={e => setEndTime(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono text-sm"
+                  required
+                />
+              </div>
             </div>
           </div>
         )}

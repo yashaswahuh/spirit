@@ -13,6 +13,7 @@ import {
   Weekday,
   CourseType,
   SaturdayRule,
+  PeriodTiming,
 } from '../types';
 
 /**
@@ -452,5 +453,58 @@ export function resolveDaySchedule(params: ResolveDayScheduleParams): DaySchedul
     slots: effectiveSlots,
     total_periods: totalPeriods,
   };
+}
+
+/**
+ * Computes slot end time given a starting period timing, slot weight (periods it spans),
+ * and an optional list of ordered teaching period timings.
+ * If weight is 1, returns starting timing's end_time.
+ * If weight >= 2, looks up the end time of the (startIdx + weight - 1)th period if available,
+ * or calculates duration based on period length.
+ */
+export function calculateEndTimeForPeriod(
+  startTiming: PeriodTiming,
+  weight: number = 1,
+  teachingPeriods: PeriodTiming[] = []
+): string {
+  if (weight <= 1) return startTiming.end_time;
+
+  const startIdx = teachingPeriods.findIndex(p => p.start_time === startTiming.start_time);
+  if (startIdx !== -1 && startIdx + weight - 1 < teachingPeriods.length) {
+    return teachingPeriods[startIdx + weight - 1].end_time;
+  }
+
+  const startM = timeToMinutes(startTiming.start_time);
+  const endM = timeToMinutes(startTiming.end_time);
+  const singleDuration = Math.max(40, endM - startM);
+  const totalM = startM + singleDuration * weight;
+  const h = Math.floor(totalM / 60) % 24;
+  const m = totalM % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/**
+ * Finds the next available period timing for a given day from the provided teaching periods,
+ * avoiding already scheduled slots.
+ */
+export function findNextAvailablePeriodTiming(
+  daySlots: Array<{ start_time: string; end_time: string; id?: string }>,
+  teachingPeriods: PeriodTiming[],
+  ignoreSlotId?: string | null
+): PeriodTiming | null {
+  if (teachingPeriods.length === 0) return null;
+
+  const unscheduled = teachingPeriods.find(p => {
+    const pStart = timeToMinutes(p.start_time);
+    const pEnd = timeToMinutes(p.end_time);
+    return !daySlots.some(s => {
+      if (ignoreSlotId && s.id === ignoreSlotId) return false;
+      const sStart = timeToMinutes(s.start_time);
+      const sEnd = timeToMinutes(s.end_time);
+      return pStart < sEnd && pEnd > sStart;
+    });
+  });
+
+  return unscheduled || teachingPeriods[0];
 }
 

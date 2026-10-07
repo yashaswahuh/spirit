@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, Trash2, Calendar, Clock, Sliders } from 'lucide-react';
 import { Term, Course, Weekday, PeriodTiming, SaturdayRule } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
+import { setPeriodTimings as setGlobalPeriodTimings, PeriodTimingConfig } from '../../utils/preferences';
 
 interface TermSettingsModalProps {
   isOpen: boolean;
@@ -99,6 +100,19 @@ export const TermSettingsModal: React.FC<TermSettingsModalProps> = ({
         period_timings: periodTimings,
         saturday_rule: saturdayRule,
       });
+
+      // Sync non-break teaching periods to preferences
+      const configTimings: PeriodTimingConfig[] = periodTimings
+        .filter(p => !p.is_break)
+        .map((p, idx) => ({
+          period: idx + 1,
+          name: p.name,
+          startTime: p.start_time,
+          endTime: p.end_time,
+        }));
+      if (configTimings.length > 0) {
+        setGlobalPeriodTimings(configTimings);
+      }
 
       // Update per-course threshold overrides
       for (const [courseId, thresh] of Object.entries(courseThresholds)) {

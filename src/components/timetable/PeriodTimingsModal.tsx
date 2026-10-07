@@ -7,6 +7,8 @@ import {
   setPeriodTimings,
   DEFAULT_PERIOD_TIMINGS,
 } from '../../utils/preferences';
+import { db } from '../../db/dexie';
+import { PeriodTiming } from '../../types';
 
 interface PeriodTimingsModalProps {
   isOpen: boolean;
@@ -47,9 +49,29 @@ export const PeriodTimingsModal: React.FC<PeriodTimingsModalProps> = ({
     setTimings(DEFAULT_PERIOD_TIMINGS);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setPeriodTimings(timings);
+
+    try {
+      const activeTerm = await db.term.filter(t => t.deleted_at === null && t.status === 'ongoing').first();
+      if (activeTerm) {
+        const convertedTimings: PeriodTiming[] = timings.map(t => ({
+          id: `p-${t.period}`,
+          name: t.name,
+          start_time: t.startTime,
+          end_time: t.endTime,
+          is_break: false,
+        }));
+        await db.term.update(activeTerm.id, {
+          period_timings: convertedTimings,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    } catch (err) {
+      console.error('Failed to sync period timings to active term', err);
+    }
+
     setSaved(true);
     setTimeout(() => {
       setSaved(false);

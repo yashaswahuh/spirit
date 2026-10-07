@@ -679,6 +679,7 @@ export const TimetableScreen: React.FC = () => {
         }))}
         courses={courses}
         termId={term?.id || ''}
+        periodTimings={term?.period_timings}
         onSaveOverride={async data => {
           await createTimetableOverride(data);
         }}

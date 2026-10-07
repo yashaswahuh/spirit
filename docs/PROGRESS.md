@@ -164,6 +164,14 @@
   - **Smart Timetable Auto-Detection & Merging**:
     - `timetableParser.ts`: Upgraded parser to detect theory lectures and practical lab sessions with the same base name or code (e.g., "Data Structures" and "Data Structures Lab" or "CS201" and "CS201L"), automatically unifying them under a single `theory_and_lab` course instead of generating duplicate subjects.
   - **Unit Tests**: Added unit tests in `src/engine/__tests__/attendance.test.ts` and `src/utils/__tests__/timetableParser.test.ts` verifying breakdown calculations and file upload grouping. 140 passing tests across 15 test files.
+- **Period Timings Auto-Sync & Quick Timings Flow**:
+  - **Auto-Sync to Next Available Period**: In `SlotModal.tsx`, opening the modal automatically calculates existing slots on the active weekday and auto-fills the start time, end time, and period name of the next unscheduled period. Switching weekdays inside the modal immediately re-syncs to the next free period on that new day.
+  - **Quick Timings Bell Schedule Grid**: Rendered responsive 1-tap period cards showing period name, timing, and `In use` status badges, with active highlights and checkmarks.
+  - **Multi-Period Lab Span Calculation**: Implemented `calculateEndTimeForPeriod` in `timetable.ts` to automatically extend end times across consecutive periods when weight is 2 or 3 (e.g. 2-hour labs).
+  - **Manual Entry On-Demand**: Custom time input fields tucked under an accessible toggle (`Need custom times? Edit start/end manually`) with a quick "Reset to Period" button, ensuring manual entry is only needed for non-standard times.
+  - **One-Off Date Overrides Integration**: Added Quick Timings selection to `OneOffOverrideModal.tsx` for rescheduling and extra classes.
+  - **Bidirectional Period Timings Storage Sync**: Synced period timings edits between `PeriodTimingsModal.tsx` (More screen), active term in Dexie (`Term.period_timings`), and global preferences (`preferences.ts`).
+  - **Engine Unit Tests**: Added pure engine tests for `calculateEndTimeForPeriod` and `findNextAvailablePeriodTiming` in `src/engine/__tests__/timetable.test.ts`. All 147 tests passing across 15 test files.
 
 ### Schema Changes & Migration History (Dexie v3 -> v4)
 - **New Columns Added**:

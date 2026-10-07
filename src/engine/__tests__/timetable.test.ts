@@ -7,12 +7,15 @@ import {
   resolveDaySchedule,
   timeToMinutes,
   isSaturdayOff,
+  calculateEndTimeForPeriod,
+  findNextAvailablePeriodTiming,
 } from '../timetable';
 import {
   TimetableSlot,
   TimetableVersion,
   TimetableOverride,
   CalendarEvent,
+  PeriodTiming,
 } from '../../types';
 
 describe('Timetable Engine Unit Tests', () => {
@@ -582,6 +585,70 @@ describe('Timetable Engine Unit Tests', () => {
         expect(result1stSat.is_holiday).toBe(false);
         expect(result1stSat.is_working_day).toBe(true);
         expect(result1stSat.slots).toHaveLength(1);
+      });
+    });
+
+    describe('calculateEndTimeForPeriod', () => {
+      const sampleTimings: PeriodTiming[] = [
+        { id: 'p1', name: 'Period 1', start_time: '09:00', end_time: '09:55', is_break: false },
+        { id: 'p2', name: 'Period 2', start_time: '10:00', end_time: '10:55', is_break: false },
+        { id: 'p3', name: 'Period 3', start_time: '11:15', end_time: '12:10', is_break: false },
+      ];
+
+      it('returns original end_time for weight 1', () => {
+        expect(calculateEndTimeForPeriod(sampleTimings[0], 1, sampleTimings)).toBe('09:55');
+      });
+
+      it('spans across to the end time of the subsequent period timing for weight 2 (e.g. 2-period lab)', () => {
+        // Period 1 (09:00 - 09:55) with weight 2 reaches end of Period 2 (10:55)
+        expect(calculateEndTimeForPeriod(sampleTimings[0], 2, sampleTimings)).toBe('10:55');
+      });
+
+      it('computes proportional duration if next period is beyond the predefined list', () => {
+        // Period 3 (11:15 - 12:10) with weight 2: single duration is 55 mins -> 11:15 + 110m = 13:05
+        expect(calculateEndTimeForPeriod(sampleTimings[2], 2, sampleTimings)).toBe('13:05');
+      });
+    });
+
+    describe('findNextAvailablePeriodTiming', () => {
+      const sampleTimings: PeriodTiming[] = [
+        { id: 'p1', name: 'Period 1', start_time: '09:00', end_time: '09:55', is_break: false },
+        { id: 'p2', name: 'Period 2', start_time: '10:00', end_time: '10:55', is_break: false },
+        { id: 'p3', name: 'Period 3', start_time: '11:15', end_time: '12:10', is_break: false },
+      ];
+
+      it('returns Period 1 when no slots are scheduled yet on that day', () => {
+        const next = findNextAvailablePeriodTiming([], sampleTimings);
+        expect(next?.name).toBe('Period 1');
+        expect(next?.start_time).toBe('09:00');
+      });
+
+      it('automatically skips already scheduled slots and picks Period 2', () => {
+        const scheduledSlots = [
+          { id: 's1', start_time: '09:00', end_time: '09:55' },
+        ];
+        const next = findNextAvailablePeriodTiming(scheduledSlots, sampleTimings);
+        expect(next?.name).toBe('Period 2');
+        expect(next?.start_time).toBe('10:00');
+      });
+
+      it('automatically skips Period 1 and Period 2 and picks Period 3', () => {
+        const scheduledSlots = [
+          { id: 's1', start_time: '09:00', end_time: '09:55' },
+          { id: 's2', start_time: '10:00', end_time: '10:55' },
+        ];
+        const next = findNextAvailablePeriodTiming(scheduledSlots, sampleTimings);
+        expect(next?.name).toBe('Period 3');
+        expect(next?.start_time).toBe('11:15');
+      });
+
+      it('ignores the slot currently being edited when matching availability', () => {
+        const scheduledSlots = [
+          { id: 'editing-slot-1', start_time: '09:00', end_time: '09:55' },
+        ];
+        // When editing editing-slot-1, Period 1 should be treated as available
+        const next = findNextAvailablePeriodTiming(scheduledSlots, sampleTimings, 'editing-slot-1');
+        expect(next?.name).toBe('Period 1');
       });
     });
   });

@@ -148,6 +148,11 @@ The **Timetable** tab provides a complete view of your weekly routine:
 1. Tap **Settings (Gear Icon)** &rarr; **Period Timings** or visit `MoreScreen`.
 2. Define period names, start times, and end times.
 3. Mark break intervals and lunch periods.
+4. **Smart Quick Timings Sync**:
+   - When tapping **Add Slot**, Spirit checks existing classes on that day and **automatically pre-selects the next unscheduled period** (e.g., auto-filling Period 2 if Period 1 is already in use). You never need to type times manually unless your college holds a class at an unusual time!
+   - 1-tap Quick Timings grid allows selecting any standard period instantly.
+   - For multi-period labs (2 or 3 periods), end times automatically extend across consecutive periods.
+   - Manual start and end time inputs remain accessible anytime via a quick toggle.
 
 ### One-Off Date Overrides
 Need to change the schedule for a single date without permanently modifying your weekly routine?
