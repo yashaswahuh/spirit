@@ -5,10 +5,12 @@ on:
     branches:
       - main
       - master
+      - phase-6
   pull_request:
     branches:
       - main
       - master
+      - phase-6
   workflow_dispatch:
     inputs:
       base_path:
@@ -62,7 +64,7 @@ jobs:
           retention-days: 14
 
       - name: Upload GitHub Pages artifact
-        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch') && github.event_name != 'pull_request'
+        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/phase-6' || github.event_name == 'workflow_dispatch') && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
           path: './dist'
@@ -70,7 +72,7 @@ jobs:
   deploy:
     name: Deploy via GitHub Actions
     needs: build
-    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch') && github.event_name != 'pull_request'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/phase-6' || github.event_name == 'workflow_dispatch') && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
