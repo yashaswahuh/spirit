@@ -8,6 +8,7 @@ import { z } from 'zod';
 export const baseEntitySchema = z.object({
   id: z.string().uuid(),
   user_id: z.string().min(1).optional().default('00000000-0000-0000-0000-000000000001'),
+  is_demo: z.boolean().default(false).optional(),
   created_at: z.string().datetime({ offset: true }),
   updated_at: z.string().datetime({ offset: true }),
   deleted_at: z.string().datetime({ offset: true }).nullable(),

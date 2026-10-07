@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db/dexie';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { PwaReloadPrompt } from './components/common/PwaReloadPrompt';
 import { AppShell } from './components/layout/AppShell';
 import { NavTab } from './components/layout/BottomNav';
 import { OnboardingWizard } from './components/onboarding/OnboardingWizard';
@@ -106,9 +108,12 @@ const MainApp: React.FC = () => {
 
 export const App: React.FC = () => {
   return (
-    <HashRouter>
-      <MainApp />
-    </HashRouter>
+    <ErrorBoundary>
+      <HashRouter>
+        <MainApp />
+        <PwaReloadPrompt />
+      </HashRouter>
+    </ErrorBoundary>
   );
 };
 

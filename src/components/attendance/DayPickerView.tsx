@@ -19,7 +19,7 @@ import { db } from '../../db/dexie';
 import { AttendanceStatus, Course, AttendanceRecord } from '../../types';
 import { resolveDaySchedule, DayScheduleResolution } from '../../engine/timetable';
 import { markAttendance, deleteAttendanceRecord } from '../../db/repositories/attendance.repo';
-import { createCalendarEvent } from '../../db/repositories/calendar.repo';
+import { createCalendarEvent, revertHolidayForDate } from '../../db/repositories/calendar.repo';
 
 interface DayPickerViewProps {
   onRecordChanged?: () => void;
@@ -199,6 +199,22 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
     onRecordChanged?.();
   };
 
+  const handleRevertHoliday = async () => {
+    const success = await revertHolidayForDate(selectedDate);
+    if (success) {
+      onRecordChanged?.();
+      setLastAction({
+        recordId: 'holiday-revert',
+        previousStatus: 'holiday',
+        courseId: '',
+        date: selectedDate,
+        slotId: null,
+        courseName: 'Holiday',
+        statusLabel: 'Reverted holiday. Regular timetable restored!',
+      });
+    }
+  };
+
   const isToday = selectedDate === new Date().toISOString().slice(0, 10);
 
   return (
@@ -248,10 +264,21 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
         {/* Day Status Pill */}
         <div className="flex items-center gap-2 flex-wrap">
           {daySchedule.is_holiday ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 text-xs font-bold">
-              <Sun className="w-3.5 h-3.5" />
-              {daySchedule.holiday_note || 'Holiday'} (No classes conducted)
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 text-xs font-bold">
+                <Sun className="w-3.5 h-3.5" />
+                {daySchedule.holiday_note || 'Holiday'} (No classes)
+              </span>
+              <button
+                type="button"
+                onClick={handleRevertHoliday}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl border border-rose-200 dark:border-rose-900 bg-white dark:bg-gray-800 text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/50 text-xs font-semibold transition-colors min-h-[30px]"
+                title="Revert holiday if marked by mistake"
+              >
+                <RotateCcw className="w-3 h-3" />
+                Revert
+              </button>
+            </div>
           ) : daySchedule.is_swap_day ? (
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 text-xs font-bold">
               Swap Day (Following Day {daySchedule.effective_weekday} schedule)
@@ -320,6 +347,16 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
             <p className="text-xs text-gray-500 dark:text-gray-400">
               No classes are conducted on holidays. They are excluded from your attendance denominator.
             </p>
+            <div className="pt-3">
+              <button
+                type="button"
+                onClick={handleRevertHoliday}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-700 dark:text-rose-300 font-bold text-xs transition-colors min-h-[38px] shadow-xs"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Marked by mistake? Revert Holiday & Restore Classes
+              </button>
+            </div>
           </div>
         ) : daySchedule.slots.length === 0 ? (
           <div className="p-12 text-center bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 text-sm text-gray-500">

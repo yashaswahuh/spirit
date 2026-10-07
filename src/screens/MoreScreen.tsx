@@ -18,7 +18,7 @@ import {
   Save,
 } from 'lucide-react';
 import { db } from '../db/dexie';
-import { seedDemoData } from '../db/repositories/setup.repo';
+import { seedDemoData, hasDemoData, clearDemoData, resetDatabase } from '../db/repositories/setup.repo';
 import { PageContainer } from '../components/layout/PageContainer';
 import { TasksTrackerModal } from '../components/tasks/TasksTrackerModal';
 import { BackupModal } from '../components/safety/BackupModal';
@@ -70,6 +70,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
 
   const lastBackupAt = getLastBackupTimestamp();
   const changesCount = getChangesSinceBackup();
+  const isDemoMode = useLiveQuery(() => hasDemoData()) ?? false;
 
   useEffect(() => {
     checkPersistentStorage().then(setIsPersisted);
@@ -98,8 +99,21 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   };
 
   const handleSeedDemo = async () => {
-    if (confirm('Load demo semester data? This will add sample subjects and attendance logs.')) {
+    if (confirm('Load demo semester data? This will add sample subjects and attendance logs tagged as demo data.')) {
       await seedDemoData();
+    }
+  };
+
+  const handleClearDemo = async () => {
+    if (confirm('Clear all demo data? This will remove sample subjects and demo attendance records.')) {
+      await clearDemoData();
+    }
+  };
+
+  const handleResetApp = async () => {
+    if (confirm('RESET ENTIRE APP? This will permanently wipe all local database tables and restart onboarding.')) {
+      await resetDatabase();
+      onResetApp();
     }
   };
 
@@ -374,19 +388,35 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
               Data Tools
             </h3>
             <div className="space-y-2.5">
-              <button
-                onClick={handleSeedDemo}
-                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold text-xs sm:text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors min-h-[44px]"
-              >
-                <Sparkles className="w-4 h-4 text-indigo-500" />
-                Load Sample Demo Semester Data
-              </button>
+              {isDemoMode ? (
+                <button
+                  onClick={handleClearDemo}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-200 font-semibold text-xs sm:text-sm hover:bg-amber-100/60 dark:hover:bg-amber-900/50 transition-colors min-h-[44px]"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-600" />
+                  Clear Demo Data (Keep Real Data)
+                </button>
+              ) : (
+                <button
+                  onClick={handleSeedDemo}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold text-xs sm:text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors min-h-[44px]"
+                >
+                  <Sparkles className="w-4 h-4 text-indigo-500" />
+                  Load Sample Demo Semester Data
+                </button>
+              )}
               <button
                 onClick={() => setIsDeleteOpen(true)}
                 className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50/40 dark:bg-red-950/20 text-red-600 dark:text-red-400 font-semibold text-xs sm:text-sm hover:bg-red-100/60 transition-colors min-h-[44px]"
               >
                 <Trash2 className="w-4 h-4" />
-                Delete All My Data
+                Delete All My Data (Typed Confirm)
+              </button>
+              <button
+                onClick={handleResetApp}
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-800 text-gray-500 dark:text-gray-400 text-xs hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              >
+                Reset App & Restart Setup
               </button>
             </div>
           </div>

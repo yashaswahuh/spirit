@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { AlertTriangle, CheckCircle2, ShieldCheck, ArrowRight, BookOpen, Clock, CalendarCheck } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ShieldCheck, ArrowRight, BookOpen, Clock, CalendarCheck, Sparkles } from 'lucide-react';
 import { db } from '../db/dexie';
 import type { TimetableSlot, Course } from '../types';
 import { computeCourseAttendanceStats, countUnmarkedClasses } from '../engine/attendance';
 import { canISkipTomorrow } from '../engine/whatif';
 import { getTodayTimetableSlots } from '../db/repositories/timetable.repo';
 import { markAttendance } from '../db/repositories/attendance.repo';
+import { hasDemoData, clearDemoData, seedDemoData } from '../db/repositories/setup.repo';
 import { TodayClassesSection } from '../components/home/TodayClassesSection';
 import { CanISkipTomorrowCard } from '../components/home/CanISkipTomorrowCard';
 import { UpcomingTasksWidget } from '../components/home/UpcomingTasksWidget';
@@ -14,6 +15,7 @@ import { CatchUpModal } from '../components/attendance/CatchUpModal';
 import { WhatIfModal } from '../components/attendance/WhatIfModal';
 import { BackupReminderBanner } from '../components/safety/BackupReminderBanner';
 import { BackupModal } from '../components/safety/BackupModal';
+import { EmptyState } from '../components/common/EmptyState';
 import { PageContainer } from '../components/layout/PageContainer';
 
 interface HomeScreenProps {
@@ -29,6 +31,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
   const versions = useLiveQuery(() => db.timetable_version.filter(v => v.deleted_at === null).toArray()) || [];
   const overrides = useLiveQuery(() => db.timetable_override.filter(o => o.deleted_at === null).toArray()) || [];
   const calendarEvents = useLiveQuery(() => db.calendar_event.filter(e => e.deleted_at === null).toArray()) || [];
+  const isDemoMode = useLiveQuery(() => hasDemoData()) ?? false;
+  const [clearingDemo, setClearingDemo] = useState(false);
 
   // Modals state
   const [isCatchUpOpen, setIsCatchUpOpen] = useState(false);
@@ -136,6 +140,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
     });
   };
 
+  const handleClearDemo = async () => {
+    if (window.confirm('Clear all demo data? This will reset demo courses, timetable, and attendance records.')) {
+      setClearingDemo(true);
+      try {
+        await clearDemoData();
+      } catch (err) {
+        console.error('Failed to clear demo data', err);
+      } finally {
+        setClearingDemo(false);
+      }
+    }
+  };
+
   const formattedDate = new Date().toLocaleDateString('en-IN', {
     weekday: 'long',
     month: 'short',
@@ -162,6 +179,33 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
           </span>
         </div>
       </div>
+
+      {/* Demo Mode Banner (Dismissible / Actionable) */}
+      {isDemoMode && (
+        <div className="p-3.5 sm:p-4 bg-indigo-50 dark:bg-indigo-950/50 rounded-3xl border border-indigo-200 dark:border-indigo-800 flex items-center justify-between gap-3 shadow-sm animate-fade-in">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-2xl bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-xs sm:text-sm font-bold text-indigo-900 dark:text-indigo-200 truncate">
+                Demo Mode Active
+              </h4>
+              <p className="text-[11px] sm:text-xs text-indigo-700 dark:text-indigo-300 truncate">
+                Sample semester data is loaded. Real data never mixes silently with demo data.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleClearDemo}
+            disabled={clearingDemo}
+            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex-shrink-0 min-h-[36px]"
+          >
+            {clearingDemo ? 'Clearing...' : 'Clear Demo'}
+          </button>
+        </div>
+      )}
 
       {/* Backup Reminder Banner (Dismissible) */}
       <BackupReminderBanner onOpenBackup={() => setIsBackupOpen(true)} />
@@ -192,8 +236,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
         </div>
       )}
 
-      {/* Multi-column layout on Desktop (lg:grid-cols-12), single column on Mobile */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {courses.length === 0 ? (
+        <EmptyState
+          icon={BookOpen}
+          title="No subjects registered"
+          description="You don't have any subjects registered yet for this term. Add subjects in the Attendance tab or load sample data to explore."
+          actionText="Load Sample Data"
+          onAction={async () => { await seedDemoData(); }}
+        />
+      ) : (
+        /* Multi-column layout on Desktop (lg:grid-cols-12), single column on Mobile */
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left / Primary Column: Hero Card, Can I Skip Tomorrow & Today's Schedule */}
         <div className="lg:col-span-7 xl:col-span-7 space-y-6">
           {/* Can I Skip Tomorrow Card */}
@@ -357,6 +410,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
           </div>
         </div>
       </div>
+      )}
 
       {/* Catch-Up Modal */}
       <CatchUpModal

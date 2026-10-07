@@ -13,6 +13,7 @@
 export interface BaseEntity {
   id: string; // Client-generated UUID (v4)
   user_id: string; // Supabase auth user UUID or local default user ID
+  is_demo?: boolean; // True if this entity was generated as demo data
   created_at: string; // ISO 8601 string
   updated_at: string; // ISO 8601 string
   deleted_at: string | null; // ISO 8601 string, null if active, set if soft-deleted

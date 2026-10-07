@@ -66,7 +66,7 @@ export async function getActiveTerm(): Promise<Term | undefined> {
 /**
  * Saves initial onboarding configuration atomically.
  */
-export async function saveOnboardingSetup(data: OnboardingData): Promise<void> {
+export async function saveOnboardingSetup(data: OnboardingData, isDemo = false): Promise<void> {
   const now = new Date().toISOString();
 
   // 1. Create or use grading scheme
@@ -74,6 +74,7 @@ export async function saveOnboardingSetup(data: OnboardingData): Promise<void> {
   const gradingScheme: GradingScheme = {
     id: gradingSchemeId,
     user_id: LOCAL_USER_ID,
+    is_demo: isDemo,
     name: UGC_10_POINT_SCHEME.name,
     is_preset: true,
     scheme_data: UGC_10_POINT_SCHEME.data,
@@ -88,6 +89,7 @@ export async function saveOnboardingSetup(data: OnboardingData): Promise<void> {
   const profile: Profile = {
     id: profileId,
     user_id: LOCAL_USER_ID,
+    is_demo: isDemo,
     name: data.userName.trim() || 'Student',
     region: 'IN',
     theme: 'system',
@@ -104,6 +106,7 @@ export async function saveOnboardingSetup(data: OnboardingData): Promise<void> {
   const program: Program = {
     id: programId,
     user_id: LOCAL_USER_ID,
+    is_demo: isDemo,
     degree_type: data.degreeType as any,
     branch_department: data.branchName.trim() || 'Engineering',
     start_year: data.startYear,
@@ -132,6 +135,7 @@ export async function saveOnboardingSetup(data: OnboardingData): Promise<void> {
     id: termId,
     user_id: LOCAL_USER_ID,
     program_id: programId,
+    is_demo: isDemo,
     number: data.termNumber,
     name: data.termName,
     start_date: data.startDate,
@@ -153,6 +157,7 @@ export async function saveOnboardingSetup(data: OnboardingData): Promise<void> {
     id: initialVersionId,
     user_id: LOCAL_USER_ID,
     term_id: termId,
+    is_demo: isDemo,
     name: 'Initial Timetable',
     effective_from: data.startDate,
     created_at: now,
@@ -167,6 +172,7 @@ export async function saveOnboardingSetup(data: OnboardingData): Promise<void> {
       id: generateUUID(),
       user_id: LOCAL_USER_ID,
       term_id: termId,
+      is_demo: isDemo,
       name: c.name,
       code: c.code,
       credits: c.credits,
@@ -198,6 +204,7 @@ export async function saveOnboardingSetup(data: OnboardingData): Promise<void> {
           user_id: LOCAL_USER_ID,
           course_id: targetCourse.id,
           version_id: initialVersionId,
+          is_demo: isDemo,
           weekday: s.weekday,
           start_time: s.startTime,
           end_time: s.endTime,
@@ -229,6 +236,7 @@ export async function saveOnboardingSetup(data: OnboardingData): Promise<void> {
 
 /**
  * Creates a rich demo setup so the app is instantly usable for testing.
+ * All demo records are marked with is_demo: true so they never mix silently with real data.
  */
 export async function seedDemoData(): Promise<void> {
   const currentYear = new Date().getFullYear();
@@ -278,10 +286,10 @@ export async function seedDemoData(): Promise<void> {
     ],
   };
 
-  await saveOnboardingSetup(demoData);
+  await saveOnboardingSetup(demoData, true);
 
-  // Seed sample past attendance records so cards immediately show realistic calculations
-  const courses = await db.course.filter(c => c.deleted_at === null).toArray();
+  // Seed sample past attendance records marked as is_demo: true
+  const courses = await db.course.filter(c => c.deleted_at === null && c.is_demo === true).toArray();
   const recordsToInsert: any[] = [];
   const now = new Date().toISOString();
 
@@ -292,6 +300,7 @@ export async function seedDemoData(): Promise<void> {
       recordsToInsert.push({
         id: generateUUID(),
         user_id: LOCAL_USER_ID,
+        is_demo: true,
         course_id: courses[0].id,
         date: `2026-09-${dayStr}`,
         slot_id: null,
@@ -311,6 +320,7 @@ export async function seedDemoData(): Promise<void> {
       recordsToInsert.push({
         id: generateUUID(),
         user_id: LOCAL_USER_ID,
+        is_demo: true,
         course_id: courses[1].id,
         date: `2026-09-${dayStr}`,
         slot_id: null,
@@ -330,6 +340,7 @@ export async function seedDemoData(): Promise<void> {
       recordsToInsert.push({
         id: generateUUID(),
         user_id: LOCAL_USER_ID,
+        is_demo: true,
         course_id: courses[2].id,
         date: `2026-09-${dayStr}`,
         slot_id: null,
@@ -345,6 +356,73 @@ export async function seedDemoData(): Promise<void> {
   if (recordsToInsert.length > 0) {
     await db.attendance_record.bulkPut(recordsToInsert);
   }
+
+  try {
+    localStorage.setItem('spirit_demo_mode', 'true');
+  } catch {
+    // Ignore
+  }
+}
+
+/**
+ * Checks if demo data is currently loaded in the system.
+ */
+export async function hasDemoData(): Promise<boolean> {
+  try {
+    const demoCourses = await db.course.filter(c => c.is_demo === true && c.deleted_at === null).count();
+    if (demoCourses > 0) return true;
+    const profile = await db.profile.filter(p => p.is_demo === true && p.deleted_at === null).first();
+    if (profile) return true;
+    return localStorage.getItem('spirit_demo_mode') === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Clears demo data without deleting any user-created real data.
+ * If the profile itself is demo, resets the app entirely.
+ */
+export async function clearDemoData(): Promise<{ clearedCount: number; resetApp: boolean }> {
+  const profile = await db.profile.filter(p => p.deleted_at === null).first();
+  const isProfileDemo = profile?.is_demo === true;
+
+  try {
+    localStorage.removeItem('spirit_demo_mode');
+  } catch {
+    // Ignore
+  }
+
+  if (isProfileDemo) {
+    await resetDatabase();
+    return { clearedCount: 1, resetApp: true };
+  }
+
+  let clearedCount = 0;
+  const tables = [
+    db.course,
+    db.attendance_record,
+    db.timetable_slot,
+    db.timetable_version,
+    db.timetable_override,
+    db.calendar_event,
+    db.assessment_component,
+    db.mark,
+    db.grade_result,
+    db.task,
+  ];
+
+  await db.transaction('rw', tables, async () => {
+    for (const table of tables) {
+      const demoItems = await table.filter(item => item.is_demo === true).toArray();
+      clearedCount += demoItems.length;
+      if (demoItems.length > 0) {
+        await table.bulkDelete(demoItems.map(item => item.id));
+      }
+    }
+  });
+
+  return { clearedCount, resetApp: false };
 }
 
 /**
@@ -367,4 +445,11 @@ export async function resetDatabase(): Promise<void> {
     db.grade_result.clear(),
     db.task.clear(),
   ]);
+
+  try {
+    localStorage.removeItem('spirit_demo_mode');
+  } catch {
+    // Ignore
+  }
 }
+

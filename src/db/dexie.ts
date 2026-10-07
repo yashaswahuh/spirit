@@ -128,6 +128,48 @@ export class SpiritDatabase extends Dexie {
         if (gr.term_id === undefined) gr.term_id = null;
       });
     });
+
+    this.version(4).stores({
+      profile: '&id, user_id, is_demo, updated_at, deleted_at',
+      grading_scheme: '&id, user_id, is_demo, updated_at, deleted_at',
+      program: '&id, user_id, grading_scheme_id, is_demo, updated_at, deleted_at',
+      term: '&id, user_id, program_id, status, is_demo, updated_at, deleted_at',
+      course: '&id, user_id, term_id, is_demo, updated_at, deleted_at',
+      timetable_version: '&id, user_id, term_id, effective_from, is_demo, updated_at, deleted_at',
+      timetable_slot: '&id, user_id, version_id, course_id, weekday, is_demo, updated_at, deleted_at',
+      timetable_override: '&id, user_id, term_id, date, course_id, is_demo, updated_at, deleted_at',
+      calendar_event: '&id, user_id, date, is_demo, updated_at, deleted_at',
+      attendance_record: '&id, user_id, course_id, date, slot_id, [course_id+date], is_demo, updated_at, deleted_at',
+      assessment_component: '&id, user_id, course_id, is_end_sem, is_demo, updated_at, deleted_at',
+      mark: '&id, user_id, component_id, status, is_demo, updated_at, deleted_at',
+      grade_result: '&id, user_id, course_id, term_id, attempt_number, [course_id+attempt_number], is_demo, updated_at, deleted_at',
+      task: '&id, user_id, course_id, due_at, done, is_demo, updated_at, deleted_at',
+    }).upgrade(async tx => {
+      // Safe upgrade: backfill is_demo: false on all existing records so user data is never lost or modified
+      const tableNames = [
+        'profile',
+        'grading_scheme',
+        'program',
+        'term',
+        'course',
+        'timetable_version',
+        'timetable_slot',
+        'timetable_override',
+        'calendar_event',
+        'attendance_record',
+        'assessment_component',
+        'mark',
+        'grade_result',
+        'task',
+      ];
+      for (const tName of tableNames) {
+        await tx.table(tName).toCollection().modify((record: any) => {
+          if (record.is_demo === undefined) {
+            record.is_demo = false;
+          }
+        });
+      }
+    });
   }
 }
 

@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 
+import { subscribePwaInstall, promptPwaInstall } from '../../utils/pwa';
+
 interface InstallGuidanceModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -20,11 +22,12 @@ interface InstallGuidanceModalProps {
 export const InstallGuidanceModal: React.FC<InstallGuidanceModalProps> = ({
   isOpen,
   onClose,
-  deferredPrompt,
-  onPromptInstall,
+  deferredPrompt: propDeferredPrompt,
+  onPromptInstall: propOnPromptInstall,
 }) => {
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
+  const [canInstallNative, setCanInstallNative] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -39,7 +42,23 @@ export const InstallGuidanceModal: React.FC<InstallGuidanceModalProps> = ({
         (window.navigator as any).standalone === true;
       setIsStandalone(standalone);
     }
+
+    const unsubscribe = subscribePwaInstall((canInstall) => {
+      setCanInstallNative(canInstall);
+    });
+    return unsubscribe;
   }, []);
+
+  const handleInstallClick = async () => {
+    if (propOnPromptInstall) {
+      propOnPromptInstall();
+      return;
+    }
+    const success = await promptPwaInstall();
+    if (success) {
+      onClose();
+    }
+  };
 
   return (
     <ResponsiveDialog
@@ -60,7 +79,7 @@ export const InstallGuidanceModal: React.FC<InstallGuidanceModalProps> = ({
               </span>
             </div>
           </div>
-        ) : deferredPrompt ? (
+        ) : (canInstallNative || propDeferredPrompt) ? (
           /* Browser supports native prompt */
           <div className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 flex flex-col sm:flex-row items-center justify-between gap-3">
             <div>
@@ -72,7 +91,7 @@ export const InstallGuidanceModal: React.FC<InstallGuidanceModalProps> = ({
               </span>
             </div>
             <button
-              onClick={onPromptInstall}
+              onClick={handleInstallClick}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs sm:text-sm transition-colors shadow-sm min-h-[44px]"
             >
               <Download className="w-4 h-4" />
