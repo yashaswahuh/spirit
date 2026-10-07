@@ -89,7 +89,7 @@ Spirit uses route-level and component-level code splitting to guarantee instant 
 ### Installation & Development
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/spirit.git
+git clone https://github.com/yashaswahuh/spirit.git
 cd spirit
 
 # Install dependencies
@@ -107,12 +107,28 @@ npm run build
 
 ---
 
-## 🚢 Deployment
+## 🚢 Deployment via GitHub Actions
 
-Spirit includes a GitHub Actions CI/CD workflow (`.github/workflows/deploy.yml`):
-- Runs unit tests and axe accessibility audits on push and pull requests to `main`.
-- Compiles production assets with configurable base path via `VITE_BASE_PATH` (defaults to `/spirit/`).
-- Deploys the static PWA automatically to GitHub Pages via `actions/deploy-pages`.
+Spirit includes a fully automated GitHub Actions CI/CD workflow (`.github/workflows/deploy.yml`) that tests, builds, and deploys the application directly to GitHub Pages hosting:
+
+### How to Enable Hosting on GitHub:
+1. **Push your code to GitHub:**
+   ```bash
+   git push origin main
+   # or
+   git push origin phase-6
+   ```
+2. **Enable GitHub Pages:**
+   - In your GitHub repository, go to **Settings** > **Pages** (under the "Code and automation" section).
+   - Under **Build and deployment** > **Source**, select **GitHub Actions** (instead of "Deploy from a branch").
+3. **Automatic Deployment:**
+   - On every push to `main` or `phase-6`, the workflow will automatically run:
+     1. All unit tests & axe-core accessibility checks
+     2. Production Vite PWA build with service worker generation
+     3. Direct deployment to GitHub Pages via `actions/deploy-pages`
+   - Your app will be live at: `https://<username>.github.io/spirit/`
+4. **Manual Dispatch (Optional):**
+   - You can also manually trigger a deployment from the **Actions** tab in GitHub by selecting **"Build and Deploy Spirit via GitHub Actions"** and clicking **Run workflow**.
 
 ---
 
