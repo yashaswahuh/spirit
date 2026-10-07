@@ -223,10 +223,13 @@ export const gradeResultSchema = baseEntitySchema.extend({
 
 export const taskSchema = baseEntitySchema.extend({
   title: z.string().min(1),
-  type: z.enum(['assignment', 'exam', 'other']).default('other'),
+  type: z.enum(['assignment', 'quiz', 'mid_sem', 'end_sem', 'exam', 'project', 'other']).default('other'),
   due_at: z.string().nullable().optional(),
   course_id: z.string().uuid().nullable().optional(),
   done: z.boolean().default(false),
+  syllabus: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  venue: z.string().nullable().optional(),
 });
 
 /**

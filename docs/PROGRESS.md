@@ -48,7 +48,6 @@
   - **Term & Timings Settings**: Built full semester configuration modal for term start/end dates, term attendance threshold, working days selector (Mon-Sat, Sunday optional), custom period timings editor (named periods, breaks, lunch), and per-subject threshold overrides.
   - **Calculation Engine**: Extended `/src/engine/timetable.ts` with 18 unit tests covering slot weights, version transitions, overlap warnings, date range expansions, swap days, and term edge cases (75 passing tests total).
   - **Schema Updates**: Added `timetable_version`, `timetable_override`, and enhanced `term`, `course`, `timetable_slot`, `calendar_event`, `attendance_record` across `docs/SPEC.md`, `src/types/index.ts`, `src/db/schemas.ts`, and `docs/archive/supabase/migration.sql`.
-
 - **Phase 3 (Part B): Attendance Management, Catch-Up & Projections**:
   - **Date-Picker Day View (`DayPickerView.tsx`)**: Pick any past date (and today) to inspect and log classes. One-tap Present/Absent/Cancelled/Medical/Duty leave; tapping active status toggles to clear; undo toast with timer for the last action; bulk day actions (All Present, All Absent, All Cancelled, Whole Day Holiday).
   - **Unmarked Classes & Catch-Up Screen (`CatchUpModal.tsx`)**: Past scheduled classes without an attendance record are flagged as "unmarked" and excluded from conducted totals until logged. Prominent Home banner and Attendance header badge show total unmarked periods and launch the Catch Up modal with per-day bulk buttons.
@@ -57,28 +56,41 @@
   - **Semester Attendance Projections**: Real-time projection strip on `CourseAttendanceCard.tsx` calculating best-case %, worst-case %, remaining scheduled classes count, and minimum classes needed to reach threshold based on timetable schedule to term end.
   - **What-If Attendance Planner (`WhatIfModal.tsx`)**: Three simulation modes: (1) Specific Dates to skip, (2) Recurring Weekday to skip until semester end, and (3) N Upcoming Consecutive Days. Shows exact percentage drops, safe bunks left, and must-attend warnings.
   - **Engine & Testing**: Added unit tests for opening balances, slot weights, unmarked period counting, and `canISkipTomorrow` simulator. All 81 tests passing across 9 test files.
+- **Phase 4 (Part A): Marks, Assessment Components & Grades**:
+  - **Courses per Term**: Editable credits, type, "counts toward GPA" toggle, and audit/non-credit courses (pass/fail only, no GPA impact).
+  - **Assessment Components per Course (`CourseMarksModal.tsx`)**: Fully editable components (name, max marks, weightage %, evaluation rules: normal / best-of-N / drop-lowest). Includes 4 quick university templates: Standard 40/60 Split, Engineering Best-of-2 (50/50), Lab-only, and Project-only. Marks entry supporting numeric scores, `absent` (0 score with full weight counted), and `not_held` (excluded from current evaluated weightage).
+  - **Institutional Eligibility Rules**: Per-course cutoffs for minimum internal marks for end-sem exam eligibility, separate end-sem minimum pass marks, and overall pass mark. Flags attendance detention risks with prominent warnings whenever course attendance is below the institutional threshold.
+  - **Final Course Result (`FinalGradeModal.tsx`)**: Supports direct university letter grade entry (relative grading), optional grade derivation from marks via grading scale bands, special grades (`AB` absent, `I` incomplete, `W` withdrawn, `P` pass only, `F` fail), and attempt history (regular vs retake/arrear attempt numbers).
+  - **Grading Scheme Editor (`GradingSchemeModal.tsx`)**: Letter-to-points scale editor, pass marks, max point, rounding rules, CGPA-to-percentage conversion (multiplier mode e.g. 9.5 or 10.0, and custom formulas e.g. `(CGPA - 0.75) * 10`), repeat handling (`replace_old` vs `keep_best`), division/class thresholds (Distinction/First/Second/Pass Class), and prominent "Check your university's rules" disclaimer.
+  - **Term SGPA & Cumulative CGPA**: Full SGPA per term and cumulative CGPA across terms, with lateral entry support (programs starting at semester 3), backlog repeat resolution, and equivalent percentage reporting.
+- **Phase 4 (Part B): Planning Tools, Terms, Tasks & Responsive Charts**:
+  - **Required-Marks Calculator (`RequiredMarksModal.tsx`)**: Calculates minimum end-sem marks to achieve a target letter grade or target percentage given internal scores and weightages. Accurately reports achievability status and enforces separate end-sem minimum pass thresholds.
+  - **Grade Simulator (`GradeSimulatorModal.tsx`)**: Interactive slider/selector per course predicting simulated term SGPA and cumulative CGPA in real time.
+  - **Target CGPA Planner (`TargetPlannerModal.tsx`)**: Given a target CGPA (e.g. 8.5) and target semester (e.g. Semester 6), calculates the required average SGPA in remaining semesters, flagging mathematically impossible targets (> max scale points).
+  - **Term Management & Backlog Tracker (`TermManagerModal.tsx`)**: Lists terms with locked/computed SGPA, switches active ongoing term, locks/finishes terms to freeze grades, and provides a cross-semester backlog tracker.
+  - **Start Next Semester Wizard (`NextSemesterWizardModal.tsx`)**: Easily roll forward to the next semester, locking the current term and optionally copying course structures with zeroed attendance and empty marks.
+  - **Tasks & Exams Tracker (`TasksTrackerModal.tsx`)**: Assignments, quizzes, mid-sems, end-sems, and exams with due dates, syllabus, exam hall/venue, notes, and countdown/overdue badges ("Due Today", "Due Tomorrow", "In X days", "Overdue by Y days").
+  - **Home Dashboard Widget (`UpcomingTasksWidget.tsx`)**: Displays top upcoming deadlines and exams directly on the Home dashboard with one-tap completion. Automatic sync of exams to `CalendarEvent` for timetable/calendar visibility. Also accessible via "More" tab.
+  - **Lazy-Loaded Responsive Charts (`LazyCharts.tsx`)**: Code-split into on-demand bundles with Suspense fallback and responsive layouts from 320px to 1920px:
+    - `SgpaTrendChart.tsx`: SVG trend of SGPA and CGPA across terms with tooltips and accessible table fallback.
+    - `MarksBreakdownChart.tsx`: Visual component-by-component bar chart of scored vs maximum marks and weightages.
+    - `AttendanceThresholdChart.tsx`: Course attendance bars compared directly against the institutional 75% threshold marker.
 
-### Schema Changes & Migration History (Dexie v1 -> v2)
-- **New Tables Added**:
-  - `timetable_version`: Stores semester timetable revisions (`id`, `user_id`, `term_id`, `name`, `effective_from`). Index: `&id, user_id, term_id, effective_from, updated_at, deleted_at`.
-  - `timetable_override`: Stores date-specific one-off adjustments (`id`, `user_id`, `term_id`, `date`, `action`, `original_slot_id`, `course_id`, `start_time`, `end_time`, `room`, `faculty`, `component_type`, `weight`, `note`). Index: `&id, user_id, term_id, date, course_id, updated_at, deleted_at`.
-- **Table Alterations & Data Preservation**:
-  - `timetable_slot`: Added `version_id` (nullable), `weight` (default 1), `period_name` (nullable). Existing rows backfilled via `Dexie.version(2).upgrade()` with `weight = 1`, `version_id = null`. Index updated to include `version_id`.
-  - `course`: Added opening balance fields `initial_attended`, `initial_conducted`, and `tracking_start_date`. Existing rows backfilled with defaults (`0`, `0`, `null`).
-  - `attendance_record`: Added `weight` (default 1) and `override_id` (nullable). Existing rows backfilled with `weight = 1`, `override_id = null`.
-  - `calendar_event`: Added `end_date` (for range holidays) and `swap_target_weekday` (for swap days). Existing rows backfilled with `null`.
-  - `term`: Added `working_days` (default `[1, 2, 3, 4, 5, 6]`) and `period_timings` (default `[]`). Existing rows preserved and backfilled.
-- **Specification & Type Synchronization**:
-  - `docs/SPEC.md` section 3 updated with all newly introduced entities and fields.
-  - `docs/types.ts` synced with `src/types/index.ts` containing strict TypeScript definitions.
-  - `src/db/schemas.ts` Zod validation schemas updated for all tables.
+### Schema Changes & Migration History (Dexie v2 -> v3)
+- **New Columns Added**:
+  - `course`: Added `min_internal_marks` (nullable), `min_end_sem_marks` (nullable), `pass_marks` (nullable), `grade_band_override` (nullable JSON array of grade bands).
+  - `mark`: Added `status` (`'entered' | 'absent' | 'not_held'`). Existing marks backfilled with `'entered'`.
+  - `grade_result`: Added `term_id` (nullable foreign key to `term.id`).
+  - `grading_scheme`: Added `repeat_handling` (`'replace_old' | 'keep_best'`).
+  - `task`: Added `syllabus` (nullable), `venue` (nullable), `notes` (nullable), and expanded `type` to `'assignment' | 'quiz' | 'mid_sem' | 'end_sem' | 'exam' | 'project' | 'other'`.
+- **Database Version Upgrade**:
+  - `Dexie.version(3)` implemented with `.upgrade(async tx => ...)` callback preserving all existing tables and data.
+  - `docs/SPEC.md` section 3 and `docs/types.ts` synchronized with all schema extensions.
+  - `docs/archive/supabase/migration.sql` synchronized with table DDL.
 
 ## Remaining
-- **Phase 4**: Per-Subject Calendar View & Past Attendance Logs Editing (integrated into Phase 3B; remaining deeper analytics and history export).
-- **Phase 5**: Grades, Assessment Components (Best-of-N / Drop-Lowest), SGPA/CGPA Dashboard & Required Marks Solver UI.
-- **Phase 6**: Tasks & Exams Tracker, PDF/Print Attendance Report, Backup & Restore (JSON/CSV) with persistent storage & reminders, and Offline PWA Manifest/Worker.
+- **Phase 5**: Backup and Restore (JSON export/import, CSV export) with "last backed up" status, PDF/print attendance report, storage-safety rules (`navigator.storage.persist()`, reminders, iOS install instructions).
+- **Phase 6**: PWA offline worker, install manifest, final polish.
 
 ## Known Issues
 - None.
-
-

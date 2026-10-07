@@ -9,6 +9,7 @@ import { getTodayTimetableSlots } from '../db/repositories/timetable.repo';
 import { markAttendance } from '../db/repositories/attendance.repo';
 import { TodayClassesSection } from '../components/home/TodayClassesSection';
 import { CanISkipTomorrowCard } from '../components/home/CanISkipTomorrowCard';
+import { UpcomingTasksWidget } from '../components/home/UpcomingTasksWidget';
 import { CatchUpModal } from '../components/attendance/CatchUpModal';
 import { WhatIfModal } from '../components/attendance/WhatIfModal';
 import { PageContainer } from '../components/layout/PageContainer';
@@ -290,8 +291,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
           />
         </div>
 
-        {/* Right Column: Subject Health Breakdown & Highlights */}
+        {/* Right Column: Tasks/Exams & Subject Health Breakdown */}
         <div className="lg:col-span-5 xl:col-span-5 space-y-6">
+          {/* Upcoming Tasks & Exams Widget */}
+          <UpcomingTasksWidget courses={courses} />
+
           {/* Subject Health Card */}
           <div className="bg-white dark:bg-gray-900 rounded-3xl p-5 sm:p-6 border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
             <div className="flex items-center justify-between">

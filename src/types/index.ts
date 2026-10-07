@@ -94,7 +94,7 @@ export type AttendanceStatus =
 
 export type AssessmentRuleType = 'normal' | 'best_of_N' | 'drop_lowest';
 
-export type TaskType = 'assignment' | 'exam' | 'other';
+export type TaskType = 'assignment' | 'quiz' | 'mid_sem' | 'end_sem' | 'exam' | 'project' | 'other';
 
 // ============================================================================
 // 1. PROFILE
@@ -339,10 +339,13 @@ export interface GradeResult extends BaseEntity {
 
 export interface Task extends BaseEntity {
   title: string; // e.g. "Submit DSA Assignment 2"
-  type: TaskType; // 'assignment' | 'exam' | 'other'
-  due_at: string | null; // ISO 8601 timestamp string
+  type: TaskType; // 'assignment' | 'quiz' | 'mid_sem' | 'end_sem' | 'exam' | 'project' | 'other'
+  due_at: string | null; // ISO 8601 timestamp string or YYYY-MM-DD
   course_id: string | null; // Foreign key to course.id (null for general tasks)
   done: boolean; // true if completed
+  syllabus?: string | null;
+  notes?: string | null;
+  venue?: string | null;
 }
 
 // ============================================================================

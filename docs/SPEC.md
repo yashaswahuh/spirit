@@ -27,7 +27,7 @@ Must support every program type through configuration, not hardcoding: BTech/BE 
 - assessment_component: course_id, name (CAT1, mid-sem, assignment, lab internal, end-sem...), max_marks, weightage, rule (normal / best_of_N / drop_lowest), rule_group nullable, rule_params nullable, is_end_sem, min_pass_marks.
 - mark: component_id, obtained_marks (nullable), status (entered/absent/not_held).
 - grade_result: course_id, term_id nullable, letter_grade (final, supports special grades AB/I/W/P/F), grade_points nullable, attempt_number (supports backlog/arrear, repeat/improvement), is_passing.
-- task: title, type (assignment/exam/other), due_at, course_id nullable, done.
+- task: title, type (assignment/quiz/mid_sem/end_sem/exam/project/other), due_at, course_id nullable, done, syllabus, notes, venue.
 
 ## 4. Calculation engine (unit-test all, including edge cases)
 - attendance% = attended / conducted * 100. Cancelled and holiday are excluded from conducted. Medical/duty follow per-course settings.

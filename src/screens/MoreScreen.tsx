@@ -1,9 +1,10 @@
 import React from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Sparkles, Trash2, Sun, Moon, ShieldCheck, User } from 'lucide-react';
+import { Sparkles, Trash2, Sun, Moon, ShieldCheck, User, CheckSquare } from 'lucide-react';
 import { db } from '../db/dexie';
 import { seedDemoData, resetDatabase } from '../db/repositories/setup.repo';
 import { PageContainer } from '../components/layout/PageContainer';
+import { TasksTrackerModal } from '../components/tasks/TasksTrackerModal';
 
 interface MoreScreenProps {
   isDark: boolean;
@@ -19,6 +20,8 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   const profile = useLiveQuery(() => db.profile.filter(p => p.deleted_at === null).first());
   const program = useLiveQuery(() => db.program.filter(p => p.deleted_at === null).first());
   const activeTerm = useLiveQuery(() => db.term.filter(t => t.deleted_at === null && t.status === 'ongoing').first());
+  const courses = useLiveQuery(() => db.course.filter(c => c.deleted_at === null).toArray()) || [];
+  const [isTasksOpen, setIsTasksOpen] = React.useState(false);
 
   const handleSeedDemo = async () => {
     if (confirm('Load demo semester data? This will add sample subjects and attendance logs.')) {
@@ -100,6 +103,23 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
 
         {/* Right Column: Database Tools & Privacy */}
         <div className="space-y-4 sm:space-y-6">
+          {/* Tasks & Deadlines Card */}
+          <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-3">
+            <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+              <CheckSquare className="w-3.5 h-3.5 text-indigo-600" />
+              Tasks & Exams Tracker
+            </h3>
+            <p className="text-xs text-gray-400">
+              Manage assignments, quizzes, mid-sems, syllabus, exam venues, and countdowns.
+            </p>
+            <button
+              onClick={() => setIsTasksOpen(true)}
+              className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-500 text-gray-800 dark:text-white font-semibold text-xs sm:text-sm transition-colors min-h-[44px]"
+            >
+              Open Tasks & Exams Manager
+            </button>
+          </div>
+
           <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
             <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               Database & Testing Tools
@@ -134,6 +154,14 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
           </div>
         </div>
       </div>
+
+      {isTasksOpen && (
+        <TasksTrackerModal
+          isOpen={isTasksOpen}
+          onClose={() => setIsTasksOpen(false)}
+          courses={courses}
+        />
+      )}
     </PageContainer>
   );
 };

@@ -10,6 +10,9 @@ import {
   Edit3,
   AlertCircle,
   TrendingUp,
+  Target,
+  Calculator,
+  Calendar,
 } from 'lucide-react';
 import { db } from '../db/dexie';
 import { Course, GradeResult } from '../types';
@@ -21,6 +24,14 @@ import { CourseMarksModal } from '../components/grades/CourseMarksModal';
 import { CourseRulesModal } from '../components/grades/CourseRulesModal';
 import { FinalGradeModal } from '../components/grades/FinalGradeModal';
 import { GradingSchemeModal } from '../components/grades/GradingSchemeModal';
+import { RequiredMarksModal } from '../components/grades/RequiredMarksModal';
+import { GradeSimulatorModal } from '../components/grades/GradeSimulatorModal';
+import { TargetPlannerModal } from '../components/grades/TargetPlannerModal';
+import { TermManagerModal } from '../components/grades/TermManagerModal';
+import {
+  LazySgpaTrendChart,
+  LazyAttendanceThresholdChart,
+} from '../components/charts/LazyCharts';
 
 export const GradesScreen: React.FC = () => {
   // Database live queries
@@ -49,6 +60,11 @@ export const GradesScreen: React.FC = () => {
   const [marksModalCourse, setMarksModalCourse] = useState<Course | null>(null);
   const [rulesModalCourse, setRulesModalCourse] = useState<Course | null>(null);
   const [finalGradeCourse, setFinalGradeCourse] = useState<Course | null>(null);
+  const [isRequiredMarksOpen, setIsRequiredMarksOpen] = useState(false);
+  const [requiredMarksCourseId, setRequiredMarksCourseId] = useState<string | null>(null);
+  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
+  const [isPlannerOpen, setIsPlannerOpen] = useState(false);
+  const [isTermManagerOpen, setIsTermManagerOpen] = useState(false);
   const [isSchemeModalOpen, setIsSchemeModalOpen] = useState<boolean>(false);
 
   const currentTerm = terms.find(t => t.id === (selectedTermId || activeTerm?.id)) || activeTerm || terms[0];
@@ -58,7 +74,7 @@ export const GradesScreen: React.FC = () => {
 
   // Compute attendance stats per course
   const courseAttendanceMap = new Map<string, number>();
-  for (const c of allCourses) {
+  const courseChartStats = termCourses.map(c => {
     const records = attendanceRecords.filter(r => r.course_id === c.id);
     const stats = computeCourseAttendanceStats(
       records,
@@ -74,12 +90,21 @@ export const GradesScreen: React.FC = () => {
       }
     );
     courseAttendanceMap.set(c.id, stats.percentage);
-  }
+    return {
+      course: c,
+      percentage: stats.percentage,
+      attended: stats.attended,
+      conducted: stats.conducted,
+      threshold: c.attendance_threshold_override || defaultThreshold,
+      isInDanger: stats.is_in_danger,
+      safeBunks: stats.safe_bunks,
+      mustAttend: stats.must_attend,
+    };
+  });
 
   // Active Term SGPA calculation
   const termCourseInputs = termCourses.map(c => {
     const results = allGradeResults.filter(g => g.course_id === c.id);
-    // Find highest attempt for this course
     const latestResult = results.sort((a, b) => b.attempt_number - a.attempt_number)[0];
     return {
       credits: c.credits,
@@ -118,13 +143,45 @@ export const GradesScreen: React.FC = () => {
     entry_term: program?.entry_type === 'lateral' ? 3 : 1,
   });
 
+  // Trend data across terms for the trend chart
+  const trendData = terms.map(t => {
+    const tCourses = allCourses.filter(c => c.term_id === t.id);
+    const tInputs = tCourses.map(c => {
+      const results = allGradeResults.filter(g => g.course_id === c.id);
+      const latest = results.sort((a, b) => b.attempt_number - a.attempt_number)[0];
+      return {
+        credits: c.credits,
+        grade_points: latest?.grade_points ?? null,
+        counts_toward_gpa: c.counts_toward_gpa,
+        letter_grade: latest?.letter_grade ?? null,
+        is_audit: !c.counts_toward_gpa,
+      };
+    });
+    const termSgpa = t.sgpa !== null && t.sgpa !== undefined
+      ? t.sgpa
+      : calculateSgpa(tInputs, gradingScheme?.scheme_data?.rounding).sgpa;
+
+    // Cumulative CGPA up to this term
+    const pastAttempts = allAttemptRecords.filter(a => a.term_number !== undefined && a.term_number <= t.number);
+    const termCgpa = calculateCgpa(pastAttempts, {
+      repeat_handling: gradingScheme?.scheme_data?.repeat_handling || 'replace_old',
+      rounding: gradingScheme?.scheme_data?.rounding,
+      entry_term: program?.entry_type === 'lateral' ? 3 : 1,
+    }).cgpa;
+
+    return {
+      termName: t.name,
+      termNumber: t.number,
+      sgpa: termSgpa,
+      cgpa: termCgpa,
+    };
+  });
+
   // Find active backlogs
-  // Group results by course
   const activeBacklogs: Array<{ course: Course; result: GradeResult }> = [];
   for (const course of allCourses) {
     const results = allGradeResults.filter(g => g.course_id === course.id);
     if (results.length === 0) continue;
-    // check if latest attempt or best attempt is failing
     const sortedByAttempt = [...results].sort((a, b) => b.attempt_number - a.attempt_number);
     const latest = sortedByAttempt[0];
     if (!latest.is_passing || latest.letter_grade === 'F' || latest.letter_grade === 'AB') {
@@ -141,8 +198,8 @@ export const GradesScreen: React.FC = () => {
 
   return (
     <PageContainer maxWidth="xl" className="space-y-6 animate-fade-in pb-12">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100 dark:border-gray-800">
+      {/* Header & Planning Tools Strip */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-gray-100 dark:border-gray-800">
         <div>
           <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2.5">
             <GraduationCap className="w-7 h-7 text-indigo-600" />
@@ -154,10 +211,51 @@ export const GradesScreen: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Quick Tools Buttons */}
+        <div className="flex flex-wrap items-center gap-2">
           <button
+            type="button"
+            onClick={() => {
+              setRequiredMarksCourseId(null);
+              setIsRequiredMarksOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 rounded-xl text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+          >
+            <Target className="w-3.5 h-3.5 text-indigo-600" />
+            Required Marks
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsSimulatorOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-semibold shadow-sm transition-colors"
+          >
+            <Calculator className="w-3.5 h-3.5 text-indigo-600" />
+            Simulator
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsPlannerOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-semibold shadow-sm transition-colors"
+          >
+            <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+            Target CGPA
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsTermManagerOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-semibold shadow-sm transition-colors"
+          >
+            <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+            Terms & Backlogs
+          </button>
+
+          <button
+            type="button"
             onClick={() => setIsSchemeModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-semibold shadow-sm transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-gray-300 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-semibold shadow-sm transition-colors"
           >
             <Sliders className="w-3.5 h-3.5 text-indigo-600" />
             Scheme & Scale
@@ -445,15 +543,29 @@ export const GradesScreen: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Actions: Marks Entry, Rules Modal, Set Grade */}
-                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
-                    <button
-                      type="button"
-                      onClick={() => setRulesModalCourse(course)}
-                      className="px-3 py-1.5 text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
-                    >
-                      Course Rules
-                    </button>
+                  {/* Actions: Marks Entry, Rules Modal, Set Grade, Required Marks */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setRulesModalCourse(course)}
+                        className="px-2.5 py-1.5 text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+                      >
+                        Rules
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRequiredMarksCourseId(course.id);
+                          setIsRequiredMarksOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-semibold transition-colors"
+                      >
+                        <Target className="w-3 h-3 text-indigo-600" />
+                        Target Marks
+                      </button>
+                    </div>
 
                     <button
                       type="button"
@@ -469,6 +581,12 @@ export const GradesScreen: React.FC = () => {
             })}
           </div>
         )}
+      </div>
+
+      {/* Responsive Charts Section (Lazy-Loaded) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
+        <LazySgpaTrendChart data={trendData} maxPoint={gradingScheme?.scheme_data?.max_point || 10} />
+        <LazyAttendanceThresholdChart data={courseChartStats} defaultThreshold={defaultThreshold} />
       </div>
 
       {/* Modals */}
@@ -517,6 +635,55 @@ export const GradesScreen: React.FC = () => {
           onClose={() => setIsSchemeModalOpen(false)}
           gradingScheme={gradingScheme}
           onSaved={() => {}}
+        />
+      )}
+
+      {isRequiredMarksOpen && (
+        <RequiredMarksModal
+          isOpen={isRequiredMarksOpen}
+          onClose={() => setIsRequiredMarksOpen(false)}
+          courses={termCourses}
+          initialCourseId={requiredMarksCourseId}
+          allComponents={allComponents}
+          allMarks={allMarks}
+          gradingScheme={gradingScheme || null}
+        />
+      )}
+
+      {isSimulatorOpen && (
+        <GradeSimulatorModal
+          isOpen={isSimulatorOpen}
+          onClose={() => setIsSimulatorOpen(false)}
+          courses={termCourses}
+          existingResults={allGradeResults.filter(g => termCourses.some(c => c.id === g.course_id))}
+          allGradeResultsAcrossTerms={allGradeResults}
+          allCoursesAcrossTerms={allCourses}
+          gradingScheme={gradingScheme || null}
+          entryType={program?.entry_type}
+        />
+      )}
+
+      {isPlannerOpen && (
+        <TargetPlannerModal
+          isOpen={isPlannerOpen}
+          onClose={() => setIsPlannerOpen(false)}
+          currentCgpa={cgpaResult.cgpa}
+          completedCredits={cgpaResult.total_gpa_credits}
+          gradingScheme={gradingScheme || null}
+          terms={terms}
+          currentTerm={currentTerm || null}
+        />
+      )}
+
+      {isTermManagerOpen && (
+        <TermManagerModal
+          isOpen={isTermManagerOpen}
+          onClose={() => setIsTermManagerOpen(false)}
+          terms={terms}
+          allCourses={allCourses}
+          allGradeResults={allGradeResults}
+          activeTermId={currentTerm?.id}
+          onTermChanged={() => {}}
         />
       )}
     </PageContainer>

@@ -449,6 +449,9 @@ create table if not exists public.task (
     due_at timestamptz,
     course_id uuid references public.course(id) on delete set null,
     done boolean not null default false,
+    syllabus text,
+    notes text,
+    venue text,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
     deleted_at timestamptz
