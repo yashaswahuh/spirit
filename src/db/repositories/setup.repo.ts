@@ -1,0 +1,337 @@
+/**
+ * Setup and Initialization Repository
+ * Coordinates full setup initialization and demo seeding in Dexie.
+ */
+
+import { db, LOCAL_USER_ID } from '../dexie';
+import {
+  Profile,
+  Program,
+  GradingScheme,
+  Term,
+  Course,
+  TimetableSlot,
+} from '../../types';
+import {
+  profileSchema,
+  programSchema,
+  gradingSchemeSchema,
+  termSchema,
+  courseSchema,
+  timetableSlotSchema,
+  validateEntity,
+} from '../schemas';
+import { generateUUID } from '../../utils/uuid';
+import { UGC_10_POINT_SCHEME } from '../../presets/grading-schemes';
+
+export interface OnboardingData {
+  userName: string;
+  degreeType: string;
+  branchName: string;
+  startYear: number;
+  entryType: 'regular' | 'lateral';
+  termNumber: number;
+  termName: string;
+  startDate: string;
+  endDate: string;
+  attendanceThreshold: number;
+  courses: Array<{
+    name: string;
+    code: string;
+    credits: number;
+    type: 'theory' | 'lab' | 'tutorial' | 'project' | 'elective' | 'audit';
+    color: string;
+  }>;
+  slots?: Array<{
+    courseIndex: number;
+    weekday: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+    startTime: string;
+    endTime: string;
+  }>;
+}
+
+export async function isAppInitialized(): Promise<boolean> {
+  const count = await db.profile.count();
+  return count > 0;
+}
+
+export async function getActiveProfile(): Promise<Profile | undefined> {
+  return db.profile.filter(p => p.deleted_at === null).first();
+}
+
+export async function getActiveTerm(): Promise<Term | undefined> {
+  return db.term.filter(t => t.deleted_at === null && t.status === 'ongoing').first();
+}
+
+/**
+ * Saves initial onboarding configuration atomically.
+ */
+export async function saveOnboardingSetup(data: OnboardingData): Promise<void> {
+  const now = new Date().toISOString();
+
+  // 1. Create or use grading scheme
+  const gradingSchemeId = generateUUID();
+  const gradingScheme: GradingScheme = {
+    id: gradingSchemeId,
+    user_id: LOCAL_USER_ID,
+    name: UGC_10_POINT_SCHEME.name,
+    is_preset: true,
+    scheme_data: UGC_10_POINT_SCHEME.data,
+    created_at: now,
+    updated_at: now,
+    deleted_at: null,
+  };
+  validateEntity(gradingSchemeSchema, gradingScheme);
+
+  // 2. Profile
+  const profileId = generateUUID();
+  const profile: Profile = {
+    id: profileId,
+    user_id: LOCAL_USER_ID,
+    name: data.userName.trim() || 'Student',
+    region: 'IN',
+    theme: 'system',
+    accent: 'indigo',
+    default_attendance_threshold: data.attendanceThreshold,
+    created_at: now,
+    updated_at: now,
+    deleted_at: null,
+  };
+  validateEntity(profileSchema, profile);
+
+  // 3. Program
+  const programId = generateUUID();
+  const program: Program = {
+    id: programId,
+    user_id: LOCAL_USER_ID,
+    degree_type: data.degreeType as any,
+    branch_department: data.branchName.trim() || 'Engineering',
+    start_year: data.startYear,
+    duration_years: 4,
+    entry_type: data.entryType,
+    term_system: 'semester',
+    grading_scheme_id: gradingSchemeId,
+    created_at: now,
+    updated_at: now,
+    deleted_at: null,
+  };
+  validateEntity(programSchema, program);
+
+  // 4. Term
+  const termId = generateUUID();
+  const term: Term = {
+    id: termId,
+    user_id: LOCAL_USER_ID,
+    program_id: programId,
+    number: data.termNumber,
+    name: data.termName,
+    start_date: data.startDate,
+    end_date: data.endDate,
+    sgpa: null,
+    status: 'ongoing',
+    created_at: now,
+    updated_at: now,
+    deleted_at: null,
+  };
+  validateEntity(termSchema, term);
+
+  // 5. Courses
+  const createdCourses: Course[] = [];
+  for (const c of data.courses) {
+    const course: Course = {
+      id: generateUUID(),
+      user_id: LOCAL_USER_ID,
+      term_id: termId,
+      name: c.name,
+      code: c.code,
+      credits: c.credits,
+      type: c.type,
+      counts_toward_gpa: c.type !== 'audit',
+      attendance_threshold_override: null,
+      color: c.color,
+      medical_counts_as_present: false,
+      duty_leave_counts_as_present: true,
+      created_at: now,
+      updated_at: now,
+      deleted_at: null,
+    };
+    validateEntity(courseSchema, course);
+    createdCourses.push(course);
+  }
+
+  // 6. Timetable Slots
+  const createdSlots: TimetableSlot[] = [];
+  if (data.slots && data.slots.length > 0) {
+    for (const s of data.slots) {
+      if (s.courseIndex < createdCourses.length) {
+        const slot: TimetableSlot = {
+          id: generateUUID(),
+          user_id: LOCAL_USER_ID,
+          course_id: createdCourses[s.courseIndex].id,
+          weekday: s.weekday,
+          start_time: s.startTime,
+          end_time: s.endTime,
+          room: null,
+          component_type: createdCourses[s.courseIndex].type,
+          created_at: now,
+          updated_at: now,
+          deleted_at: null,
+        };
+        validateEntity(timetableSlotSchema, slot);
+        createdSlots.push(slot);
+      }
+    }
+  }
+
+  // Save all entities in a single Dexie transaction
+  await db.transaction('rw', [db.profile, db.grading_scheme, db.program, db.term, db.course, db.timetable_slot], async () => {
+    await db.grading_scheme.put(gradingScheme);
+    await db.profile.put(profile);
+    await db.program.put(program);
+    await db.term.put(term);
+    await db.course.bulkPut(createdCourses);
+    if (createdSlots.length > 0) {
+      await db.timetable_slot.bulkPut(createdSlots);
+    }
+  });
+}
+
+/**
+ * Creates a rich demo setup so the app is instantly usable for testing.
+ */
+export async function seedDemoData(): Promise<void> {
+  const currentYear = new Date().getFullYear();
+  const demoData: OnboardingData = {
+    userName: 'Aarav Sharma',
+    degreeType: 'BTech',
+    branchName: 'Computer Science and Engineering',
+    startYear: currentYear,
+    entryType: 'regular',
+    termNumber: 5,
+    termName: 'Semester 5',
+    startDate: `${currentYear}-08-01`,
+    endDate: `${currentYear}-12-15`,
+    attendanceThreshold: 75,
+    courses: [
+      { name: 'Operating Systems', code: 'CS501', credits: 4, type: 'theory', color: '#6366f1' },
+      { name: 'Database Management Systems', code: 'CS502', credits: 4, type: 'theory', color: '#0ea5e9' },
+      { name: 'Computer Networks', code: 'CS503', credits: 4, type: 'theory', color: '#10b981' },
+      { name: 'DBMS Laboratory', code: 'CS504L', credits: 2, type: 'lab', color: '#f59e0b' },
+      { name: 'Theory of Computation', code: 'CS505', credits: 3, type: 'theory', color: '#ec4899' },
+    ],
+    slots: [
+      // Monday (1)
+      { courseIndex: 0, weekday: 1, startTime: '09:00', endTime: '09:55' },
+      { courseIndex: 1, weekday: 1, startTime: '10:00', endTime: '10:55' },
+      { courseIndex: 2, weekday: 1, startTime: '11:15', endTime: '12:10' },
+      // Tuesday (2)
+      { courseIndex: 1, weekday: 2, startTime: '09:00', endTime: '09:55' },
+      { courseIndex: 2, weekday: 2, startTime: '10:00', endTime: '10:55' },
+      { courseIndex: 3, weekday: 2, startTime: '14:00', endTime: '16:00' }, // Lab
+      // Wednesday (3)
+      { courseIndex: 0, weekday: 3, startTime: '09:00', endTime: '09:55' },
+      { courseIndex: 4, weekday: 3, startTime: '10:00', endTime: '10:55' },
+      { courseIndex: 1, weekday: 3, startTime: '11:15', endTime: '12:10' },
+      // Thursday (4)
+      { courseIndex: 2, weekday: 4, startTime: '09:00', endTime: '09:55' },
+      { courseIndex: 0, weekday: 4, startTime: '10:00', endTime: '10:55' },
+      { courseIndex: 4, weekday: 4, startTime: '11:15', endTime: '12:10' },
+      // Friday (5)
+      { courseIndex: 4, weekday: 5, startTime: '09:00', endTime: '09:55' },
+      { courseIndex: 0, weekday: 5, startTime: '10:00', endTime: '10:55' },
+      { courseIndex: 1, weekday: 5, startTime: '11:15', endTime: '12:10' },
+      // Saturday (6)
+      { courseIndex: 2, weekday: 6, startTime: '09:00', endTime: '09:55' },
+      // Sunday (0)
+      { courseIndex: 0, weekday: 0, startTime: '10:00', endTime: '10:55' },
+    ],
+  };
+
+  await saveOnboardingSetup(demoData);
+
+  // Seed sample past attendance records so cards immediately show realistic calculations
+  const courses = await db.course.filter(c => c.deleted_at === null).toArray();
+  const recordsToInsert: any[] = [];
+  const now = new Date().toISOString();
+
+  // Course 0 (Operating Systems): 18 attended out of 20 conducted (90%) -> 4 safe bunks
+  if (courses[0]) {
+    for (let i = 1; i <= 20; i++) {
+      const dayStr = i < 10 ? `0${i}` : `${i}`;
+      recordsToInsert.push({
+        id: generateUUID(),
+        user_id: LOCAL_USER_ID,
+        course_id: courses[0].id,
+        date: `2026-09-${dayStr}`,
+        slot_id: null,
+        status: i <= 18 ? 'present' : 'absent',
+        note: null,
+        created_at: now,
+        updated_at: now,
+        deleted_at: null,
+      });
+    }
+  }
+
+  // Course 1 (DBMS): 14 attended out of 20 conducted (70%) -> in danger, must attend 4
+  if (courses[1]) {
+    for (let i = 1; i <= 20; i++) {
+      const dayStr = i < 10 ? `0${i}` : `${i}`;
+      recordsToInsert.push({
+        id: generateUUID(),
+        user_id: LOCAL_USER_ID,
+        course_id: courses[1].id,
+        date: `2026-09-${dayStr}`,
+        slot_id: null,
+        status: i <= 14 ? 'present' : 'absent',
+        note: null,
+        created_at: now,
+        updated_at: now,
+        deleted_at: null,
+      });
+    }
+  }
+
+  // Course 2 (Networks): 15 attended out of 20 conducted (75%) -> borderline
+  if (courses[2]) {
+    for (let i = 1; i <= 20; i++) {
+      const dayStr = i < 10 ? `0${i}` : `${i}`;
+      recordsToInsert.push({
+        id: generateUUID(),
+        user_id: LOCAL_USER_ID,
+        course_id: courses[2].id,
+        date: `2026-09-${dayStr}`,
+        slot_id: null,
+        status: i <= 15 ? 'present' : 'absent',
+        note: null,
+        created_at: now,
+        updated_at: now,
+        deleted_at: null,
+      });
+    }
+  }
+
+  if (recordsToInsert.length > 0) {
+    await db.attendance_record.bulkPut(recordsToInsert);
+  }
+}
+
+/**
+ * Resets all database tables.
+ */
+export async function resetDatabase(): Promise<void> {
+  await Promise.all([
+    db.profile.clear(),
+    db.grading_scheme.clear(),
+    db.program.clear(),
+    db.term.clear(),
+    db.course.clear(),
+    db.timetable_slot.clear(),
+    db.calendar_event.clear(),
+    db.attendance_record.clear(),
+    db.assessment_component.clear(),
+    db.mark.clear(),
+    db.grade_result.clear(),
+    db.task.clear(),
+  ]);
+}
