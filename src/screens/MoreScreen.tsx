@@ -22,6 +22,8 @@ import {
   Send,
   CalendarDays,
   Pencil,
+  BookOpen,
+  ArrowRight,
 } from 'lucide-react';
 import { db } from '../db/dexie';
 import { seedDemoData, hasDemoData, clearDemoData, resetDatabase } from '../db/repositories/setup.repo';
@@ -35,6 +37,7 @@ import { PrivacyModal } from '../components/safety/PrivacyModal';
 import { PeriodTimingsModal } from '../components/timetable/PeriodTimingsModal';
 import { ProfileEditModal } from '../components/profile/ProfileEditModal';
 import { SemesterSwitcherModal } from '../components/timetable/SemesterSwitcherModal';
+import { UserGuideModal } from '../components/common/UserGuideModal';
 import { useI18n } from '../i18n';
 import {
   ThemePreference,
@@ -105,6 +108,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   const [isPeriodTimingsOpen, setIsPeriodTimingsOpen] = useState(false);
   const [isProfileEditOpen, setIsProfileEditOpen] = useState(false);
   const [isSemesterSwitcherOpen, setIsSemesterSwitcherOpen] = useState(false);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   // Storage and Safety state
   const [isPersisted, setIsPersisted] = useState<boolean | null>(null);
@@ -354,6 +358,30 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+
+          {/* How to Use Guide Card */}
+          <div
+            onClick={() => setIsGuideOpen(true)}
+            className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-transparent border border-indigo-200 dark:border-indigo-900/60 hover:border-indigo-400 dark:hover:border-indigo-700 transition-all cursor-pointer group shadow-xs flex items-center justify-between gap-4"
+          >
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center flex-shrink-0 shadow-md shadow-indigo-500/20 group-hover:scale-105 transition-transform">
+                <BookOpen className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2 flex-wrap">
+                  How to Use Spirit Guide
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300">
+                    User Manual
+                  </span>
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 pt-0.5 truncate">
+                  Attendance math, safe bunks, timetable upload, GPA rules & backups.
+                </p>
+              </div>
+            </div>
+            <ArrowRight className="w-5 h-5 text-indigo-600 dark:text-indigo-400 group-hover:translate-x-1 transition-transform flex-shrink-0" />
           </div>
 
           {/* Display & Appearance Card */}
@@ -915,6 +943,13 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
         <SemesterSwitcherModal
           isOpen={isSemesterSwitcherOpen}
           onClose={() => setIsSemesterSwitcherOpen(false)}
+        />
+      )}
+
+      {isGuideOpen && (
+        <UserGuideModal
+          isOpen={isGuideOpen}
+          onClose={() => setIsGuideOpen(false)}
         />
       )}
     </PageContainer>

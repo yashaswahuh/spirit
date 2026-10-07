@@ -153,6 +153,7 @@
   - **Interactive Course Color Picker**: Created reusable `CourseColorPicker.tsx` with 17 curated course swatches, native OS color picker (`<input type="color">`), and monospace hex text input with live validation. Integrated into `SubjectModal.tsx` (course creation and edit), `OnboardingWizard.tsx` (setup wizard), and `TimetableUploadModal.tsx` (uploaded timetable preview).
   - **Period Timings & Form Contrast Fixes**: Corrected styling in `TermSettingsModal.tsx` and `PeriodTimingsModal.tsx` where inputs lacked explicit backgrounds, resolving white-on-white text readability issues across both light and dark modes.
   - **Unit Test Suite Expansion**: Added `src/utils/__tests__/preferences.test.ts` testing accent and theme application, date/time format preferences, and color palette presets. All 138 tests pass across 15 test files.
+  - **Comprehensive Service User Guide**: Created `docs/USER_GUIDE.md` covering end-to-end functionality (onboarding, attendance math, safe bunks, timetable auto-recognition, grading schemes, alternate Saturday rules, .ics phone calendar alarms, and data safety), linked in `README.md`, and built an in-app interactive tabbed guide (`UserGuideModal.tsx`) accessible directly from `MoreScreen.tsx`.
 
 ### Schema Changes & Migration History (Dexie v3 -> v4)
 - **New Columns Added**:

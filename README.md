@@ -4,6 +4,8 @@
 
 Spirit runs entirely on your device. Zero accounts, no tracking, no external database, and zero latency. Built for students who want a reliable, offline-capable dashboard for attendance tracking, weekly timetables, exam deadlines, and grade calculation.
 
+📖 **Looking for instructions? Read the [Complete How-To-Use Guide & Manual](docs/USER_GUIDE.md)** or open the interactive **How to Use Spirit Guide** directly within the app under **Settings & More**.
+
 ---
 
 ## 🌟 Key Features
