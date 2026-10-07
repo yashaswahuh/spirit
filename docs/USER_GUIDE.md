@@ -50,7 +50,8 @@ Choose your university's grading scale:
 - **Percentage & Division System:** Distinction ($\ge 75\%$), 1st Division ($\ge 60\%$), 2nd Division ($\ge 50\%$).
 
 ### Step 3: Add Your Semester Courses
-- Define your subjects with code (e.g. `CS501`), name, credits, and component type (*Theory, Lab, Tutorial, Project, Elective, Audit*).
+- Define your subjects with code (e.g. `CS501`), name, credits, and component type (*Theory, Lab, Theory + Lab (Integrated), Tutorial, Project, Elective, Audit*).
+- **Integrated Theory + Lab Subjects:** In Indian colleges, many subjects (e.g., *Data Structures*, *Database Management Systems*, *Microprocessors*) feature both classroom theory lectures and lab practicals under a single course code. Select **Theory + Practical / Lab (Integrated)** so you do not have to create separate duplicate subjects! Spirit tracks total combined attendance for semester rules while providing separate Theory vs Lab breakdown tallies.
 - Click the **Color Picker Swatch** to assign distinct custom colors to every subject.
 - Non-credit audit courses can be marked as **Audit** so they do not impact your GPA.
 
@@ -138,6 +139,9 @@ Need to verify your attendance with your faculty advisor or college portal?
 The **Timetable** tab provides a complete view of your weekly routine:
 - **Weekly Schedule Grid:** View your daily classes organized by period and time.
 - **Class Details:** Displays course code, subject name, time range (`09:00 - 09:55`), room number, and faculty name.
+- **Integrated Theory + Lab Slots:** When scheduling a class for an integrated subject, Spirit provides a 1-tap quick selector:
+  - `[ 📘 Theory Lecture ]`: Automatically sets component to Theory and default weight to 1 period.
+  - `[ 🧪 Lab Practical ]`: Automatically sets component to Lab and default weight to 2 periods.
 - **Overlap Detection:** If you have parallel elective slots or simultaneous lab batches, Spirit warns you of the overlap while allowing both slots to exist.
 
 ### Bell Schedule & Period Timings
@@ -171,11 +175,14 @@ Instead of typing your timetable slot-by-slot, Spirit can recognize and import y
 3. **Matrix & List Formats Supported:**
    - Grid/matrix timetables (Days as rows, Period times as columns).
    - List formats (`Monday, 09:00-10:00, CS501, Operating Systems, Room 301`).
-4. **Live Preview:**
+4. **Intelligent Theory + Lab Grouping:**
+   - If your timetable contains both theory periods (e.g., *Data Structures*) and practical sessions (e.g., *Data Structures Lab* or *DSA Lab*), Spirit automatically groups them under a single unified course marked **Theory + Practical / Lab**.
+   - No duplicate dummy courses are created.
+5. **Live Preview:**
    - Spirit automatically extracts subjects, course codes, period timings, and rooms.
    - Any new subjects are recognized and created automatically.
    - Click the **Color Dot** next to any detected course to customize its color right in the preview.
-5. Tap **Import to My Timetable** to populate your semester schedule in seconds!
+6. Tap **Import to My Timetable** to populate your semester schedule in seconds!
 
 ---
 
@@ -316,3 +323,4 @@ Installing Spirit gives you full-screen mode, persistent storage protection, and
 ---
 
 *Spirit is open, private, and built for students. Have a great semester!* 🎓
+

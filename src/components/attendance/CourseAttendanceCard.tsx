@@ -47,7 +47,7 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
               </span>
             )}
             <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
-              {course.type} • {course.credits} cr
+              {course.type === 'theory_and_lab' ? 'Theory + Lab' : course.type} • {course.credits} cr
             </span>
           </div>
           <h2 className="text-base font-bold text-gray-900 dark:text-white mt-1 truncate">
@@ -179,6 +179,25 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
           <span className="font-mono font-bold text-gray-700 dark:text-gray-200">
             Best: <span className="text-emerald-600">{projection.bestCase.toFixed(1)}%</span> | Worst: <span className="text-rose-600">{projection.worstCase.toFixed(1)}%</span>
           </span>
+        </div>
+      )}
+
+      {/* Theory vs Practical Breakdown if Integrated Course */}
+      {course.type === 'theory_and_lab' && stats.theory && stats.lab && (stats.theory.conducted > 0 || stats.lab.conducted > 0) && (
+        <div className="mt-2.5 p-2 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 flex items-center justify-between text-[11px]">
+          <div className="flex items-center gap-1.5">
+            <span className="font-bold text-gray-700 dark:text-gray-300">📘 Theory:</span>
+            <span className="font-mono text-gray-900 dark:text-gray-100 font-semibold">
+              {stats.theory.attended}/{stats.theory.conducted} ({stats.theory.percentage.toFixed(0)}%)
+            </span>
+          </div>
+          <span className="text-gray-300 dark:text-gray-600 font-bold">•</span>
+          <div className="flex items-center gap-1.5">
+            <span className="font-bold text-gray-700 dark:text-gray-300">🧪 Lab:</span>
+            <span className="font-mono text-gray-900 dark:text-gray-100 font-semibold">
+              {stats.lab.attended}/{stats.lab.conducted} ({stats.lab.percentage.toFixed(0)}%)
+            </span>
+          </div>
         </div>
       )}
 

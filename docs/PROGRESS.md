@@ -153,17 +153,28 @@
   - **Interactive Course Color Picker**: Created reusable `CourseColorPicker.tsx` with 17 curated course swatches, native OS color picker (`<input type="color">`), and monospace hex text input with live validation. Integrated into `SubjectModal.tsx` (course creation and edit), `OnboardingWizard.tsx` (setup wizard), and `TimetableUploadModal.tsx` (uploaded timetable preview).
   - **Period Timings & Form Contrast Fixes**: Corrected styling in `TermSettingsModal.tsx` and `PeriodTimingsModal.tsx` where inputs lacked explicit backgrounds, resolving white-on-white text readability issues across both light and dark modes.
   - **Unit Test Suite Expansion**: Added `src/utils/__tests__/preferences.test.ts` testing accent and theme application, date/time format preferences, and color palette presets. All 138 tests pass across 15 test files.
-  - **Comprehensive Service User Guide**: Created `docs/USER_GUIDE.md` covering end-to-end functionality (onboarding, attendance math, safe bunks, timetable auto-recognition, grading schemes, alternate Saturday rules, .ics phone calendar alarms, and data safety), linked in `README.md`, and built an in-app interactive tabbed guide (`UserGuideModal.tsx`) accessible directly from `MoreScreen.tsx`.
+- **Integrated Theory + Practical / Lab Course Support**:
+  - **Unified Course Type (`theory_and_lab`)**: Added `theory_and_lab` to `CourseType` and schema validations across `courseSchema`, `timetableSlotSchema`, `timetableOverrideSchema`, and `attendanceRecordSchema`. Enables a single subject entry to represent both classroom lectures and practical lab sessions without duplicate course entries.
+  - **Dual Attendance Tracking & Calculation Engine**: Enhanced `computeCourseAttendanceStats` to calculate overall attendance percentage while computing distinct `theory` (`attended`, `conducted`, `percentage`) and `lab` breakdown statistics using slot lookup and record `component_type`.
+  - **Slot & Attendance Marking Flow**:
+    - `SubjectModal.tsx`: Added "Theory + Practical / Lab (Integrated)" option with explanatory helper text.
+    - `SlotModal.tsx`: Added 1-tap quick selector `[ 📘 Theory Lecture (1 period) ]` vs `[ 🧪 Lab Practical (2 periods) ]` when an integrated subject is selected, automatically configuring component type and slot weight.
+    - `HomeScreen.tsx` & `TodayClassesSection.tsx`: Integrated slot `component_type` and `weight` into 1-tap attendance marking, displaying badges for `📘 Theory` vs `🧪 Lab (N hrs)`.
+    - `CourseAttendanceCard.tsx`: Displays unified attendance percentage alongside an informative breakdown strip (`📘 Theory: A/B (X%) • 🧪 Lab: C/D (Y%)`).
+  - **Smart Timetable Auto-Detection & Merging**:
+    - `timetableParser.ts`: Upgraded parser to detect theory lectures and practical lab sessions with the same base name or code (e.g., "Data Structures" and "Data Structures Lab" or "CS201" and "CS201L"), automatically unifying them under a single `theory_and_lab` course instead of generating duplicate subjects.
+  - **Unit Tests**: Added unit tests in `src/engine/__tests__/attendance.test.ts` and `src/utils/__tests__/timetableParser.test.ts` verifying breakdown calculations and file upload grouping. 140 passing tests across 15 test files.
 
 ### Schema Changes & Migration History (Dexie v3 -> v4)
 - **New Columns Added**:
   - `BaseEntity`: Added `is_demo?: boolean` flag across all 14 Dexie tables to isolate demo records from user data.
   - `Term`: Added `saturday_rule?: SaturdayRule` to support alternate Saturday holiday rules (2nd Saturday off, 2nd & 4th Saturday off, all off).
+  - `AttendanceRecord`: Added `component_type?: CourseType` to track whether logged attendance was for a theory lecture or lab session.
 - **Database Version Upgrade**:
   - `Dexie.version(4)` implemented with safe in-place upgrade backfilling `is_demo: false` on existing records without data loss.
 
 ## Remaining
-- All planned phases and polish enhancements fully implemented, tested, and verified.
+- All planned phases, user features, and integrated theory/lab workflows fully implemented, tested, and verified.
 
 ## Known Issues
 - None.

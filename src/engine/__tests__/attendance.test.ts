@@ -226,6 +226,35 @@ describe('Attendance Engine', () => {
       expect(stats.conducted).toBe(5);
       expect(stats.percentage).toBe(40.0);
     });
+
+    it('computes distinct theory vs lab breakdown stats for integrated theory_and_lab courses', () => {
+      const mixedRecords: AttendanceRecord[] = [
+        // 3 theory lectures (weight 1 each): 2 present, 1 absent
+        { id: 'r1', user_id: 'u1', course_id: 'c1', date: '2026-10-05', slot_id: null, status: 'present', weight: 1, component_type: 'theory', note: null, created_at: '', updated_at: '', deleted_at: null },
+        { id: 'r2', user_id: 'u1', course_id: 'c1', date: '2026-10-06', slot_id: null, status: 'present', weight: 1, component_type: 'theory', note: null, created_at: '', updated_at: '', deleted_at: null },
+        { id: 'r3', user_id: 'u1', course_id: 'c1', date: '2026-10-07', slot_id: null, status: 'absent', weight: 1, component_type: 'theory', note: null, created_at: '', updated_at: '', deleted_at: null },
+        // 1 lab session (weight 2): present
+        { id: 'r4', user_id: 'u1', course_id: 'c1', date: '2026-10-08', slot_id: null, status: 'present', weight: 2, component_type: 'lab', note: null, created_at: '', updated_at: '', deleted_at: null },
+      ];
+
+      const stats = computeCourseAttendanceStats(mixedRecords, rulesStrict, 75);
+      // Overall: 2 (theory) + 2 (lab) = 4 attended out of 3 + 2 = 5 conducted (80%)
+      expect(stats.attended).toBe(4);
+      expect(stats.conducted).toBe(5);
+      expect(stats.percentage).toBe(80.0);
+
+      // Theory breakdown: 2 attended, 3 conducted (66.67%)
+      expect(stats.theory).toBeDefined();
+      expect(stats.theory?.attended).toBe(2);
+      expect(stats.theory?.conducted).toBe(3);
+      expect(stats.theory?.percentage).toBeCloseTo(66.7, 1);
+
+      // Lab breakdown: 2 attended, 2 conducted (100%)
+      expect(stats.lab).toBeDefined();
+      expect(stats.lab?.attended).toBe(2);
+      expect(stats.lab?.conducted).toBe(2);
+      expect(stats.lab?.percentage).toBe(100.0);
+    });
   });
 
   describe('countUnmarkedClasses', () => {

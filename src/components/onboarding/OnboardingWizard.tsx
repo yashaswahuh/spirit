@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { ALL_PROGRAM_PRESETS, ProgramPreset } from '../../presets/programs';
 import { OnboardingData, saveOnboardingSetup, seedDemoData } from '../../db/repositories/setup.repo';
+import { CourseType } from '../../types';
 
 interface OnboardingWizardProps {
   onComplete: () => void;
@@ -38,13 +39,13 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
     name: string;
     code: string;
     credits: number;
-    type: 'theory' | 'lab' | 'tutorial' | 'project' | 'elective' | 'audit';
+    type: CourseType;
     color: string;
   }>>([
-    { name: 'Data Structures & Algorithms', code: 'CS201', credits: 4, type: 'theory', color: '#6366f1' },
+    { name: 'Data Structures & Algorithms', code: 'CS201', credits: 4, type: 'theory_and_lab', color: '#6366f1' },
     { name: 'Computer Architecture', code: 'CS202', credits: 4, type: 'theory', color: '#0ea5e9' },
-    { name: 'Object Oriented Programming', code: 'CS203', credits: 3, type: 'theory', color: '#10b981' },
-    { name: 'DSA Laboratory', code: 'CS204L', credits: 2, type: 'lab', color: '#f59e0b' },
+    { name: 'Object Oriented Programming', code: 'CS203', credits: 4, type: 'theory_and_lab', color: '#10b981' },
+    { name: 'Engineering Mathematics', code: 'MA201', credits: 4, type: 'theory', color: '#f59e0b' },
   ]);
 
   const handlePresetSelect = (preset: ProgramPreset) => {
@@ -407,6 +408,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
                         className="w-full px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
                       >
                         <option value="theory">Theory</option>
+                        <option value="theory_and_lab">Theory + Lab</option>
                         <option value="lab">Lab</option>
                         <option value="tutorial">Tutorial</option>
                         <option value="audit">Audit</option>

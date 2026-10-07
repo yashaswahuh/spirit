@@ -159,6 +159,7 @@ export function parseSubjectInfo(raw: string): {
   cleanName: string;
   code: string;
   type: CourseType;
+  explicitCode?: string;
 } {
   let text = raw.trim();
 
@@ -176,11 +177,13 @@ export function parseSubjectInfo(raw: string): {
   }
 
   // Look for course code in parentheses, e.g. "Data Structures (CS-201)"
+  let explicitCode: string | undefined = undefined;
   let code = '';
   const codeMatch = text.match(/\(([^)]+)\)/);
   if (codeMatch) {
     const potentialCode = codeMatch[1].trim();
     if (potentialCode.length <= 10 && /\d/.test(potentialCode)) {
+      explicitCode = potentialCode;
       code = potentialCode;
       text = text.replace(codeMatch[0], '').trim();
     }
@@ -189,9 +192,21 @@ export function parseSubjectInfo(raw: string): {
   // Remove bracket annotations e.g. "[Lab]"
   text = text.replace(/\[[^\]]+\]/g, '').trim();
 
+  // If component is lab/practical, clean trailing "Lab" or "Practical" from the course cleanName
+  let cleanName = text;
+  if (type === 'lab') {
+    const stripped = text
+      .replace(/\b(lab|laboratory|practical)\b/gi, '')
+      .replace(/[-–—/]+$/, '')
+      .trim();
+    if (stripped.length >= 2) {
+      cleanName = stripped;
+    }
+  }
+
   // If no code extracted, create code from uppercase initials
   if (!code) {
-    const words = text
+    const words = cleanName
       .split(/[\s_-]+/)
       .filter(w => w.length > 0 && !['and', '&', 'of', 'for', 'in', 'the'].includes(w.toLowerCase()));
     if (words.length >= 2) {
@@ -207,9 +222,10 @@ export function parseSubjectInfo(raw: string): {
   }
 
   return {
-    cleanName: text || raw.trim(),
+    cleanName: cleanName || raw.trim(),
     code: code || 'SUBJ',
     type,
+    explicitCode,
   };
 }
 
@@ -433,31 +449,70 @@ function finalizeResult(
 ): ParsedTimetableResult {
   // Aggregate unique courses
   const courseMap = new Map<string, ParsedCourseItem>();
+  const baseKeyToRawName = new Map<string, string>();
   let paletteIdx = 0;
 
   for (const slot of rawSlots) {
     const rawName = slot.courseRawName.trim();
-    if (!courseMap.has(rawName)) {
-      const { cleanName, code, type } = parseSubjectInfo(rawName);
+    const { cleanName, code, type, explicitCode } = parseSubjectInfo(rawName);
 
+    // Grouping key:
+    // If an explicit code was provided (e.g. CS201 / CS201L), normalize by stripping trailing 'L'.
+    // Otherwise group by normalized course name (where trailing "Lab" / "Practical" was already stripped).
+    const normalizedExplicitCode = explicitCode
+      ? explicitCode.replace(/L$/i, '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+      : '';
+    const normalizedNameKey = (type === 'lab' ? cleanName.replace(/\b(lab|laboratory|practical)\b/gi, '').replace(/l$/i, '') : cleanName)
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '');
+
+    const baseKey = normalizedExplicitCode ? `code:${normalizedExplicitCode}` : `name:${normalizedNameKey}`;
+
+    const existingRawName = baseKeyToRawName.get(baseKey);
+
+    if (existingRawName && courseMap.has(existingRawName)) {
+      // Course already encountered! If one is lab and one is theory, upgrade to theory_and_lab
+      const existingItem = courseMap.get(existingRawName)!;
+      if (
+        (existingItem.type === 'theory' && type === 'lab') ||
+        (existingItem.type === 'lab' && type === 'theory')
+      ) {
+        existingItem.type = 'theory_and_lab';
+      }
+      // If the existing course was just "lab" and had a trailing L code, clean it up
+      if (normalizedExplicitCode && existingItem.code.endsWith('L') && !explicitCode?.endsWith('L')) {
+        existingItem.code = explicitCode || normalizedExplicitCode;
+      }
+      // Point this slot to the primary course
+      slot.courseRawName = existingRawName;
+      slot.componentType = type === 'lab' ? 'lab' : 'theory';
+    } else if (!courseMap.has(rawName)) {
       // Check match with existing courses by code or name
       const existing = existingCourses.find(
         c =>
-          c.code.toLowerCase() === code.toLowerCase() ||
+          (explicitCode && c.code.toLowerCase() === explicitCode.toLowerCase()) ||
+          (normalizedExplicitCode && c.code.toLowerCase() === normalizedExplicitCode.toLowerCase()) ||
           c.name.toLowerCase() === cleanName.toLowerCase() ||
-          c.name.toLowerCase() === rawName.toLowerCase()
+          c.name.toLowerCase() === rawName.toLowerCase() ||
+          c.name.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedNameKey
       );
+
+      let finalType: CourseType = existing ? existing.type : type;
+      if (existing && existing.type === 'theory' && type === 'lab') {
+        finalType = 'theory_and_lab';
+      }
 
       courseMap.set(rawName, {
         rawName,
         cleanName,
-        code,
-        type: existing ? existing.type : type,
+        code: (normalizedExplicitCode || code),
+        type: finalType,
         color: existing ? existing.color : PALETTE[paletteIdx % PALETTE.length],
         isExisting: !!existing,
         existingCourseId: existing?.id,
       });
 
+      baseKeyToRawName.set(baseKey, rawName);
       paletteIdx++;
     }
   }

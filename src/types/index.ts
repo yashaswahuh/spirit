@@ -75,6 +75,7 @@ export type TermStatus = 'upcoming' | 'ongoing' | 'completed';
 
 export type CourseType =
   | 'theory'
+  | 'theory_and_lab'
   | 'lab'
   | 'tutorial'
   | 'project'
@@ -293,6 +294,7 @@ export interface AttendanceRecord extends BaseEntity {
   weight?: number; // Period weight for this session (default 1)
   override_id?: string | null; // Optional foreign key to timetable_override.id
   note: string | null; // e.g. "Proxy missed", "NSS Duty Leave", "Teacher absent"
+  component_type?: CourseType; // 'theory' | 'lab' | etc.
 }
 
 // ============================================================================
@@ -365,6 +367,12 @@ export interface CourseAttendanceRules {
   duty_leave_counts_as_present: boolean;
 }
 
+export interface ComponentAttendanceStats {
+  attended: number;
+  conducted: number;
+  percentage: number;
+}
+
 export interface AttendanceStats {
   attended: number;
   conducted: number;
@@ -373,6 +381,8 @@ export interface AttendanceStats {
   safe_bunks: number; // Max classes student can safely miss: floor(attended / t - conducted), min 0
   must_attend: number; // Min classes student must attend consecutively: ceil((t * conducted - attended) / (1 - t)), min 0
   is_in_danger: boolean; // true if percentage < threshold
+  theory?: ComponentAttendanceStats; // Breakdown for theory lectures
+  lab?: ComponentAttendanceStats; // Breakdown for laboratory/practical sessions
 }
 
 export interface AttendanceProjection {

@@ -10,6 +10,7 @@ import {
   GradingScheme,
   Term,
   Course,
+  CourseType,
   TimetableSlot,
 } from '../../types';
 import {
@@ -39,7 +40,7 @@ export interface OnboardingData {
     name: string;
     code: string;
     credits: number;
-    type: 'theory' | 'lab' | 'tutorial' | 'project' | 'elective' | 'audit';
+    type: CourseType;
     color: string;
   }>;
   slots?: Array<{

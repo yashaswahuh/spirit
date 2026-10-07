@@ -108,7 +108,7 @@ export const courseSchema = baseEntitySchema.extend({
   name: z.string().min(1),
   code: z.string().default(''),
   credits: z.number().min(0).default(3),
-  type: z.enum(['theory', 'lab', 'tutorial', 'project', 'elective', 'audit']).default('theory'),
+  type: z.enum(['theory', 'lab', 'theory_and_lab', 'tutorial', 'project', 'elective', 'audit']).default('theory'),
   counts_toward_gpa: z.boolean().default(true),
   attendance_threshold_override: z.number().min(0).max(100).nullable().optional(),
   color: z.string().default('#4f46e5'),
@@ -145,7 +145,7 @@ export const timetableSlotSchema = baseEntitySchema.extend({
   end_time: z.string(),
   room: z.string().nullable().optional(),
   faculty: z.string().nullable().optional(),
-  component_type: z.enum(['theory', 'lab', 'tutorial', 'project', 'elective', 'audit']).default('theory'),
+  component_type: z.enum(['theory', 'lab', 'theory_and_lab', 'tutorial', 'project', 'elective', 'audit']).default('theory'),
   weight: z.number().int().min(1).default(1).optional(),
   period_name: z.string().nullable().optional(),
 });
@@ -160,7 +160,7 @@ export const timetableOverrideSchema = baseEntitySchema.extend({
   end_time: z.string(),
   room: z.string().nullable().optional(),
   faculty: z.string().nullable().optional(),
-  component_type: z.enum(['theory', 'lab', 'tutorial', 'project', 'elective', 'audit']).default('theory'),
+  component_type: z.enum(['theory', 'lab', 'theory_and_lab', 'tutorial', 'project', 'elective', 'audit']).default('theory'),
   weight: z.number().int().min(1).default(1),
   note: z.string().nullable().optional(),
 });
@@ -190,6 +190,7 @@ export const attendanceRecordSchema = baseEntitySchema.extend({
   weight: z.number().int().min(1).default(1).optional(),
   override_id: z.string().uuid().nullable().optional(),
   note: z.string().nullable().optional(),
+  component_type: z.enum(['theory', 'lab', 'theory_and_lab', 'tutorial', 'project', 'elective', 'audit']).optional(),
 });
 
 export const assessmentComponentSchema = baseEntitySchema.extend({

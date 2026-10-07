@@ -105,8 +105,18 @@ export const TodayClassesSection: React.FC<TodayClassesSectionProps> = ({
                           Room {slot.room}
                         </span>
                       )}
-                      <span className="text-[10px] uppercase font-bold text-gray-400">
-                        {slot.component_type}
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${
+                        slot.component_type === 'lab'
+                          ? 'bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'
+                          : slot.component_type === 'theory'
+                          ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-100 dark:border-blue-900/40'
+                          : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                      }`}>
+                        {slot.component_type === 'lab'
+                          ? `🧪 Lab${slot.weight && slot.weight > 1 ? ` (${slot.weight} hrs)` : ''}`
+                          : slot.component_type === 'theory'
+                          ? '📘 Theory'
+                          : slot.component_type}
                       </span>
                     </div>
                   </div>

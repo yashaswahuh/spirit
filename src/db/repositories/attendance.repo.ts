@@ -31,6 +31,8 @@ export interface MarkAttendanceParams {
   status: AttendanceStatus;
   slot_id?: string | null;
   note?: string | null;
+  weight?: number;
+  component_type?: any;
 }
 
 /**
@@ -40,7 +42,7 @@ export interface MarkAttendanceParams {
  */
 export async function markAttendance(params: MarkAttendanceParams): Promise<AttendanceRecord> {
   const now = new Date().toISOString();
-  const { course_id, date, status, slot_id = null, note = null } = params;
+  const { course_id, date, status, slot_id = null, note = null, weight = 1, component_type } = params;
 
   // Query existing active records for this course and date
   const records = await db.attendance_record
@@ -55,6 +57,8 @@ export async function markAttendance(params: MarkAttendanceParams): Promise<Atte
       ...existing,
       status,
       note: note ?? existing.note,
+      weight: weight ?? existing.weight,
+      component_type: component_type ?? existing.component_type,
       updated_at: now,
     };
     validateEntity(attendanceRecordSchema, updated);
@@ -70,6 +74,8 @@ export async function markAttendance(params: MarkAttendanceParams): Promise<Atte
     date,
     slot_id,
     status,
+    weight,
+    component_type,
     note,
     created_at: now,
     updated_at: now,

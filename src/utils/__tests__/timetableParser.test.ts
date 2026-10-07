@@ -91,6 +91,22 @@ Tuesday, 09:00 - 10:00, Math, Room 101, Dr. Gupta`;
       expect(result.detectedCourses.length).toBe(2);
       expect(result.totalSlots).toBe(2);
     });
+
+    it('groups theory and lab sessions into a single theory_and_lab course', () => {
+      const csv = `Day, Time, Subject
+Monday, 09:00 - 10:00, Data Structures
+Wednesday, 14:00 - 16:00, Data Structures Lab`;
+
+      const result = parseTimetableFile(csv);
+      expect(result.detectedCourses.length).toBe(1);
+      expect(result.detectedCourses[0].type).toBe('theory_and_lab');
+      expect(result.detectedCourses[0].cleanName).toBe('Data Structures');
+      expect(result.totalSlots).toBe(2);
+      expect(result.detectedSlots[0].componentType).toBe('theory');
+      expect(result.detectedSlots[0].weight).toBe(1);
+      expect(result.detectedSlots[1].componentType).toBe('lab');
+      expect(result.detectedSlots[1].weight).toBe(2);
+    });
   });
 });
 

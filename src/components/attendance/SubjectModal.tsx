@@ -162,13 +162,19 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
               onChange={e => setType(e.target.value as CourseType)}
               className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[44px]"
             >
-              <option value="theory">Theory</option>
-              <option value="lab">Laboratory / Practical</option>
+              <option value="theory">Theory Only</option>
+              <option value="theory_and_lab">Theory + Practical / Lab (Integrated)</option>
+              <option value="lab">Laboratory / Practical Only</option>
               <option value="tutorial">Tutorial</option>
               <option value="project">Project Work</option>
               <option value="elective">Elective</option>
               <option value="audit">Audit (Non-Credit)</option>
             </select>
+            {type === 'theory_and_lab' && (
+              <p className="text-[11px] text-indigo-600 dark:text-indigo-400 mt-1.5 font-medium leading-tight">
+                💡 Unified subject for lectures & practicals. Schedule slots as Theory or Lab without creating duplicate subjects!
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">

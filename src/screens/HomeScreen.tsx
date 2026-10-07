@@ -78,6 +78,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
         initialAttended: c.initial_attended,
         initialConducted: c.initial_conducted,
         trackingStartDate: c.tracking_start_date,
+        slots,
       }
     );
 
@@ -134,11 +135,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
   const courseMap = new Map<string, Course>(courses.map(c => [c.id, c]));
 
   const handleMarkToday = async (courseId: string, slotId: string | null, status: any) => {
+    const slot = slotId ? slots.find(s => s.id === slotId) : null;
     await markAttendance({
       course_id: courseId,
       date: todayStr,
       slot_id: slotId,
       status,
+      weight: slot?.weight || 1,
+      component_type: slot?.component_type || courseMap.get(courseId)?.type,
     });
   };
 

@@ -90,9 +90,14 @@ export const SlotModal: React.FC<SlotModalProps> = ({
     setCourseId(id);
     const selected = courses.find(c => c.id === id);
     if (selected) {
-      setComponentType(selected.type);
-      if (selected.type === 'lab') {
-        setWeight(2);
+      if (selected.type === 'theory_and_lab') {
+        setComponentType('theory');
+        setWeight(1);
+      } else {
+        setComponentType(selected.type);
+        if (selected.type === 'lab') {
+          setWeight(2);
+        }
       }
     }
   };
@@ -140,6 +145,7 @@ export const SlotModal: React.FC<SlotModalProps> = ({
   };
 
   const visibleDays = WEEKDAYS.filter(d => workingDays.includes(d.day) || d.day === weekday);
+  const selectedCourse = courses.find(c => c.id === courseId);
 
   return (
     <ResponsiveDialog
@@ -163,11 +169,57 @@ export const SlotModal: React.FC<SlotModalProps> = ({
           >
             {courses.map(c => (
               <option key={c.id} value={c.id}>
-                {c.name} {c.code ? `(${c.code})` : ''} - {c.type}
+                {c.name} {c.code ? `(${c.code})` : ''} - {c.type === 'theory_and_lab' ? 'Theory + Lab' : c.type}
               </option>
             ))}
           </select>
         </div>
+
+        {/* If selected course is Theory + Lab, provide quick 1-tap Lecture vs Practical selector */}
+        {selectedCourse?.type === 'theory_and_lab' && (
+          <div className="p-3 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/50 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-indigo-900 dark:text-indigo-200">
+                Integrated Subject: Is this slot a Lecture or Lab?
+              </span>
+              <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider">
+                {componentType === 'lab' ? '🧪 Lab Practical' : '📘 Theory Lecture'}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setComponentType('theory');
+                  setWeight(1);
+                }}
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  componentType === 'theory'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <span>📘 Theory Lecture</span>
+                <span className="text-[10px] opacity-80">(1 period)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setComponentType('lab');
+                  setWeight(2);
+                }}
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  componentType === 'lab'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <span>🧪 Lab Practical</span>
+                <span className="text-[10px] opacity-80">(2 periods)</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Weekday Switcher */}
         <div>

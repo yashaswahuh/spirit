@@ -74,6 +74,7 @@ export const AttendanceScreen: React.FC = () => {
         initialAttended: course.initial_attended,
         initialConducted: course.initial_conducted,
         trackingStartDate: course.tracking_start_date,
+        slots,
       }
     );
 

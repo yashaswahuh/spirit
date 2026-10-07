@@ -75,6 +75,8 @@ export interface CourseAttendanceCalculationOptions {
   initialAttended?: number;
   initialConducted?: number;
   trackingStartDate?: string | null;
+  slots?: TimetableSlot[];
+  slotsMap?: Map<string, TimetableSlot>;
 }
 
 /**
@@ -86,6 +88,7 @@ export interface CourseAttendanceCalculationOptions {
  * - 'cancelled' and 'holiday' are excluded from conducted count.
  * - 'medical' counts as present if rules.medical_counts_as_present is true.
  * - 'duty_leave' counts as present if rules.duty_leave_counts_as_present is true.
+ * - If slots or slotsMap provided, computes separate theory and lab breakdowns for integrated courses.
  */
 export function computeCourseAttendanceStats(
   records: AttendanceRecord[],
@@ -97,30 +100,46 @@ export function computeCourseAttendanceStats(
   let conducted = Math.max(0, options?.initialConducted || 0);
   const trackingStart = options?.trackingStartDate;
 
+  let theoryAttended = 0;
+  let theoryConducted = 0;
+  let labAttended = 0;
+  let labConducted = 0;
+
+  // Build slot lookup if slots array is provided
+  const slotLookup = options?.slotsMap || (options?.slots ? new Map(options.slots.map(s => [s.id, s])) : undefined);
+
   for (const record of records) {
     if (record.deleted_at) continue;
     if (trackingStart && record.date < trackingStart) continue;
 
     const weight = record.weight && record.weight > 0 ? record.weight : 1;
 
+    let compType = record.component_type;
+    if (!compType && record.slot_id && slotLookup) {
+      compType = slotLookup.get(record.slot_id)?.component_type;
+    }
+
+    let isConducted = false;
+    let isAttended = false;
+
     switch (record.status) {
       case 'present':
-        conducted += weight;
-        attended += weight;
+        isConducted = true;
+        isAttended = true;
         break;
       case 'absent':
-        conducted += weight;
+        isConducted = true;
         break;
       case 'medical':
-        conducted += weight;
+        isConducted = true;
         if (rules.medical_counts_as_present) {
-          attended += weight;
+          isAttended = true;
         }
         break;
       case 'duty_leave':
-        conducted += weight;
+        isConducted = true;
         if (rules.duty_leave_counts_as_present) {
-          attended += weight;
+          isAttended = true;
         }
         break;
       case 'cancelled':
@@ -128,12 +147,37 @@ export function computeCourseAttendanceStats(
         // Cancelled and holidays are excluded from conducted
         break;
     }
+
+    if (isConducted) {
+      conducted += weight;
+      if (isAttended) attended += weight;
+
+      if (compType === 'theory') {
+        theoryConducted += weight;
+        if (isAttended) theoryAttended += weight;
+      } else if (compType === 'lab') {
+        labConducted += weight;
+        if (isAttended) labAttended += weight;
+      }
+    }
   }
 
   const percentage = calculateAttendancePercentage(attended, conducted);
   const normThreshold = normalizeThreshold(threshold) * 100;
   const safe_bunks = calculateSafeBunks(attended, conducted, threshold);
   const must_attend = calculateMustAttend(attended, conducted, threshold);
+
+  const theory = theoryConducted > 0 ? {
+    attended: theoryAttended,
+    conducted: theoryConducted,
+    percentage: calculateAttendancePercentage(theoryAttended, theoryConducted),
+  } : undefined;
+
+  const lab = labConducted > 0 ? {
+    attended: labAttended,
+    conducted: labConducted,
+    percentage: calculateAttendancePercentage(labAttended, labConducted),
+  } : undefined;
 
   return {
     attended,
@@ -143,6 +187,8 @@ export function computeCourseAttendanceStats(
     safe_bunks,
     must_attend,
     is_in_danger: conducted > 0 && percentage < normThreshold,
+    theory,
+    lab,
   };
 }
 
