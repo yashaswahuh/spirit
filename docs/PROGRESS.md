@@ -30,12 +30,22 @@
   - Enhanced desktop interactions: hover transitions, `focus-visible` accessibility rings, keyboard navigation, and touch targets $\ge 40\text{px}-44\text{px}$ on phones.
   - Added "Responsive rules" subsection to `docs/SPEC.md` (Section 5).
   - All 57 unit tests pass and clean production build verified.
+- **Specification Update: Local-Only Architecture (`spec-local-only`)**:
+  - Transitioned specification strictly to local-only architecture: no backend, no accounts, no sign-in, and no data leaving the user's device.
+  - Section 2 updated: data lives only in IndexedDB (Dexie).
+  - Section 3 updated: client-generated UUIDs, `created_at`, `updated_at`, and `deleted_at` retained for potential future sync, but `user_id` requirement removed.
+  - Section 5 ("More") updated: removed sign in/out; added Backup and Restore (JSON export/import, CSV export) with "last backed up" status.
+  - Section 6 replaced: Storage & Privacy rules defined (`navigator.storage.persist()`, periodic backup reminders, iOS PWA install-to-home-screen guidance).
+  - Section 7 updated: cloud sync and accounts added to "out of scope for now".
+  - Section 9 updated: removed rule about Supabase migration; phases must NOT create or update `supabase/migration.sql`.
+  - Moved `supabase/` directory to `docs/archive/supabase/` and marked unused.
 
 ## Remaining
 - **Phase 3**: What-If Simulator Modal & Timetable Grid with Swap-Days & Holiday Management.
 - **Phase 4**: Per-Subject Calendar View & Past Attendance Logs Editing.
 - **Phase 5**: Grades, Assessment Components (Best-of-N / Drop-Lowest), SGPA/CGPA Dashboard & Required Marks Solver UI.
-- **Phase 6**: Tasks & Exams Tracker, PDF/Print Attendance Report, Offline PWA Manifest/Worker, and Supabase Cloud Sync with 6-digit OTP & Google Auth.
+- **Phase 6**: Tasks & Exams Tracker, PDF/Print Attendance Report, Backup & Restore (JSON/CSV) with persistent storage & reminders, and Offline PWA Manifest/Worker.
 
 ## Known Issues
 - None.
+

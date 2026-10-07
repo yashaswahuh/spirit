@@ -7,13 +7,13 @@ Must support every program type through configuration, not hardcoding: BTech/BE 
 
 ## 2. Tech
 - React + TypeScript + Vite + Tailwind, HashRouter, configurable base path (one constant, default /spirit/) for GitHub Pages.
-- Local-first: all features work with NO login using IndexedDB (use Dexie). Optional sign-in syncs to Supabase (Postgres + Auth + RLS).
+- Local-only: data lives only in IndexedDB (Dexie) on the user's device. No backend, no accounts, no login.
 - Pure-TypeScript calculation engine in /src/engine with zero React imports, fully unit tested (vitest).
-- zod validation on every save and on import. No service_role key anywhere in the frontend. No analytics/trackers.
+- zod validation on every save and on import. No analytics/trackers.
 - PWA: installable, works offline.
 - NEVER scrape or integrate with college ERP/portals.
 
-## 3. Data model (all rows have: id (client-generated UUID), user_id, created_at, updated_at, deleted_at nullable)
+## 3. Data model (all rows have: id (client-generated UUID), created_at, updated_at, deleted_at nullable; kept so cloud sync can be added later, no user_id requirement)
 - profile: name, region (IN default), theme, accent, default attendance threshold.
 - program: degree_type, branch/department, start_year, duration_years, entry_type (regular/lateral), term_system (semester/trimester/annual), grading_scheme_id.
 - grading_scheme (JSON, user-editable, with presets): type (point_scale/percentage/division/pass_fail), letter->points map, pass mark, max point (10 or 4 etc.), cgpa_to_percentage rule (multiplier or custom formula), rounding rule. Presets are APPROXIMATIONS: show a notice "Check your university's rules" and let the user edit everything.
@@ -44,7 +44,7 @@ Must support every program type through configuration, not hardcoding: BTech/BE 
 - Attendance: per-subject cards (percentage, status color PLUS icon and text, safe bunks / must attend), calendar view per subject, edit past records, what-if planner.
 - Timetable: weekly grid, today view, swap days, holidays.
 - Grades: terms, courses, marks per component, SGPA/CGPA, required-marks calculator, backlog tracker, grading scheme editor.
-- More: tasks and exams, settings (theme, accent, thresholds, period timings), export/import (JSON, CSV), PDF/print attendance report, sign in/out, delete all data.
+- More: tasks and exams, settings (theme, accent, thresholds, period timings), Backup and Restore (JSON export/import, CSV export) and a "last backed up" status, PDF/print attendance report, delete all data.
 - Design: clean, friendly, dark and light, large touch targets, empty states, accessible (never color alone), respects prefers-reduced-motion.
 
 ### Responsive rules
@@ -54,15 +54,15 @@ Must support every program type through configuration, not hardcoding: BTech/BE 
 - **Large screens (1536px+)**: Content centered with sensible max-widths and no stretched cards.
 - **Universal compatibility**: All future screens, including tables, the weekly timetable grid, and charts, must be built on the shared layout components (`AppShell`, `PageContainer`, `ResponsiveGrid`, `ResponsiveDialog`) and work seamlessly from 320px to 1920px without horizontal scrolling.
 
-## 6. Backend (Supabase)
-- RLS enabled on EVERY table. Policies: select/insert/update/delete only where user_id = auth.uid(). No public access.
-- Auth: email OTP (6-digit code entered in-app) and Google sign-in. Do NOT depend on magic-link redirects (HashRouter makes them unreliable).
-- Sync: client-generated UUIDs, offline queue, last-write-wins by updated_at, soft deletes. First sign-in offers to upload local data.
-- SQL goes in /supabase/migration.sql as a file. NEVER execute it yourself.
-- Keep rows compact (free-tier limits).
+## 6. Storage & Privacy
+- No backend. No accounts. No data leaves the device.
+- Storage-safety rule:
+  - Request persistent storage with `navigator.storage.persist()`.
+  - Show a backup reminder after a number of days or changes.
+  - Show install-to-home-screen guidance (especially for iOS).
 
 ## 7. Out of scope for now
-Europe/ECTS presets (but design grading, terms, and locale as data so they can be added), social features, AI features, college portal integration.
+Cloud sync and accounts, Europe/ECTS presets (but design grading, terms, and locale as data so they can be added), social features, AI features, college portal integration.
 
 ## 8. Conventions
 Small components, strict TypeScript, engine separate from UI, tests beside code, commit per phase, keep docs/PROGRESS.md updated.
@@ -71,7 +71,7 @@ Small components, strict TypeScript, engine separate from UI, tests beside code,
 - Read docs/SPEC.md and docs/PROGRESS.md first. Read only other files you need. Do not open a browser or take screenshots.
 - Implement ONLY the phase I name. Do not start other phases or refactor unrelated code.
 - Work on a git branch named phase-N (N = phase number). Never commit to main directly.
-- Never run the Supabase migration or any command that changes remote services. Never put real keys in code or commits.
+- Phases must NOT create or update supabase/migration.sql. Move the existing supabase/ folder to docs/archive/supabase/ and mark it unused.
 - Before finishing: run the tests and "npm run build" (once the project exists) and fix errors.
 - Final report, in this order: (1) files created/changed, (2) test and build results (pass/fail with real output summary), (3) commit made, (4) docs/PROGRESS.md updated with done / remaining / known issues, (5) 3-5 steps for me to test manually, (6) anything you had to guess or could not do.
 - If you are running low on usage, stop at a clean point, commit what works, and write the remaining work into docs/PROGRESS.md.
