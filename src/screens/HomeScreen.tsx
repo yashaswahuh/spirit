@@ -102,6 +102,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
     records,
     courses,
     workingDays: activeTerm?.working_days || [1, 2, 3, 4, 5, 6],
+    saturdayRule: activeTerm?.saturday_rule,
   });
 
   // Tomorrow calculation for "Can I Skip Tomorrow?"
@@ -126,6 +127,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
       calendarEvents,
       overrides,
       workingDays: activeTerm?.working_days || [1, 2, 3, 4, 5, 6],
+      saturdayRule: activeTerm?.saturday_rule,
     }
   );
 

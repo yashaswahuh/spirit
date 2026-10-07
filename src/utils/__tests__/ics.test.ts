@@ -108,3 +108,4 @@ describe('iCalendar generator', () => {
     expect(ics).toContain('END:VCALENDAR');
   });
 });
+

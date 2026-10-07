@@ -55,6 +55,7 @@ export const AttendanceScreen: React.FC = () => {
     records,
     courses,
     workingDays: activeTerm?.working_days || [1, 2, 3, 4, 5, 6],
+    saturdayRule: activeTerm?.saturday_rule,
   });
 
   // Compute stats and projections for all courses

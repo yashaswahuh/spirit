@@ -130,16 +130,35 @@
   - Created `.github/workflows/deploy.yml` with automated test, build, and deploy to GitHub Pages (`actions/deploy-pages`) using configurable base path `VITE_BASE_PATH` (default `/spirit/`).
   - Created comprehensive `README.md` and manual verification test plan in `docs/QA_CHECKLIST.md`.
   - All 122 unit and accessibility tests passing across 13 test suites.
+- **Comprehensive UI Polish & Feature Completion Pass**:
+  - **Sleek Custom Scrollbars**: Replaced default browser scrollbars with modern theme-aware scrollbars (`::-webkit-scrollbar` and Firefox `scrollbar-width: thin`) styled seamlessly for light and dark modes.
+  - **Text Overflow & Bounds Safeguards**: Added universal `overflow-wrap: break-word`, `min-w-0`, and text clipping protections across all cards, modals, grids, and tables to eliminate text spilling.
+  - **Alternate Saturdays (2nd & 4th Saturday Off) Rule**:
+    - Added `SaturdayRule` (`all_working`, `second_saturday_off`, `second_fourth_saturday_off`, `all_saturdays_off`) to `Term`.
+    - Implemented exact calendar mathematical detection (`isSaturdayOff`) and integrated it into `resolveDaySchedule`, `countUnmarkedClasses`, `canISkipTomorrow`, `simulateSkippingDates`, `getEffectiveDaySchedule`, `SemesterSwitcherModal`, and `TermSettingsModal`.
+  - **Timetable File Upload & Auto-Recognition Engine**:
+    - Created `timetableParser.ts` supporting Matrix grids and Line/Row formats (.csv, .tsv, .txt, .json), auto-detecting subjects, codes, period times, labs, and faculty.
+    - Created `TimetableUploadModal.tsx` with drag-and-drop, sample timetable loader, live recognition preview, auto-creation of missing subjects with distinct colors, and 1-tap import.
+    - Added "Upload Timetable" action in `TimetableScreen.tsx`.
+  - **Manual Semester Switching & Management**:
+    - Created `SemesterSwitcherModal.tsx` for 1-tap switching of ongoing active terms, date editing, threshold adjustments, Saturday rules, and new term creation.
+    - Integrated global semester switcher into `AppShell.tsx`, mobile/tablet `Header.tsx`, desktop `Sidebar.tsx`, `TimetableScreen.tsx`, and `MoreScreen.tsx`.
+  - **Task, Exam & Deadline Editing**: Added full edit workflow in `TasksTrackerModal.tsx` with prefilled forms, edit mode indicators, and `updateTask` persistence.
+  - **Student Profile Customization**: Created `ProfileEditModal.tsx` to customize name, degree program, branch/department, admission year, and threshold, accessible from `MoreScreen.tsx`.
+  - **Daily Backup Reminder**: Added 1-day threshold setting and "Daily (1 Day)" preset option in `MoreScreen.tsx` with storage safety reassurance banner.
+  - **Testing**: Added unit tests for Saturday rules, timetable parser, and verified all 131 tests passing across 14 test suites.
 
 ### Schema Changes & Migration History (Dexie v3 -> v4)
 - **New Columns Added**:
   - `BaseEntity`: Added `is_demo?: boolean` flag across all 14 Dexie tables to isolate demo records from user data.
+  - `Term`: Added `saturday_rule?: SaturdayRule` to support alternate Saturday holiday rules (2nd Saturday off, 2nd & 4th Saturday off, all off).
 - **Database Version Upgrade**:
   - `Dexie.version(4)` implemented with safe in-place upgrade backfilling `is_demo: false` on existing records without data loss.
 
 ## Remaining
-- All planned phases (0 through 6) fully implemented, tested, and verified.
+- All planned phases and polish enhancements fully implemented, tested, and verified.
 
 ## Known Issues
 - None.
+
 

@@ -117,3 +117,4 @@ Spirit includes a GitHub Actions CI/CD workflow (`.github/workflows/deploy.yml`)
 ## 🔒 Privacy & Safety Guarantee
 
 Spirit does not transmit any student data. There are no tracking scripts, cookies, analytics, or third-party telemetries. All student records remain exclusively on the user's local device. To protect against browser eviction, enable **Persistent Storage** in Settings and periodically export a JSON backup.
+

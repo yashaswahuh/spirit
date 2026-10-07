@@ -16,6 +16,7 @@ export interface SidebarProps {
   isDark: boolean;
   onToggleTheme: () => void;
   termName?: string;
+  onOpenSemesterSwitcher?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -24,6 +25,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isDark,
   onToggleTheme,
   termName,
+  onOpenSemesterSwitcher,
 }) => {
   const navItems = [
     { id: 'home' as NavTab, label: 'Home', icon: Home, description: 'Dashboard & Today' },
@@ -45,16 +47,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="w-10 h-10 rounded-2xl bg-indigo-600 flex items-center justify-center text-white font-black text-xl shadow-md shadow-indigo-200 dark:shadow-none flex-shrink-0">
               S
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <h1 className="text-lg font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-1.5">
                 Spirit
                 <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
                   PWA
                 </span>
               </h1>
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                {termName || 'Semester Dashboard'}
-              </p>
+              {onOpenSemesterSwitcher ? (
+                <button
+                  type="button"
+                  onClick={onOpenSemesterSwitcher}
+                  className="text-xs text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 truncate flex items-center gap-1 transition-colors mt-0.5 text-left group"
+                  title="Click to switch or manage semesters"
+                >
+                  <span className="group-hover:underline truncate">{termName || 'Semester 1'}</span>
+                  <span className="text-[10px] text-indigo-500 font-bold opacity-75 group-hover:opacity-100">&rarr;</span>
+                </button>
+              ) : (
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  {termName || 'Semester Dashboard'}
+                </p>
+              )}
             </div>
           </div>
         </div>

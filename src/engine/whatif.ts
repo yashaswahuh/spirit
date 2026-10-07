@@ -101,6 +101,7 @@ export function simulateSkippingClasses(
 import {
   TimetableVersion,
   TimetableOverride,
+  SaturdayRule,
 } from '../types';
 import { resolveDaySchedule } from './timetable';
 
@@ -110,6 +111,7 @@ export interface WhatIfScheduleContext {
   calendarEvents: CalendarEvent[];
   overrides?: TimetableOverride[];
   workingDays?: Weekday[];
+  saturdayRule?: SaturdayRule;
 }
 
 /**
@@ -126,6 +128,7 @@ export function simulateSkippingDates(
   const versions = context?.versions || [];
   const overrides = context?.overrides || [];
   const workingDays = context?.workingDays || [1, 2, 3, 4, 5, 6];
+  const saturdayRule = context?.saturdayRule;
 
   const skipCounts: Record<string, number> = {};
 
@@ -137,6 +140,7 @@ export function simulateSkippingDates(
       calendarEvents: events,
       overrides,
       workingDays,
+      saturdayRule,
     });
 
     if (!daySchedule.is_holiday) {
@@ -196,6 +200,7 @@ export function simulateSkippingNUpcomingDays(
       calendarEvents: context.calendarEvents,
       overrides: context.overrides || [],
       workingDays: context.workingDays || [1, 2, 3, 4, 5, 6],
+      saturdayRule: context.saturdayRule,
     });
 
     if (!daySchedule.is_holiday && daySchedule.is_working_day && daySchedule.slots.length > 0) {
@@ -246,6 +251,7 @@ export function canISkipTomorrow(
     calendarEvents: context.calendarEvents,
     overrides: context.overrides || [],
     workingDays: context.workingDays || [1, 2, 3, 4, 5, 6],
+    saturdayRule: context.saturdayRule,
   });
 
   if (daySchedule.is_holiday) {

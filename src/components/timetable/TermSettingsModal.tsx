@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Calendar, Clock, Sliders } from 'lucide-react';
-import { Term, Course, Weekday, PeriodTiming } from '../../types';
+import { Term, Course, Weekday, PeriodTiming, SaturdayRule } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 
 interface TermSettingsModalProps {
@@ -14,6 +14,7 @@ interface TermSettingsModalProps {
     attendance_threshold: number;
     working_days: Weekday[];
     period_timings: PeriodTiming[];
+    saturday_rule?: SaturdayRule;
   }) => Promise<void>;
   onUpdateCourseThreshold: (courseId: string, threshold: number | null) => Promise<void>;
 }
@@ -28,6 +29,13 @@ const ALL_WEEKDAYS: { day: Weekday; label: string }[] = [
   { day: 0, label: 'Sun' },
 ];
 
+const SATURDAY_RULES: { value: SaturdayRule; label: string }[] = [
+  { value: 'second_saturday_off', label: '2nd Saturday Off (Standard)' },
+  { value: 'second_fourth_saturday_off', label: '2nd & 4th Saturday Off' },
+  { value: 'all_saturdays_off', label: 'All Saturdays Off (5-Day Week)' },
+  { value: 'all_working', label: 'All Saturdays Working' },
+];
+
 export const TermSettingsModal: React.FC<TermSettingsModalProps> = ({
   isOpen,
   onClose,
@@ -40,6 +48,7 @@ export const TermSettingsModal: React.FC<TermSettingsModalProps> = ({
   const [endDate, setEndDate] = useState(term.end_date);
   const [attendanceThreshold, setAttendanceThreshold] = useState(term.attendance_threshold || 75);
   const [workingDays, setWorkingDays] = useState<Weekday[]>(term.working_days || [1, 2, 3, 4, 5, 6]);
+  const [saturdayRule, setSaturdayRule] = useState<SaturdayRule>(term.saturday_rule || 'second_saturday_off');
   const [periodTimings, setPeriodTimings] = useState<PeriodTiming[]>(term.period_timings || []);
   const [courseThresholds, setCourseThresholds] = useState<Record<string, number | null>>(
     Object.fromEntries(courses.map(c => [c.id, c.attendance_threshold_override]))
@@ -88,6 +97,7 @@ export const TermSettingsModal: React.FC<TermSettingsModalProps> = ({
         attendance_threshold: attendanceThreshold,
         working_days: workingDays,
         period_timings: periodTimings,
+        saturday_rule: saturdayRule,
       });
 
       // Update per-course threshold overrides
@@ -165,11 +175,11 @@ export const TermSettingsModal: React.FC<TermSettingsModalProps> = ({
           </div>
         </div>
 
-        {/* Working Days */}
-        <div className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-100 dark:border-gray-700/80 space-y-2">
+        {/* Working Days & Saturday Rule */}
+        <div className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-100 dark:border-gray-700/80 space-y-3">
           <h4 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
             <Sliders className="w-3.5 h-3.5 text-indigo-500" />
-            Configurable Working Days
+            Configurable Working Days & Saturday Rule
           </h4>
           <p className="text-[11px] text-gray-500 dark:text-gray-400">
             Select standard instructional days for your semester (Sunday is optional).
@@ -196,6 +206,28 @@ export const TermSettingsModal: React.FC<TermSettingsModalProps> = ({
                 </button>
               );
             })}
+          </div>
+
+          <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+            <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-1">
+              Saturday Off Rule (e.g. 2nd Saturday Off)
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {SATURDAY_RULES.map(rule => (
+                <button
+                  type="button"
+                  key={rule.value}
+                  onClick={() => setSaturdayRule(rule.value)}
+                  className={`p-2 rounded-xl border text-xs font-bold text-left transition-all ${
+                    saturdayRule === rule.value
+                      ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-600 text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-600'
+                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400'
+                  }`}
+                >
+                  {rule.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

@@ -140,3 +140,4 @@ export const dictionaries: Record<string, Strings> = {
 };
 
 export const defaultLocale = 'en-IN';
+

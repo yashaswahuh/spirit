@@ -7,6 +7,7 @@ interface HeaderProps {
   isDark: boolean;
   onToggleTheme: () => void;
   rightAction?: React.ReactNode;
+  onOpenSemesterSwitcher?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -15,6 +16,7 @@ export const Header: React.FC<HeaderProps> = ({
   isDark,
   onToggleTheme,
   rightAction,
+  onOpenSemesterSwitcher,
 }) => {
   return (
     <header className="sticky top-0 z-30 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 px-4 py-3 flex items-center justify-between">
@@ -24,7 +26,19 @@ export const Header: React.FC<HeaderProps> = ({
           {title}
         </h1>
         {subtitle && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{subtitle}</p>
+          onOpenSemesterSwitcher ? (
+            <button
+              type="button"
+              onClick={onOpenSemesterSwitcher}
+              className="text-xs text-gray-500 dark:text-gray-400 font-medium hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1 transition-colors text-left"
+              title="Change active semester"
+            >
+              <span>{subtitle}</span>
+              <span className="text-[10px] text-indigo-500 font-bold">&#9662;</span>
+            </button>
+          ) : (
+            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{subtitle}</p>
+          )
         )}
       </div>
 

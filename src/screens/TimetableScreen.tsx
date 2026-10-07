@@ -14,6 +14,7 @@ import {
   Clipboard,
   CalendarDays,
   Layers,
+  UploadCloud,
 } from 'lucide-react';
 import { db } from '../db/dexie';
 import { Weekday, Course, TimetableSlot } from '../types';
@@ -41,6 +42,8 @@ import { OneOffOverrideModal } from '../components/timetable/OneOffOverrideModal
 import { CalendarEventModal } from '../components/timetable/CalendarEventModal';
 import { PasteHolidaysModal } from '../components/timetable/PasteHolidaysModal';
 import { TermSettingsModal } from '../components/timetable/TermSettingsModal';
+import { TimetableUploadModal } from '../components/timetable/TimetableUploadModal';
+import { SemesterSwitcherModal } from '../components/timetable/SemesterSwitcherModal';
 
 const ALL_DAYS: { day: Weekday; label: string; full: string }[] = [
   { day: 1, label: 'Mon', full: 'Monday' },
@@ -84,6 +87,8 @@ export const TimetableScreen: React.FC = () => {
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isSemesterModalOpen, setIsSemesterModalOpen] = useState(false);
 
   const courseMap = new Map<string, Course>(courses.map(c => [c.id, c]));
 
@@ -144,6 +149,26 @@ export const TimetableScreen: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setIsUploadModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/70 dark:bg-indigo-950/40 text-xs font-bold text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition-colors min-h-[44px]"
+            title="Upload or paste timetable file to auto-recognize subjects"
+          >
+            <UploadCloud className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+            Upload Timetable
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsSemesterModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors min-h-[44px]"
+            title="Switch semester or edit dates"
+          >
+            <Calendar className="w-3.5 h-3.5 text-indigo-500" />
+            {term?.name || 'Semesters'}
+          </button>
+
           <button
             type="button"
             onClick={() => setIsSettingsModalOpen(true)}
@@ -692,6 +717,21 @@ export const TimetableScreen: React.FC = () => {
           }}
         />
       )}
+
+      {/* 7. Upload Timetable Modal */}
+      <TimetableUploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        activeTerm={term}
+        existingCourses={courses}
+        activeVersion={activeVersion}
+      />
+
+      {/* 8. Semester Switcher Modal */}
+      <SemesterSwitcherModal
+        isOpen={isSemesterModalOpen}
+        onClose={() => setIsSemesterModalOpen(false)}
+      />
     </PageContainer>
   );
 };

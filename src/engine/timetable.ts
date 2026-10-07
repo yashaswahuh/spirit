@@ -12,7 +12,30 @@ import {
   CalendarEvent,
   Weekday,
   CourseType,
+  SaturdayRule,
 } from '../types';
+
+/**
+ * Evaluates whether a given date is an off Saturday based on the specified Saturday rule.
+ * 2nd Saturday of any month falls on days 8 through 14.
+ * 4th Saturday of any month falls on days 22 through 28.
+ */
+export function isSaturdayOff(dateStr: string, rule?: SaturdayRule): boolean {
+  if (!rule || rule === 'all_working') return false;
+  const d = new Date(dateStr + 'T00:00:00Z');
+  if (d.getUTCDay() !== 6) return false;
+
+  const dayOfMonth = d.getUTCDate();
+  if (rule === 'all_saturdays_off') return true;
+
+  const is2nd = dayOfMonth >= 8 && dayOfMonth <= 14;
+  if (rule === 'second_saturday_off') return is2nd;
+
+  const is4th = dayOfMonth >= 22 && dayOfMonth <= 28;
+  if (rule === 'second_fourth_saturday_off') return is2nd || is4th;
+
+  return false;
+}
 
 export interface EffectiveSlot {
   slot_id: string | null; // null if extra class
@@ -215,6 +238,7 @@ export interface ResolveDayScheduleParams {
   calendarEvents: CalendarEvent[];
   overrides?: TimetableOverride[];
   workingDays?: Weekday[]; // default [1, 2, 3, 4, 5, 6] (Mon-Sat)
+  saturdayRule?: SaturdayRule;
 }
 
 /**
@@ -223,8 +247,9 @@ export interface ResolveDayScheduleParams {
  * 1. Timetable versions (effective_from)
  * 2. Calendar events (holidays, range holidays, swap days, exams)
  * 3. Working days of the term
- * 4. One-off date overrides (cancel, substitute, extra, reschedule)
- * 5. Slot weights
+ * 4. Saturday working rules (e.g. 2nd Saturday off, 2nd & 4th Saturday off)
+ * 5. One-off date overrides (cancel, substitute, extra, reschedule)
+ * 6. Slot weights
  */
 export function resolveDaySchedule(params: ResolveDayScheduleParams): DayScheduleResolution {
   const {
@@ -234,6 +259,7 @@ export function resolveDaySchedule(params: ResolveDayScheduleParams): DaySchedul
     calendarEvents,
     overrides = [],
     workingDays = [1, 2, 3, 4, 5, 6],
+    saturdayRule,
   } = params;
 
   const dateObj = new Date(date + 'T00:00:00Z');
@@ -255,6 +281,25 @@ export function resolveDaySchedule(params: ResolveDayScheduleParams): DaySchedul
       is_working_day: false,
       is_holiday: true,
       holiday_note: holidayEvent.note || 'Holiday',
+      is_swap_day: false,
+      effective_weekday: regularWeekday,
+      is_exam_day: false,
+      exam_note: null,
+      slots: [],
+      total_periods: 0,
+    };
+  }
+
+  // Check Saturday working rule (e.g. 2nd Saturday off)
+  if (saturdayRule && isSaturdayOff(date, saturdayRule)) {
+    const dayOfMonth = dateObj.getUTCDate();
+    const note = dayOfMonth >= 22 ? '4th Saturday Off' : '2nd Saturday Off';
+    return {
+      date,
+      weekday: regularWeekday,
+      is_working_day: false,
+      is_holiday: true,
+      holiday_note: note,
       is_swap_day: false,
       effective_weekday: regularWeekday,
       is_exam_day: false,

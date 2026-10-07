@@ -8,6 +8,49 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Custom Sleek Scrollbars - Light & Dark Mode */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.4);
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.75);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.55);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(129, 140, 248, 0.85);
+}
+
+/* Firefox modern scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.4) transparent;
+}
+
+.dark * {
+  scrollbar-color: rgba(75, 85, 99, 0.55) transparent;
+}
+
+/* Universal text safety - prevent texts spanning out of boxes */
+p, span, h1, h2, h3, h4, h5, h6, button, a, label {
+  overflow-wrap: break-word;
+}
+
 /* Accessibility: Accessible visible focus ring for keyboard navigation */
 :focus-visible {
   outline: 2px solid #4f46e5;

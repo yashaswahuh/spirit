@@ -258,6 +258,7 @@ export async function getEffectiveDaySchedule(dateStr?: string): Promise<DaySche
     calendarEvents,
     overrides,
     workingDays,
+    saturdayRule: activeTerm?.saturday_rule,
   });
 }
 

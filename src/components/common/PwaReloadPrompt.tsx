@@ -48,3 +48,4 @@ export const PwaReloadPrompt: React.FC = () => {
     </div>
   );
 };
+

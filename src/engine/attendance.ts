@@ -146,7 +146,7 @@ export function computeCourseAttendanceStats(
   };
 }
 
-import { TimetableSlot, CalendarEvent, TimetableVersion, TimetableOverride, Weekday } from '../types';
+import { TimetableSlot, CalendarEvent, TimetableVersion, TimetableOverride, Weekday, SaturdayRule } from '../types';
 import { resolveDaySchedule } from './timetable';
 
 export interface UnmarkedCountParams {
@@ -159,6 +159,7 @@ export interface UnmarkedCountParams {
   records: AttendanceRecord[];
   courses: { id: string; tracking_start_date?: string | null }[];
   workingDays?: Weekday[];
+  saturdayRule?: SaturdayRule;
 }
 
 /**
@@ -176,6 +177,7 @@ export function countUnmarkedClasses(params: UnmarkedCountParams): number {
     records,
     courses,
     workingDays = [1, 2, 3, 4, 5, 6],
+    saturdayRule,
   } = params;
 
   if (startDate > endDate) return 0;
@@ -198,6 +200,7 @@ export function countUnmarkedClasses(params: UnmarkedCountParams): number {
       calendarEvents,
       overrides,
       workingDays,
+      saturdayRule,
     });
 
     if (!schedule.is_holiday && schedule.slots.length > 0) {

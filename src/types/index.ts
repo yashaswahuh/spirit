@@ -83,6 +83,12 @@ export type CourseType =
 
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
 
+export type SaturdayRule =
+  | 'all_working'
+  | 'second_saturday_off'
+  | 'second_fourth_saturday_off'
+  | 'all_saturdays_off';
+
 export type CalendarEventType = 'holiday' | 'exam' | 'swap_day' | 'event';
 
 export type AttendanceStatus =
@@ -192,6 +198,7 @@ export interface Term extends BaseEntity {
   attendance_threshold?: number; // Target attendance threshold for the term (default 75)
   working_days?: Weekday[]; // Working days of week (default Mon-Sat: [1, 2, 3, 4, 5, 6])
   period_timings?: PeriodTiming[]; // Custom period timings
+  saturday_rule?: SaturdayRule; // e.g. 'second_saturday_off' or 'second_fourth_saturday_off'
 }
 
 // ============================================================================

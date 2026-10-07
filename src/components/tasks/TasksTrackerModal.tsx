@@ -4,14 +4,15 @@ import {
   CheckSquare,
   Plus,
   Trash2,
+  Edit2,
   MapPin,
   CheckCircle2,
   FileText,
 } from 'lucide-react';
 import { db } from '../../db/dexie';
-import { TaskType, Course } from '../../types';
+import { TaskType, Course, Task } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
-import { createTask, toggleTaskDone, deleteTask } from '../../db/repositories/task.repo';
+import { createTask, updateTask, toggleTaskDone, deleteTask } from '../../db/repositories/task.repo';
 
 interface TasksTrackerModalProps {
   isOpen: boolean;
@@ -28,8 +29,9 @@ export const TasksTrackerModal: React.FC<TasksTrackerModalProps> = ({
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'exams' | 'assignments' | 'pending' | 'completed'>('all');
   const [isAdding, setIsAdding] = useState(false);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
 
-  // New task form state
+  // Task form state
   const [title, setTitle] = useState('');
   const [type, setType] = useState<TaskType>('assignment');
   const [dueDate, setDueDate] = useState('');
@@ -49,10 +51,30 @@ export const TasksTrackerModal: React.FC<TasksTrackerModalProps> = ({
     setSyllabus('');
     setVenue('');
     setNotes('');
+    setEditingTaskId(null);
     setIsAdding(false);
   };
 
-  const handleCreateTask = async (e: React.FormEvent) => {
+  const handleStartEdit = (task: Task) => {
+    setEditingTaskId(task.id);
+    setTitle(task.title);
+    setType(task.type);
+    if (task.due_at) {
+      const parts = task.due_at.split('T');
+      setDueDate(parts[0] || '');
+      setDueTime(parts[1] ? parts[1].slice(0, 5) : '23:59');
+    } else {
+      setDueDate('');
+      setDueTime('23:59');
+    }
+    setCourseId(task.course_id || '');
+    setSyllabus(task.syllabus || '');
+    setVenue(task.venue || '');
+    setNotes(task.notes || '');
+    setIsAdding(true);
+  };
+
+  const handleSubmitTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
@@ -60,20 +82,32 @@ export const TasksTrackerModal: React.FC<TasksTrackerModalProps> = ({
     try {
       const dueAt = dueDate ? `${dueDate}T${dueTime || '23:59'}:00` : null;
 
-      await createTask({
-        title: title.trim(),
-        type,
-        due_at: dueAt,
-        course_id: courseId || null,
-        done: false,
-        syllabus: syllabus.trim() || null,
-        venue: venue.trim() || null,
-        notes: notes.trim() || null,
-      });
+      if (editingTaskId) {
+        await updateTask(editingTaskId, {
+          title: title.trim(),
+          type,
+          due_at: dueAt,
+          course_id: courseId || null,
+          syllabus: syllabus.trim() || null,
+          venue: venue.trim() || null,
+          notes: notes.trim() || null,
+        });
+      } else {
+        await createTask({
+          title: title.trim(),
+          type,
+          due_at: dueAt,
+          course_id: courseId || null,
+          done: false,
+          syllabus: syllabus.trim() || null,
+          venue: venue.trim() || null,
+          notes: notes.trim() || null,
+        });
+      }
 
       resetForm();
     } catch (err) {
-      console.error('Failed to create task:', err);
+      console.error('Failed to save task:', err);
     } finally {
       setIsSubmitting(false);
     }
@@ -152,7 +186,13 @@ export const TasksTrackerModal: React.FC<TasksTrackerModalProps> = ({
 
           <button
             type="button"
-            onClick={() => setIsAdding(!isAdding)}
+            onClick={() => {
+              if (isAdding) {
+                resetForm();
+              } else {
+                setIsAdding(true);
+              }
+            }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors flex-shrink-0"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -160,16 +200,21 @@ export const TasksTrackerModal: React.FC<TasksTrackerModalProps> = ({
           </button>
         </div>
 
-        {/* Add Task / Exam Form */}
+        {/* Add / Edit Task / Exam Form */}
         {isAdding && (
           <form
-            onSubmit={handleCreateTask}
+            onSubmit={handleSubmitTask}
             className="p-4 sm:p-5 bg-gray-50 dark:bg-gray-800/60 rounded-3xl border border-gray-100 dark:border-gray-800 space-y-4 animate-fade-in"
           >
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">
-                Create Task or Exam
+                {editingTaskId ? 'Edit Task or Exam' : 'Create Task or Exam'}
               </h4>
+              {editingTaskId && (
+                <span className="text-[10px] bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-semibold px-2 py-0.5 rounded">
+                  Editing
+                </span>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -301,7 +346,7 @@ export const TasksTrackerModal: React.FC<TasksTrackerModalProps> = ({
                 disabled={isSubmitting || !title.trim()}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm transition-colors"
               >
-                Save
+                {editingTaskId ? 'Update Task' : 'Save'}
               </button>
             </div>
           </form>
@@ -390,15 +435,25 @@ export const TasksTrackerModal: React.FC<TasksTrackerModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-3 flex-shrink-0">
+                  <div className="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0">
                     <span className={`px-2.5 py-1 rounded-xl text-xs font-bold ${status.color}`}>
                       {status.label}
                     </span>
 
                     <button
                       type="button"
+                      onClick={() => handleStartEdit(task)}
+                      className="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors p-1"
+                      title="Edit Task"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
                       onClick={() => deleteTask(task.id)}
                       className="text-gray-400 hover:text-rose-500 transition-colors p-1"
+                      title="Delete Task"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

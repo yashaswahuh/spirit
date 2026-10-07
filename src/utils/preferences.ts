@@ -102,3 +102,4 @@ export const getPeriodTimings = (): PeriodTimingConfig[] => {
 export const setPeriodTimings = (timings: PeriodTimingConfig[]): void => {
   localStorage.setItem('spirit_period_timings', JSON.stringify(timings));
 };
+

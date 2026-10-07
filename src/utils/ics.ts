@@ -223,3 +223,4 @@ export async function downloadOrShareIcs(filename: string, icsContent: string): 
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   return true;
 }
+

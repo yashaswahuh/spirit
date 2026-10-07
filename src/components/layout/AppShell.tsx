@@ -12,6 +12,7 @@ export interface AppShellProps {
   isDark: boolean;
   onToggleTheme: () => void;
   termName?: string;
+  onOpenSemesterSwitcher?: () => void;
 }
 
 export const AppShell: React.FC<AppShellProps> = ({
@@ -23,6 +24,7 @@ export const AppShell: React.FC<AppShellProps> = ({
   isDark,
   onToggleTheme,
   termName,
+  onOpenSemesterSwitcher,
 }) => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black font-sans antialiased text-gray-900 dark:text-gray-100 flex flex-col lg:flex-row">
@@ -33,6 +35,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         isDark={isDark}
         onToggleTheme={onToggleTheme}
         termName={termName}
+        onOpenSemesterSwitcher={onOpenSemesterSwitcher}
       />
 
       {/* 2. Main Area (Mobile / Tablet / Desktop) */}
@@ -44,6 +47,7 @@ export const AppShell: React.FC<AppShellProps> = ({
             subtitle={subtitle}
             isDark={isDark}
             onToggleTheme={onToggleTheme}
+            onOpenSemesterSwitcher={onOpenSemesterSwitcher}
           />
         </div>
 

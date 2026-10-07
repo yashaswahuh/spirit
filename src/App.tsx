@@ -23,6 +23,7 @@ import {
   applyTheme,
   getEffectiveThemeIsDark,
 } from './utils/preferences';
+import { SemesterSwitcherModal } from './components/timetable/SemesterSwitcherModal';
 
 const MainApp: React.FC = () => {
   const navigate = useNavigate();
@@ -31,6 +32,7 @@ const MainApp: React.FC = () => {
   // Dark mode state with system preference support
   const [themePref, setThemePrefState] = useState<ThemePreference>(getThemePreference);
   const [isDark, setIsDark] = useState<boolean>(() => getEffectiveThemeIsDark());
+  const [isSemesterSwitcherOpen, setIsSemesterSwitcherOpen] = useState(false);
 
   useEffect(() => {
     const effectiveDark = applyTheme(themePref);
@@ -107,40 +109,48 @@ const MainApp: React.FC = () => {
   }
 
   return (
-    <AppShell
-      activeTab={activeTab}
-      onTabChange={handleTabChange}
-      title={headerInfo.title}
-      subtitle={headerInfo.subtitle}
-      isDark={isDark}
-      onToggleTheme={handleToggleTheme}
-      termName={activeTerm?.name}
-    >
-      <React.Suspense fallback={<LoadingSpinner message="Loading..." size="lg" className="min-h-[50vh]" />}>
-        <Routes>
-          <Route path="/" element={<HomeScreen onNavigateToAttendance={() => handleTabChange('attendance')} />} />
-          <Route path="/home" element={<HomeScreen onNavigateToAttendance={() => handleTabChange('attendance')} />} />
-          <Route path="/attendance" element={<AttendanceScreen />} />
-          <Route path="/timetable" element={<TimetableScreen />} />
-          <Route path="/grades" element={<GradesScreen />} />
-          <Route
-            path="/more"
-            element={
-              <MoreScreen
-                isDark={isDark}
-                themePref={themePref}
-                onThemePrefChange={p => {
-                  setThemePreference(p);
-                  setThemePrefState(p);
-                }}
-                onToggleTheme={handleToggleTheme}
-                onResetApp={() => navigate('/')}
-              />
-            }
-          />
-        </Routes>
-      </React.Suspense>
-    </AppShell>
+    <>
+      <AppShell
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+        title={headerInfo.title}
+        subtitle={headerInfo.subtitle}
+        isDark={isDark}
+        onToggleTheme={handleToggleTheme}
+        termName={activeTerm?.name}
+        onOpenSemesterSwitcher={() => setIsSemesterSwitcherOpen(true)}
+      >
+        <React.Suspense fallback={<LoadingSpinner message="Loading..." size="lg" className="min-h-[50vh]" />}>
+          <Routes>
+            <Route path="/" element={<HomeScreen onNavigateToAttendance={() => handleTabChange('attendance')} />} />
+            <Route path="/home" element={<HomeScreen onNavigateToAttendance={() => handleTabChange('attendance')} />} />
+            <Route path="/attendance" element={<AttendanceScreen />} />
+            <Route path="/timetable" element={<TimetableScreen />} />
+            <Route path="/grades" element={<GradesScreen />} />
+            <Route
+              path="/more"
+              element={
+                <MoreScreen
+                  isDark={isDark}
+                  themePref={themePref}
+                  onThemePrefChange={p => {
+                    setThemePreference(p);
+                    setThemePrefState(p);
+                  }}
+                  onToggleTheme={handleToggleTheme}
+                  onResetApp={() => navigate('/')}
+                />
+              }
+            />
+          </Routes>
+        </React.Suspense>
+      </AppShell>
+
+      <SemesterSwitcherModal
+        isOpen={isSemesterSwitcherOpen}
+        onClose={() => setIsSemesterSwitcherOpen(false)}
+      />
+    </>
   );
 };
 

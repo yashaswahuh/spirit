@@ -6,6 +6,7 @@ import {
   expandDateRange,
   resolveDaySchedule,
   timeToMinutes,
+  isSaturdayOff,
 } from '../timetable';
 import {
   TimetableSlot,
@@ -517,6 +518,71 @@ describe('Timetable Engine Unit Tests', () => {
         calendarEvents: [],
       });
       expect(resLast.date).toBe(termLastDay);
+    });
+
+    describe('Saturday Working Rules (2nd and 4th Saturday Off)', () => {
+      it('correctly identifies off Saturdays using isSaturdayOff', () => {
+        // Oct 2026: 3rd (1st Sat), 10th (2nd Sat), 17th (3rd Sat), 24th (4th Sat), 31st (5th Sat)
+        expect(isSaturdayOff('2026-10-10', 'second_saturday_off')).toBe(true);
+        expect(isSaturdayOff('2026-10-03', 'second_saturday_off')).toBe(false);
+        expect(isSaturdayOff('2026-10-17', 'second_saturday_off')).toBe(false);
+        expect(isSaturdayOff('2026-10-24', 'second_saturday_off')).toBe(false);
+        expect(isSaturdayOff('2026-10-31', 'second_saturday_off')).toBe(false);
+
+        // 2nd & 4th Saturday Off
+        expect(isSaturdayOff('2026-10-10', 'second_fourth_saturday_off')).toBe(true);
+        expect(isSaturdayOff('2026-10-24', 'second_fourth_saturday_off')).toBe(true);
+        expect(isSaturdayOff('2026-10-03', 'second_fourth_saturday_off')).toBe(false);
+        expect(isSaturdayOff('2026-10-17', 'second_fourth_saturday_off')).toBe(false);
+
+        // All working / all off
+        expect(isSaturdayOff('2026-10-10', 'all_working')).toBe(false);
+        expect(isSaturdayOff('2026-10-03', 'all_saturdays_off')).toBe(true);
+        expect(isSaturdayOff('2026-10-02', 'all_saturdays_off')).toBe(false); // Friday
+      });
+
+      it('automatically marks 2nd Saturday as holiday and clears slots in resolveDaySchedule', () => {
+        const saturdaySlot: TimetableSlot = {
+          id: dummyUUID(88),
+          user_id: 'user1',
+          course_id: 'c1',
+          weekday: 6, // Saturday
+          start_time: '09:00',
+          end_time: '10:00',
+          room: '101',
+          component_type: 'theory',
+          created_at: '',
+          updated_at: '',
+          deleted_at: null,
+        };
+
+        // 2nd Saturday: 2026-10-10
+        const result2ndSat = resolveDaySchedule({
+          date: '2026-10-10',
+          versions: [],
+          slots: [saturdaySlot],
+          calendarEvents: [],
+          saturdayRule: 'second_saturday_off',
+        });
+
+        expect(result2ndSat.is_holiday).toBe(true);
+        expect(result2ndSat.is_working_day).toBe(false);
+        expect(result2ndSat.holiday_note).toBe('2nd Saturday Off');
+        expect(result2ndSat.slots).toHaveLength(0);
+
+        // 1st Saturday: 2026-10-03 should still have classes
+        const result1stSat = resolveDaySchedule({
+          date: '2026-10-03',
+          versions: [],
+          slots: [saturdaySlot],
+          calendarEvents: [],
+          saturdayRule: 'second_saturday_off',
+        });
+
+        expect(result1stSat.is_holiday).toBe(false);
+        expect(result1stSat.is_working_day).toBe(true);
+        expect(result1stSat.slots).toHaveLength(1);
+      });
     });
   });
 });

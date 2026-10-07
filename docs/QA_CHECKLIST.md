@@ -129,3 +129,4 @@ This checklist covers manual verification of all Spirit capabilities across phon
 | ACC-06 | Automated Axe Audit | `vitest` automated axe-core audit passes with 0 violations across all screens. | Pass |
 | PERF-01 | Route Code Splitting | Routes load on demand via `React.lazy` with bundle chunks under 160 kB. | Pass |
 | PERF-02 | Offline PWA | Disconnecting network allows full offline navigation, attendance logging, and calculation. | Pass |
+

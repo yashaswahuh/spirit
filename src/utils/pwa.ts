@@ -59,3 +59,4 @@ export async function promptPwaInstall(): Promise<boolean> {
     return false;
   }
 }
+

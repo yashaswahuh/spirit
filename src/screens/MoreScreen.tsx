@@ -21,6 +21,7 @@ import {
   Info,
   Send,
   CalendarDays,
+  Pencil,
 } from 'lucide-react';
 import { db } from '../db/dexie';
 import { seedDemoData, hasDemoData, clearDemoData, resetDatabase } from '../db/repositories/setup.repo';
@@ -32,6 +33,8 @@ import { DeleteDataModal } from '../components/safety/DeleteDataModal';
 import { InstallGuidanceModal } from '../components/safety/InstallGuidanceModal';
 import { PrivacyModal } from '../components/safety/PrivacyModal';
 import { PeriodTimingsModal } from '../components/timetable/PeriodTimingsModal';
+import { ProfileEditModal } from '../components/profile/ProfileEditModal';
+import { SemesterSwitcherModal } from '../components/timetable/SemesterSwitcherModal';
 import { useI18n } from '../i18n';
 import {
   ThemePreference,
@@ -100,6 +103,8 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   const [isInstallOpen, setIsInstallOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isPeriodTimingsOpen, setIsPeriodTimingsOpen] = useState(false);
+  const [isProfileEditOpen, setIsProfileEditOpen] = useState(false);
+  const [isSemesterSwitcherOpen, setIsSemesterSwitcherOpen] = useState(false);
 
   // Storage and Safety state
   const [isPersisted, setIsPersisted] = useState<boolean | null>(null);
@@ -285,10 +290,20 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
         <div className="space-y-4 sm:space-y-6">
           {/* Profile Info Card */}
           <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
-            <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-indigo-600" />
-              Student Profile
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-indigo-600" />
+                Student Profile
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsProfileEditOpen(true)}
+                className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 min-h-[36px] px-2"
+              >
+                <Pencil className="w-3 h-3" />
+                Edit Profile
+              </button>
+            </div>
             <div className="divide-y divide-gray-100 dark:divide-gray-800/80 text-sm">
               <div className="py-2.5 flex items-center justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Name</span>
@@ -302,7 +317,14 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
               </div>
               <div className="py-2.5 flex items-center justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Semester</span>
-                <span className="font-semibold text-gray-900 dark:text-white">{activeTerm?.name || 'Semester 1'}</span>
+                <button
+                  type="button"
+                  onClick={() => setIsSemesterSwitcherOpen(true)}
+                  className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 text-xs sm:text-sm"
+                >
+                  <span>{activeTerm?.name || 'Semester 1'}</span>
+                  <span className="text-xs text-indigo-500 font-bold">&rarr; Switch</span>
+                </button>
               </div>
             </div>
 
@@ -678,9 +700,49 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
 
             {/* Configurable Reminder Thresholds */}
             <form onSubmit={handleSaveBackupThresholds} className="pt-2 border-t border-gray-100 dark:border-gray-800 space-y-3">
-              <span className="text-xs font-bold text-gray-800 dark:text-gray-200 block">
-                Backup Reminder Rules
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-800 dark:text-gray-200 block">
+                  Backup Reminder Rules
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDaysThreshold(1);
+                      setChangesThreshold(5);
+                    }}
+                    className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition-all ${
+                      daysThreshold === 1
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
+                    }`}
+                  >
+                    Daily (1 Day)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDaysThreshold(7);
+                      setChangesThreshold(20);
+                    }}
+                    className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition-all ${
+                      daysThreshold === 7
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
+                    }`}
+                  >
+                    Weekly (7 Days)
+                  </button>
+                </div>
+              </div>
+
+              {daysThreshold === 1 && (
+                <div className="p-2.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/40 text-[11px] text-indigo-800 dark:text-indigo-200 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
+                  <span>Daily reminders active: you will be prompted daily to export backups, safeguarding against data loss.</span>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
                   <label className="text-gray-500 dark:text-gray-400 block mb-1">Days without backup</label>
@@ -837,6 +899,22 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
           isOpen={isPrivacyOpen}
           onClose={() => setIsPrivacyOpen(false)}
           onOpenBackup={() => setIsBackupOpen(true)}
+        />
+      )}
+
+      {isProfileEditOpen && (
+        <ProfileEditModal
+          isOpen={isProfileEditOpen}
+          onClose={() => setIsProfileEditOpen(false)}
+          profile={profile}
+          program={program}
+        />
+      )}
+
+      {isSemesterSwitcherOpen && (
+        <SemesterSwitcherModal
+          isOpen={isSemesterSwitcherOpen}
+          onClose={() => setIsSemesterSwitcherOpen(false)}
         />
       )}
     </PageContainer>

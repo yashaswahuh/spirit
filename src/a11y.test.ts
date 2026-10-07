@@ -149,3 +149,4 @@ describe('Accessibility audit with axe-core across screens and layouts', () => {
     expect(results.violations).toEqual([]);
   });
 });
+
