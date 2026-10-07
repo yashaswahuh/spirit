@@ -35,7 +35,7 @@ const MainApp: React.FC = () => {
   }, [isDark]);
 
   // Check if profile exists
-  const profile = useLiveQuery(() => db.profile.filter(p => p.deleted_at === null).first());
+  const profiles = useLiveQuery(() => db.profile.filter(p => p.deleted_at === null).toArray());
   const activeTerm = useLiveQuery(() => db.term.filter(t => t.deleted_at === null && t.status === 'ongoing').first());
 
   // Determine current active tab from hash path
@@ -68,9 +68,8 @@ const MainApp: React.FC = () => {
 
   const headerInfo = getHeaderInfo();
 
-  // If app is not initialized, show Onboarding Wizard
-  if (profile === undefined) {
-    // Loading state while Dexie initializes
+  // If query is in-flight (Dexie initializing)
+  if (profiles === undefined) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600" />
@@ -78,7 +77,8 @@ const MainApp: React.FC = () => {
     );
   }
 
-  if (profile === null) {
+  // If no profile exists yet, show Onboarding Wizard
+  if (profiles.length === 0) {
     return <OnboardingWizard onComplete={() => navigate('/home')} />;
   }
 

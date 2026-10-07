@@ -36,7 +36,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
       setIsSwapDay(res.isSwapDay);
       setSwapNote(res.swapNote);
     });
-  }, [records]);
+  }, [records, courses]);
 
   // Overall attendance calculation across all courses
   let totalAttended = 0;
