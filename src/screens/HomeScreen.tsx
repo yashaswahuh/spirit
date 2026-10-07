@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { AlertTriangle, CheckCircle2, ShieldCheck, ArrowRight, BookOpen } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ShieldCheck, ArrowRight, BookOpen, Clock } from 'lucide-react';
 import { db } from '../db/dexie';
 import type { TimetableSlot } from '../types';
 import { computeCourseAttendanceStats } from '../engine/attendance';
 import { getTodayTimetableSlots } from '../db/repositories/timetable.repo';
 import { markAttendance } from '../db/repositories/attendance.repo';
 import { TodayClassesSection } from '../components/home/TodayClassesSection';
+import { PageContainer } from '../components/layout/PageContainer';
 
 interface HomeScreenProps {
   onNavigateToAttendance: () => void;
@@ -81,148 +82,181 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
   });
 
   return (
-    <div className="p-4 space-y-5 animate-fade-in">
+    <PageContainer maxWidth="xl" className="space-y-6 animate-fade-in">
       {/* Greeting Banner */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 border-b border-gray-100 dark:border-gray-800/80">
         <div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight">
             Hello, {profile?.name || 'Student'} 👋
           </h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5">
             {formattedDate} • {activeTerm?.name || 'Current Term'}
           </p>
         </div>
-      </div>
 
-      {/* Overall Attendance Stat Card */}
-      <div className="bg-gradient-to-br from-indigo-600 to-indigo-800 rounded-3xl p-5 text-white shadow-lg shadow-indigo-200 dark:shadow-none space-y-4">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-wider text-indigo-200">
-            Overall Attendance
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/40">
+            <Clock className="w-3.5 h-3.5" />
+            {todaySlots.length} Classes Today
           </span>
-          <span className="text-xs px-2.5 py-0.5 rounded-full bg-white/20 backdrop-blur-sm font-medium">
-            Goal: {threshold}%
-          </span>
-        </div>
-
-        <div className="flex items-baseline justify-between">
-          <div>
-            <span className="text-4xl font-black tracking-tight">
-              {totalConducted > 0 ? `${overallPercentage.toFixed(1)}%` : '100%'}
-            </span>
-            <p className="text-xs text-indigo-100 mt-1">
-              {totalAttended} of {totalConducted} classes attended
-            </p>
-          </div>
-
-          <div>
-            {totalConducted === 0 ? (
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-white/20 text-white">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Fresh Term
-              </span>
-            ) : isOverallSafe ? (
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-400/25 text-emerald-100 border border-emerald-400/30">
-                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
-                Safe
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-rose-400/25 text-rose-100 border border-rose-400/30">
-                <AlertTriangle className="w-3.5 h-3.5 text-rose-300" />
-                In Danger
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Status Callout Strip */}
-        <div className="pt-3 border-t border-white/15 flex items-center justify-between text-xs text-indigo-100">
-          <span>
-            {inDangerCount === 0 ? (
-              <span className="text-emerald-200 font-medium">
-                All {courses.length} subjects are safely above {threshold}%
-              </span>
-            ) : (
-              <span className="text-rose-200 font-bold flex items-center gap-1">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                {inDangerCount} {inDangerCount === 1 ? 'subject needs' : 'subjects need'} attention
-              </span>
-            )}
-          </span>
-          <button
-            onClick={onNavigateToAttendance}
-            className="font-bold underline flex items-center gap-0.5 hover:text-white"
-          >
-            Details <ArrowRight className="w-3 h-3" />
-          </button>
         </div>
       </div>
 
-      {/* Today's Classes Section (One-tap logging) */}
-      <TodayClassesSection
-        slots={todaySlots}
-        courses={courses}
-        recordsToday={recordsToday}
-        isHoliday={isHoliday}
-        holidayNote={holidayNote}
-        isSwapDay={isSwapDay}
-        swapNote={swapNote}
-        onMarkAttendance={handleMarkToday}
-      />
+      {/* Multi-column layout on Desktop (lg:grid-cols-12), single column on Mobile */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left / Primary Column: Hero Card & Today's Schedule */}
+        <div className="lg:col-span-7 xl:col-span-7 space-y-6">
+          {/* Overall Attendance Hero Card */}
+          <div className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-900 rounded-3xl p-5 sm:p-7 text-white shadow-xl shadow-indigo-100 dark:shadow-none space-y-5 relative overflow-hidden">
+            <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-44 h-44 bg-white/5 rounded-full pointer-events-none" />
 
-      {/* Subjects Overview Teaser */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-            <BookOpen className="w-4 h-4 text-indigo-600" />
-            Subject Health
-          </h3>
-          <button
-            onClick={onNavigateToAttendance}
-            className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline"
-          >
-            View All ({courses.length})
-          </button>
-        </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs sm:text-sm font-bold uppercase tracking-wider text-indigo-200">
+                Overall Attendance
+              </span>
+              <span className="text-xs px-3 py-1 rounded-full bg-white/20 backdrop-blur-md font-semibold">
+                Target: {threshold}%
+              </span>
+            </div>
 
-        <div className="divide-y divide-gray-100 dark:divide-gray-800">
-          {courseStatsList.slice(0, 3).map(({ course, stats }) => (
-            <div key={course.id} className="py-2.5 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <span
-                  className="w-2.5 h-2.5 rounded-full"
-                  style={{ backgroundColor: course.color || '#6366f1' }}
-                />
-                <div>
-                  <h4 className="text-xs font-bold text-gray-900 dark:text-white truncate max-w-[180px]">
-                    {course.name}
-                  </h4>
-                  <span className="text-[10px] text-gray-400">
-                    {stats.attended}/{stats.conducted} classes
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-right">
-                <span
-                  className={`text-xs font-bold ${
-                    stats.is_in_danger
-                      ? 'text-rose-600 dark:text-rose-400'
-                      : 'text-emerald-600 dark:text-emerald-400'
-                  }`}
-                >
-                  {stats.conducted > 0 ? `${stats.percentage.toFixed(0)}%` : '100%'}
+            <div className="flex items-baseline justify-between gap-4">
+              <div>
+                <span className="text-4xl sm:text-5xl font-black tracking-tight">
+                  {totalConducted > 0 ? `${overallPercentage.toFixed(1)}%` : '100%'}
                 </span>
-                <p className="text-[10px] text-gray-400">
-                  {stats.is_in_danger
-                    ? `Must attend ${stats.must_attend}`
-                    : `Can skip ${stats.safe_bunks}`}
+                <p className="text-xs sm:text-sm text-indigo-100 mt-1.5 font-medium">
+                  {totalAttended} attended out of {totalConducted} conducted classes
                 </p>
               </div>
+
+              <div>
+                {totalConducted === 0 ? (
+                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-white/20 text-white">
+                    <ShieldCheck className="w-4 h-4" />
+                    Fresh Term
+                  </span>
+                ) : isOverallSafe ? (
+                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-emerald-400/25 text-emerald-100 border border-emerald-400/30">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                    Safe
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-rose-400/25 text-rose-100 border border-rose-400/30">
+                    <AlertTriangle className="w-4 h-4 text-rose-300" />
+                    In Danger
+                  </span>
+                )}
+              </div>
             </div>
-          ))}
+
+            {/* Progress Bar */}
+            <div className="w-full bg-black/20 h-2.5 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-500 ${
+                  totalConducted === 0
+                    ? 'bg-white/40'
+                    : isOverallSafe
+                    ? 'bg-emerald-400'
+                    : 'bg-rose-400'
+                }`}
+                style={{ width: `${Math.min(100, Math.max(0, overallPercentage))}%` }}
+              />
+            </div>
+
+            {/* Status Callout Strip */}
+            <div className="pt-3 border-t border-white/15 flex items-center justify-between text-xs sm:text-sm text-indigo-100">
+              <div>
+                {inDangerCount === 0 ? (
+                  <span className="text-emerald-200 font-semibold flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4" />
+                    All {courses.length} subjects are safely above {threshold}%
+                  </span>
+                ) : (
+                  <span className="text-rose-200 font-bold flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-rose-300" />
+                    {inDangerCount} {inDangerCount === 1 ? 'subject requires' : 'subjects require'} immediate attendance
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={onNavigateToAttendance}
+                className="font-bold underline flex items-center gap-1 hover:text-white transition-colors focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-none rounded px-1"
+              >
+                Subject Details <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Today's Classes Section (One-tap logging) */}
+          <TodayClassesSection
+            slots={todaySlots}
+            courses={courses}
+            recordsToday={recordsToday}
+            isHoliday={isHoliday}
+            holidayNote={holidayNote}
+            isSwapDay={isSwapDay}
+            swapNote={swapNote}
+            onMarkAttendance={handleMarkToday}
+          />
+        </div>
+
+        {/* Right Column: Subject Health Breakdown & Highlights */}
+        <div className="lg:col-span-5 xl:col-span-5 space-y-6">
+          {/* Subject Health Card */}
+          <div className="bg-white dark:bg-gray-900 rounded-3xl p-5 sm:p-6 border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-indigo-600" />
+                Subject Health Overview
+              </h3>
+              <button
+                onClick={onNavigateToAttendance}
+                className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none rounded"
+              >
+                View All ({courses.length})
+              </button>
+            </div>
+
+            <div className="divide-y divide-gray-100 dark:divide-gray-800/80">
+              {courseStatsList.map(({ course, stats }) => (
+                <div key={course.id} className="py-3 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <span
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: course.color || '#6366f1' }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate">
+                        {course.name}
+                      </h4>
+                      <p className="text-[11px] text-gray-400 font-medium">
+                        {course.code || 'Course'} • {stats.attended}/{stats.conducted} classes
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right flex-shrink-0">
+                    <span
+                      className={`text-xs sm:text-sm font-black ${
+                        stats.is_in_danger
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : 'text-emerald-600 dark:text-emerald-400'
+                      }`}
+                    >
+                      {stats.conducted > 0 ? `${stats.percentage.toFixed(0)}%` : '100%'}
+                    </span>
+                    <p className="text-[10px] text-gray-400 font-medium">
+                      {stats.is_in_danger
+                        ? `Need ${stats.must_attend}`
+                        : `Skip ${stats.safe_bunks}`}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 };

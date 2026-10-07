@@ -8,6 +8,7 @@ import { CourseAttendanceCard } from '../components/attendance/CourseAttendanceC
 import { SubjectModal } from '../components/attendance/SubjectModal';
 import { createCourse, updateCourse, deleteCourse } from '../db/repositories/course.repo';
 import { markAttendance } from '../db/repositories/attendance.repo';
+import { PageContainer } from '../components/layout/PageContainer';
 
 export const AttendanceScreen: React.FC = () => {
   const profile = useLiveQuery(() => db.profile.filter(p => p.deleted_at === null).first());
@@ -80,15 +81,15 @@ export const AttendanceScreen: React.FC = () => {
   };
 
   return (
-    <div className="p-4 space-y-4 animate-fade-in">
+    <PageContainer maxWidth="xl" className="space-y-6 animate-fade-in">
       {/* Header Bar */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-gray-100 dark:border-gray-800">
         <div>
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+          <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight">
             Subject Attendance
           </h2>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            {courses.length} subjects enrolled
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+            {courses.length} subjects enrolled in {activeTerm?.name || 'Current Term'}
           </p>
         </div>
 
@@ -97,54 +98,54 @@ export const AttendanceScreen: React.FC = () => {
             setEditingCourse(undefined);
             setIsModalOpen(true);
           }}
-          className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs py-2 px-3.5 rounded-xl shadow-sm transition-colors min-h-[38px]"
+          className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs sm:text-sm py-2.5 px-4 rounded-xl shadow-md shadow-indigo-200 dark:shadow-none transition-all focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none min-h-[44px] self-start sm:self-auto"
         >
           <Plus className="w-4 h-4" />
           Add Subject
         </button>
       </div>
 
-      {/* Search and Filters */}
-      <div className="space-y-2">
-        <div className="relative">
+      {/* Search and Filters Bar */}
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+        <div className="relative flex-1 max-w-md">
           <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             placeholder="Search subjects by name or code..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full pl-9 pr-4 py-2.5 text-xs sm:text-sm rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[40px]"
           />
         </div>
 
-        <div className="flex items-center gap-1.5 text-xs">
-          <Filter className="w-3.5 h-3.5 text-gray-400 mr-1" />
+        <div className="flex items-center gap-1.5 text-xs flex-wrap">
+          <Filter className="w-3.5 h-3.5 text-gray-400 mr-1 hidden sm:inline-block" />
           <button
             onClick={() => setFilterMode('all')}
-            className={`px-3 py-1 rounded-lg font-semibold transition-all ${
+            className={`px-3 py-2 rounded-xl font-semibold transition-all min-h-[38px] ${
               filterMode === 'all'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             All ({courseItems.length})
           </button>
           <button
             onClick={() => setFilterMode('danger')}
-            className={`px-3 py-1 rounded-lg font-semibold transition-all ${
+            className={`px-3 py-2 rounded-xl font-semibold transition-all min-h-[38px] ${
               filterMode === 'danger'
-                ? 'bg-rose-600 text-white'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900'
+                ? 'bg-rose-600 text-white shadow-sm'
+                : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             Danger ({courseItems.filter(i => i.stats.is_in_danger).length})
           </button>
           <button
             onClick={() => setFilterMode('safe')}
-            className={`px-3 py-1 rounded-lg font-semibold transition-all ${
+            className={`px-3 py-2 rounded-xl font-semibold transition-all min-h-[38px] ${
               filterMode === 'safe'
-                ? 'bg-emerald-600 text-white'
-                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             Safe ({courseItems.filter(i => !i.stats.is_in_danger && i.stats.conducted > 0).length})
@@ -152,10 +153,10 @@ export const AttendanceScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Courses List */}
-      <div className="space-y-3">
+      {/* Courses Responsive Grid: 1 col on mobile, 2 on tablet, 2 or 3 on desktop */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
         {filteredItems.length === 0 ? (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-8 text-center border border-gray-100 dark:border-gray-800 space-y-3">
+          <div className="col-span-full bg-white dark:bg-gray-900 rounded-3xl p-12 text-center border border-gray-100 dark:border-gray-800 space-y-3">
             <p className="text-sm text-gray-500 dark:text-gray-400">
               No subjects found matching your criteria.
             </p>
@@ -187,7 +188,7 @@ export const AttendanceScreen: React.FC = () => {
         )}
       </div>
 
-      {/* Add / Edit Modal */}
+      {/* Add / Edit Modal (uses ResponsiveDialog) */}
       <SubjectModal
         isOpen={isModalOpen}
         initialCourse={editingCourse}
@@ -197,6 +198,6 @@ export const AttendanceScreen: React.FC = () => {
         }}
         onSave={handleSaveCourse}
       />
-    </div>
+    </PageContainer>
   );
 };

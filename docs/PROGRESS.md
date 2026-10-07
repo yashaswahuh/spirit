@@ -13,13 +13,23 @@
 - **Phase 2: Local Storage (Dexie), Onboarding, One-Tap Attendance & Home Dashboard**:
   - Integrated local-first storage using **Dexie.js** (`spirit_db` in IndexedDB) supporting all 12 entities with zero login required.
   - Built Zod validation schemas in `src/db/schemas.ts` and type-safe repositories in `src/db/repositories/`.
-  - Built Onboarding Wizard (`OnboardingWizard.tsx`): 5-step wizard (Degree preset selection, Program & term details, Subject builder, Timetable setup, Attendance threshold selector) with a 1-tap "Skip & Load Demo" option.
+  - Built Onboarding Wizard (`OnboardingWizard.tsx`) with 1-tap "Skip & Load Demo" option.
   - Subject management: View, add, edit, and delete courses with credits, types, colors, threshold overrides, and leave rules.
-  - One-tap attendance marking: Today's classes section on the Home dashboard and quick buttons (+Present, -Absent, Cancelled) on subject cards.
-  - Per-subject attendance cards: Attendance percentage, status badge with accessible icon and text (never color alone), safe-bunks / must-attend counter, and conducted tally.
-  - Bottom tab bar: 5 tabs (Home, Attendance, Timetable, Grades, More) using `HashRouter` with touch-friendly 48px+ targets.
-  - Home dashboard: Overall attendance card, danger subject alerts, and today's schedule with one-tap status toggling.
-  - Full test suite passing (8 test files, 57 tests) and verified clean production build (`tsc && vite build`).
+  - One-tap attendance marking on today's classes and per-subject cards.
+  - Per-subject attendance cards with percentage, status badges (icon + text), safe bunks / must-attend counter, and conducted tally.
+- **Phase 2b: Responsive Layout Pass (Every Screen Size 320px–1920px)**:
+  - Built reusable responsive layout building blocks:
+    - `AppShell`: Handles left sidebar on desktop (`lg:flex` at $\ge 1024\text{px}$) vs bottom navigation on mobile/tablet (`lg:hidden` at $< 1024\text{px}$).
+    - `PageContainer`: Responsive maximum width container with sensible padding from phone to ultra-wide displays (`sm:max-w-3xl`, `lg:max-w-6xl`, `2xl:max-w-7xl`).
+    - `ResponsiveGrid`: Clean multi-column grids for dashboards, subjects, and timetable slots.
+    - `ResponsiveDialog`: Bottom-sheet modal on phones ($< 640\text{px}$), centered backdrop dialog on tablet/desktop ($\ge 640\text{px}$).
+    - `Sidebar`: Desktop navigation with logo, active pills, term subtitle, theme switcher, and offline indicator.
+  - Fixed Today's Class Cards:
+    - Time display rendered strictly on ONE line (`09:00 - 09:55`, `whitespace-nowrap`).
+    - Present/Absent/Cancelled buttons placed below class details on narrow mobile screens and beside it on wider displays.
+  - Enhanced desktop interactions: hover transitions, `focus-visible` accessibility rings, keyboard navigation, and touch targets $\ge 40\text{px}-44\text{px}$ on phones.
+  - Added "Responsive rules" subsection to `docs/SPEC.md` (Section 5).
+  - All 57 unit tests pass and clean production build verified.
 
 ## Remaining
 - **Phase 3**: What-If Simulator Modal & Timetable Grid with Swap-Days & Holiday Management.

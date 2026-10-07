@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db/dexie';
-import { Header } from './components/layout/Header';
-import { BottomNav, NavTab } from './components/layout/BottomNav';
+import { AppShell } from './components/layout/AppShell';
+import { NavTab } from './components/layout/BottomNav';
 import { OnboardingWizard } from './components/onboarding/OnboardingWizard';
 import { HomeScreen } from './screens/HomeScreen';
 import { AttendanceScreen } from './screens/AttendanceScreen';
@@ -83,29 +83,24 @@ const MainApp: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-black font-sans antialiased text-gray-900 dark:text-gray-100 flex justify-center">
-      <div className="w-full max-w-md min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col relative pb-20 shadow-xl border-x border-gray-200/50 dark:border-gray-800/50">
-        <Header
-          title={headerInfo.title}
-          subtitle={headerInfo.subtitle}
-          isDark={isDark}
-          onToggleTheme={() => setIsDark(!isDark)}
-        />
-
-        <main className="flex-1 overflow-y-auto">
-          <Routes>
-            <Route path="/" element={<HomeScreen onNavigateToAttendance={() => handleTabChange('attendance')} />} />
-            <Route path="/home" element={<HomeScreen onNavigateToAttendance={() => handleTabChange('attendance')} />} />
-            <Route path="/attendance" element={<AttendanceScreen />} />
-            <Route path="/timetable" element={<TimetableScreen />} />
-            <Route path="/grades" element={<GradesScreen />} />
-            <Route path="/more" element={<MoreScreen isDark={isDark} onToggleTheme={() => setIsDark(!isDark)} onResetApp={() => navigate('/')} />} />
-          </Routes>
-        </main>
-
-        <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
-      </div>
-    </div>
+    <AppShell
+      activeTab={activeTab}
+      onTabChange={handleTabChange}
+      title={headerInfo.title}
+      subtitle={headerInfo.subtitle}
+      isDark={isDark}
+      onToggleTheme={() => setIsDark(!isDark)}
+      termName={activeTerm?.name}
+    >
+      <Routes>
+        <Route path="/" element={<HomeScreen onNavigateToAttendance={() => handleTabChange('attendance')} />} />
+        <Route path="/home" element={<HomeScreen onNavigateToAttendance={() => handleTabChange('attendance')} />} />
+        <Route path="/attendance" element={<AttendanceScreen />} />
+        <Route path="/timetable" element={<TimetableScreen />} />
+        <Route path="/grades" element={<GradesScreen />} />
+        <Route path="/more" element={<MoreScreen isDark={isDark} onToggleTheme={() => setIsDark(!isDark)} onResetApp={() => navigate('/')} />} />
+      </Routes>
+    </AppShell>
   );
 };
 

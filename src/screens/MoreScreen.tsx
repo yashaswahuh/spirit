@@ -1,8 +1,9 @@
 import React from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Sparkles, Trash2, Sun, Moon, ShieldCheck } from 'lucide-react';
+import { Sparkles, Trash2, Sun, Moon, ShieldCheck, User } from 'lucide-react';
 import { db } from '../db/dexie';
 import { seedDemoData, resetDatabase } from '../db/repositories/setup.repo';
+import { PageContainer } from '../components/layout/PageContainer';
 
 interface MoreScreenProps {
   isDark: boolean;
@@ -33,91 +34,106 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   };
 
   return (
-    <div className="p-4 space-y-4 animate-fade-in">
-      <div>
-        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-          Settings & More
+    <PageContainer maxWidth="xl" className="space-y-6 animate-fade-in">
+      <div className="pb-2 border-b border-gray-100 dark:border-gray-800">
+        <h2 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+          Settings & Data
         </h2>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Preferences, backup, and local storage
+        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+          Preferences, backup, and local storage management
         </p>
       </div>
 
-      {/* Profile Info Card */}
-      <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 space-y-3">
-        <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-          Student Profile
-        </h3>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-600 dark:text-gray-400">Name</span>
-          <span className="font-bold text-gray-900 dark:text-white">{profile?.name || 'Student'}</span>
-        </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-600 dark:text-gray-400">Program</span>
-          <span className="font-semibold text-gray-900 dark:text-white">
-            {program?.degree_type} • {program?.branch_department}
-          </span>
-        </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-600 dark:text-gray-400">Semester</span>
-          <span className="font-semibold text-gray-900 dark:text-white">{activeTerm?.name || 'Semester 1'}</span>
-        </div>
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-600 dark:text-gray-400">Default Attendance Goal</span>
-          <span className="font-bold text-indigo-600 dark:text-indigo-400">
-            {profile?.default_attendance_threshold || 75}%
-          </span>
-        </div>
-      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 items-start">
+        {/* Left Column: Profile & Preferences */}
+        <div className="space-y-4 sm:space-y-6">
+          {/* Profile Info Card */}
+          <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
+            <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+              <User className="w-3.5 h-3.5 text-indigo-600" />
+              Student Profile
+            </h3>
+            <div className="divide-y divide-gray-100 dark:divide-gray-800/80 text-sm">
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Name</span>
+                <span className="font-bold text-gray-900 dark:text-white">{profile?.name || 'Student'}</span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Program</span>
+                <span className="font-semibold text-gray-900 dark:text-white">
+                  {program?.degree_type} • {program?.branch_department}
+                </span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Semester</span>
+                <span className="font-semibold text-gray-900 dark:text-white">{activeTerm?.name || 'Semester 1'}</span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Default Attendance Goal</span>
+                <span className="font-bold text-indigo-600 dark:text-indigo-400">
+                  {profile?.default_attendance_threshold || 75}%
+                </span>
+              </div>
+            </div>
+          </div>
 
-      {/* Preferences Card */}
-      <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 space-y-3">
-        <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-          Preferences
-        </h3>
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">Dark Mode</span>
-          <button
-            onClick={onToggleTheme}
-            className="p-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
-            aria-label="Toggle theme"
-          >
-            {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-600" />}
-          </button>
+          {/* Preferences Card */}
+          <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-3">
+            <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Display Preferences
+            </h3>
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-sm font-bold text-gray-800 dark:text-gray-200 block">Theme Mode</span>
+                <span className="text-xs text-gray-400">Switch between dark and light appearance</span>
+              </div>
+              <button
+                onClick={onToggleTheme}
+                className="p-2.5 rounded-xl bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                aria-label="Toggle theme"
+              >
+                {isDark ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5 text-indigo-600" />}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Database Tools & Privacy */}
+        <div className="space-y-4 sm:space-y-6">
+          <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
+            <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Database & Testing Tools
+            </h3>
+            <div className="space-y-3">
+              <button
+                onClick={handleSeedDemo}
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 font-semibold text-xs sm:text-sm hover:bg-indigo-100 transition-colors focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none min-h-[44px]"
+              >
+                <Sparkles className="w-4 h-4" />
+                Load Sample Demo Semester Data
+              </button>
+              <button
+                onClick={handleResetData}
+                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/30 text-red-600 dark:text-red-400 font-semibold text-xs sm:text-sm hover:bg-red-100 transition-colors focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none min-h-[44px]"
+              >
+                <Trash2 className="w-4 h-4" />
+                Reset All Data & Start Fresh
+              </button>
+            </div>
+          </div>
+
+          {/* Local-First Privacy Notice */}
+          <div className="bg-gray-100/70 dark:bg-gray-800/40 rounded-3xl p-5 sm:p-6 text-center space-y-2">
+            <p className="text-xs sm:text-sm font-bold text-gray-800 dark:text-gray-200 flex items-center justify-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-emerald-600" />
+              100% Local-First & Private
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto">
+              All records are stored securely in your browser's IndexedDB. Zero login required, no tracking, and no external dependencies.
+            </p>
+          </div>
         </div>
       </div>
-
-      {/* Data Management Card */}
-      <div className="bg-white dark:bg-gray-900 p-4 rounded-2xl border border-gray-100 dark:border-gray-800 space-y-3">
-        <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-          Database & Demo Tools
-        </h3>
-        <button
-          onClick={handleSeedDemo}
-          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 font-semibold text-xs hover:bg-indigo-100 transition-colors min-h-[44px]"
-        >
-          <Sparkles className="w-4 h-4" />
-          Load Sample Demo Semester Data
-        </button>
-        <button
-          onClick={handleResetData}
-          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/30 text-red-600 dark:text-red-400 font-semibold text-xs hover:bg-red-100 transition-colors min-h-[44px]"
-        >
-          <Trash2 className="w-4 h-4" />
-          Reset All Data & Start Fresh
-        </button>
-      </div>
-
-      {/* Local-First Privacy Notice */}
-      <div className="bg-gray-100/70 dark:bg-gray-800/40 rounded-2xl p-4 text-center space-y-1">
-        <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center justify-center gap-1.5">
-          <ShieldCheck className="w-4 h-4 text-emerald-600" />
-          100% Local-First & Private
-        </p>
-        <p className="text-[11px] text-gray-500 dark:text-gray-400">
-          All records are stored securely in your browser's IndexedDB. Zero login required, no tracking.
-        </p>
-      </div>
-    </div>
+    </PageContainer>
   );
 };

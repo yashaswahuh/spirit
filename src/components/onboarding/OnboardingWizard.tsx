@@ -129,8 +129,8 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-gray-50 dark:bg-gray-950 flex flex-col justify-between overflow-y-auto p-4 sm:p-6">
-      <div className="max-w-md w-full mx-auto pb-24">
+    <div className="fixed inset-0 z-50 bg-gray-50 dark:bg-gray-950 flex flex-col justify-between overflow-y-auto p-4 sm:p-6 lg:p-8">
+      <div className="max-w-xl sm:max-w-2xl w-full mx-auto pb-24">
         {/* Top Header & Progress */}
         <div className="pt-2 pb-4">
           <div className="flex items-center justify-between mb-3">
@@ -497,7 +497,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
 
       {/* Bottom Sticky Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-t border-gray-200 dark:border-gray-800 z-40">
-        <div className="max-w-md mx-auto flex items-center gap-3">
+        <div className="max-w-xl sm:max-w-2xl mx-auto flex items-center gap-3">
           {step > 1 && (
             <button
               onClick={() => setStep(step - 1)}

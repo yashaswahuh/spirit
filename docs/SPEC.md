@@ -47,6 +47,13 @@ Must support every program type through configuration, not hardcoding: BTech/BE 
 - More: tasks and exams, settings (theme, accent, thresholds, period timings), export/import (JSON, CSV), PDF/print attendance report, sign in/out, delete all data.
 - Design: clean, friendly, dark and light, large touch targets, empty states, accessible (never color alone), respects prefers-reduced-motion.
 
+### Responsive rules
+- **Under 640px (phone)**: Single column, bottom tab bar (`BottomNav`), bottom sheets for dialogs (`ResponsiveDialog`), touch targets >= 44px.
+- **640px to 1023px (tablet)**: Two-column responsive grids where useful, content max width approx 900px.
+- **1024px and up (desktop/laptop)**: Left sidebar replaces bottom tab bar, content area max width approx 1200px, multi-column dashboard, dialogs render as centered modals.
+- **Large screens (1536px+)**: Content centered with sensible max-widths and no stretched cards.
+- **Universal compatibility**: All future screens, including tables, the weekly timetable grid, and charts, must be built on the shared layout components (`AppShell`, `PageContainer`, `ResponsiveGrid`, `ResponsiveDialog`) and work seamlessly from 320px to 1920px without horizontal scrolling.
+
 ## 6. Backend (Supabase)
 - RLS enabled on EVERY table. Policies: select/insert/update/delete only where user_id = auth.uid(). No public access.
 - Auth: email OTP (6-digit code entered in-app) and Google sign-in. Do NOT depend on magic-link redirects (HashRouter makes them unreliable).
