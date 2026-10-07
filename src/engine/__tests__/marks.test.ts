@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   evaluateRuleGroup,
   calculateCourseInternalMarks,
+  deriveGradeFromMarks,
+  checkCourseEligibility,
   EvaluatedComponent,
 } from '../marks';
 
@@ -79,6 +81,75 @@ describe('Assessment Marks Engine', () => {
       expect(summary.total_weighted_marks_obtained).toBe(35);
       // Scaled = (35 / 40) * 100 = 87.5%
       expect(summary.scaled_percentage).toBe(87.5);
+    });
+
+    it('handles absent and not_held component statuses', () => {
+      const components: EvaluatedComponent[] = [
+        // Midsem 1: entered, 40/50 (80%) -> 16 marks out of 20
+        { id: 'm1', name: 'Midsem 1', max_marks: 50, obtained_marks: 40, weightage: 20, rule: 'normal', status: 'entered' },
+        // Midsem 2: absent -> 0 marks out of 20
+        { id: 'm2', name: 'Midsem 2', max_marks: 50, obtained_marks: 0, weightage: 20, rule: 'normal', status: 'absent' },
+        // End-Sem: not held yet -> excluded from evaluated weightage
+        { id: 'end', name: 'End Sem', max_marks: 100, obtained_marks: 0, weightage: 60, rule: 'normal', status: 'not_held' },
+      ];
+
+      const summary = calculateCourseInternalMarks(components);
+      // Evaluated weightage = 20 + 20 = 40 (End sem excluded)
+      expect(summary.total_weightage_evaluated).toBe(40);
+      expect(summary.total_weighted_marks_obtained).toBe(16);
+      expect(summary.scaled_percentage).toBe(40.0);
+    });
+  });
+
+  describe('deriveGradeFromMarks', () => {
+    const scale = [
+      { letter: 'O', points: 10, min_percentage: 90 },
+      { letter: 'A+', points: 9, min_percentage: 80 },
+      { letter: 'A', points: 8, min_percentage: 70 },
+      { letter: 'B+', points: 7, min_percentage: 60 },
+      { letter: 'B', points: 6, min_percentage: 50 },
+      { letter: 'C', points: 5, min_percentage: 40 },
+      { letter: 'F', points: 0, min_percentage: 0 },
+    ];
+
+    it('matches percentage into appropriate letter grade and points', () => {
+      expect(deriveGradeFromMarks(95, scale, 40)).toEqual({ letter: 'O', points: 10, is_passing: true });
+      expect(deriveGradeFromMarks(82, scale, 40)).toEqual({ letter: 'A+', points: 9, is_passing: true });
+      expect(deriveGradeFromMarks(55, scale, 40)).toEqual({ letter: 'B', points: 6, is_passing: true });
+      expect(deriveGradeFromMarks(35, scale, 40)).toEqual({ letter: 'F', points: 0, is_passing: false });
+    });
+  });
+
+  describe('checkCourseEligibility', () => {
+    it('flags detention risk when attendance is below threshold', () => {
+      const result = checkCourseEligibility({
+        attendancePercentage: 68.5,
+        attendanceThreshold: 75.0,
+      });
+
+      expect(result.is_attendance_eligible).toBe(false);
+      expect(result.is_at_risk_of_detention).toBe(true);
+      expect(result.reasons[0]).toContain('Detention Risk');
+    });
+
+    it('enforces separate internal and end-sem minimum passing rules', () => {
+      // Passed internal minimum (needs 15, got 18)
+      // Failed end-sem minimum (needs 35, got 30)
+      const result = checkCourseEligibility({
+        attendancePercentage: 80.0,
+        attendanceThreshold: 75.0,
+        internalObtained: 18,
+        minInternalRequired: 15,
+        endSemObtained: 30,
+        minEndSemRequired: 35,
+        overallPercentage: 48,
+        passMark: 40,
+      });
+
+      expect(result.is_attendance_eligible).toBe(true);
+      expect(result.is_internal_eligible).toBe(true);
+      expect(result.is_end_sem_eligible).toBe(false);
+      expect(result.is_overall_passed).toBe(false);
     });
   });
 });

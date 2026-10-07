@@ -16,17 +16,17 @@ Must support every program type through configuration, not hardcoding: BTech/BE 
 ## 3. Data model (all rows have: id (client-generated UUID), created_at, updated_at, deleted_at nullable; kept so cloud sync can be added later, no user_id requirement)
 - profile: name, region (IN default), theme, accent, default attendance threshold.
 - program: degree_type, branch/department, start_year, duration_years, entry_type (regular/lateral), term_system (semester/trimester/annual), grading_scheme_id.
-- grading_scheme (JSON, user-editable, with presets): type (point_scale/percentage/division/pass_fail), letter->points map, pass mark, max point (10 or 4 etc.), cgpa_to_percentage rule (multiplier or custom formula), rounding rule. Presets are APPROXIMATIONS: show a notice "Check your university's rules" and let the user edit everything.
+- grading_scheme (JSON, user-editable, with presets): type (point_scale/percentage/division/pass_fail), letter->points map, pass mark, max point (10 or 4 etc.), cgpa_to_percentage rule (multiplier or custom formula), rounding rule, repeat_handling (replace_old/keep_best). Presets are APPROXIMATIONS: show a notice "Check your university's rules" and let the user edit everything.
 - term: program_id, number/name, start_date, end_date, sgpa (computed), status, attendance_threshold, working_days, period_timings.
-- course: term_id, name, code, credits, type (theory/lab/tutorial/project/elective/audit), counts_toward_gpa, attendance_threshold override, color, medical/duty leave rules, initial_attended, initial_conducted, tracking_start_date.
+- course: term_id, name, code, credits, type (theory/lab/tutorial/project/elective/audit), counts_toward_gpa, attendance_threshold override, color, medical/duty leave rules, initial_attended, initial_conducted, tracking_start_date, min_internal_marks, min_end_sem_marks, pass_marks, grade_band_override.
 - timetable_version: term_id, name, effective_from.
 - timetable_slot: course_id, version_id nullable, weekday, start_time, end_time, room, faculty nullable, component_type, weight (periods it counts for, default 1), period_name nullable.
 - timetable_override: term_id, date, action (cancel/substitute/extra/reschedule), original_slot_id nullable, course_id, start_time, end_time, room, faculty, component_type, weight, note.
 - calendar_event: date, end_date nullable, type (holiday/exam/swap-day/event), swap_target_weekday nullable, note. Swap day = "follow Monday's timetable on Saturday".
 - attendance_record: course_id, date, slot_id nullable, status (present/absent/cancelled/medical/duty_leave/holiday), weight (default 1), override_id nullable, note. Per-subject rules: whether medical and duty leave count as present (setting).
-- assessment_component: course_id, name (CAT1, mid-sem, assignment, lab internal, end-sem...), max_marks, weightage, rule (normal / best_of_N / drop_lowest).
-- mark: component_id, obtained_marks.
-- grade_result: course_id, letter/points (final), attempt number (supports backlog/arrear, repeat/improvement).
+- assessment_component: course_id, name (CAT1, mid-sem, assignment, lab internal, end-sem...), max_marks, weightage, rule (normal / best_of_N / drop_lowest), rule_group nullable, rule_params nullable, is_end_sem, min_pass_marks.
+- mark: component_id, obtained_marks (nullable), status (entered/absent/not_held).
+- grade_result: course_id, term_id nullable, letter_grade (final, supports special grades AB/I/W/P/F), grade_points nullable, attempt_number (supports backlog/arrear, repeat/improvement), is_passing.
 - task: title, type (assignment/exam/other), due_at, course_id nullable, done.
 
 ## 4. Calculation engine (unit-test all, including edge cases)

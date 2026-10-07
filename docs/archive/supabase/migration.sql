@@ -557,3 +557,15 @@ create policy "Users can delete their own timetable overrides"
     on public.timetable_override for delete
     using (auth.uid() = user_id);
 
+-- ----------------------------------------------------------------------------
+-- PHASE 4 COLUMN EXTENSIONS
+-- ----------------------------------------------------------------------------
+alter table public.course add column if not exists min_internal_marks numeric(5,2);
+alter table public.course add column if not exists min_end_sem_marks numeric(5,2);
+alter table public.course add column if not exists pass_marks numeric(5,2);
+alter table public.course add column if not exists grade_band_override jsonb;
+
+alter table public.mark add column if not exists status text default 'entered' check (status in ('entered', 'absent', 'not_held'));
+
+alter table public.grade_result add column if not exists term_id uuid references public.term(id) on delete set null;
+

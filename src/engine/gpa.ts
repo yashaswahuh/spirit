@@ -33,6 +33,11 @@ export function applyRounding(value: number, rule?: RoundingRule): number {
 /**
  * Calculates SGPA (Semester Grade Point Average) for a term.
  * SGPA = sum(credits * grade_points) / sum(credits) for GPA-counting courses.
+ * Special grades:
+ * - 'W' (Withdrawn): excluded from GPA credits and total credits.
+ * - 'I' (Incomplete): excluded from GPA calculation.
+ * - 'AB' (Absent): 0 points, counted in GPA credits.
+ * - Audit / 0-credit courses: excluded from GPA calculation.
  */
 export function calculateSgpa(
   courses: CourseGradeCreditInput[],
@@ -43,12 +48,30 @@ export function calculateSgpa(
   let totalCreditsSum = 0;
 
   for (const course of courses) {
+    const letter = course.letter_grade?.toUpperCase().trim();
+
+    // Withdrawn courses are excluded completely
+    if (letter === 'W') {
+      continue;
+    }
+
     totalCreditsSum += course.credits;
 
-    if (course.counts_toward_gpa) {
-      weightedPointsSum += course.credits * course.grade_points;
-      gpaCreditsSum += course.credits;
+    // Audit or non-credit courses do not affect GPA
+    if (course.is_audit || !course.counts_toward_gpa || course.credits === 0) {
+      continue;
     }
+
+    // Incomplete courses do not affect GPA until resolved
+    if (letter === 'I') {
+      continue;
+    }
+
+    // Absent gives 0 points but counts in GPA
+    const points = letter === 'AB' ? 0.0 : (course.grade_points ?? 0.0);
+
+    weightedPointsSum += course.credits * points;
+    gpaCreditsSum += course.credits;
   }
 
   const rawSgpa = gpaCreditsSum > 0 ? weightedPointsSum / gpaCreditsSum : 0.0;
@@ -67,12 +90,14 @@ export interface CourseAttemptRecord {
   grade_points: number;
   counts_toward_gpa: boolean;
   attempt_number: number;
+  term_number?: number;
 }
 
 export interface CgpaOptions {
   repeat_handling: 'replace_old' | 'keep_best';
   rounding?: RoundingRule;
   cgpa_to_percentage?: CgpaToPercentageRule;
+  entry_term?: number; // e.g. 3 for lateral entry
 }
 
 export interface CgpaComputationResult {
@@ -86,13 +111,17 @@ export interface CgpaComputationResult {
  * Computes CGPA across terms with backlog and repeat handling.
  * - replace_old: Keeps the attempt with the highest attempt_number.
  * - keep_best: Keeps the attempt with the highest grade_points.
+ * - entry_term: Ignores terms prior to entry term (e.g. Terms 1 & 2 for lateral entry).
  */
 export function calculateCgpa(
   allAttempts: CourseAttemptRecord[],
   options: CgpaOptions
 ): CgpaComputationResult {
-  // Filter for GPA-counting courses
-  const gpaCourses = allAttempts.filter(c => c.counts_toward_gpa);
+  // Filter for GPA-counting courses, honoring lateral entry term threshold
+  const entryTerm = options.entry_term ?? 1;
+  const gpaCourses = allAttempts.filter(
+    c => c.counts_toward_gpa && (c.term_number === undefined || c.term_number >= entryTerm)
+  );
 
   // Group by course_id to resolve retakes/backlogs
   const courseGroups = new Map<string, CourseAttemptRecord[]>();
@@ -191,4 +220,66 @@ export function convertCgpaToPercentage(
   const bounded = Math.min(100.0, Math.max(0.0, rawPercentage));
   return applyRounding(bounded, rounding);
 }
+
+export interface TargetSgpaPlannerInput {
+  currentCgpa: number;
+  completedCredits: number;
+  targetCgpa: number;
+  remainingCredits: number;
+  maxPoint?: number; // default 10.0
+}
+
+export interface TargetSgpaPlannerResult {
+  requiredSgpa: number;
+  isAchievable: boolean;
+  reason?: string;
+}
+
+/**
+ * Calculates the required SGPA needed in remaining credits to achieve a target CGPA.
+ * Explicitly indicates if target is mathematically impossible (> maxPoint).
+ */
+export function calculateRequiredSgpaForTarget(
+  input: TargetSgpaPlannerInput,
+  rounding?: RoundingRule
+): TargetSgpaPlannerResult {
+  const { currentCgpa, completedCredits, targetCgpa, remainingCredits, maxPoint = 10.0 } = input;
+
+  if (remainingCredits <= 0) {
+    const isMet = currentCgpa >= targetCgpa;
+    return {
+      requiredSgpa: 0,
+      isAchievable: isMet,
+      reason: isMet ? 'Target already met' : 'No remaining credits to improve CGPA',
+    };
+  }
+
+  const totalCredits = completedCredits + remainingCredits;
+  // targetCgpa = (currentCgpa * completedCredits + requiredSgpa * remainingCredits) / totalCredits
+  const neededWeighted = targetCgpa * totalCredits - currentCgpa * completedCredits;
+  const rawRequired = neededWeighted / remainingCredits;
+  const rounded = applyRounding(rawRequired, rounding);
+
+  if (rounded > maxPoint) {
+    return {
+      requiredSgpa: rounded,
+      isAchievable: false,
+      reason: `Requires an SGPA of ${rounded.toFixed(2)}, which exceeds the maximum scale limit of ${maxPoint}`,
+    };
+  }
+
+  if (rounded <= 0) {
+    return {
+      requiredSgpa: 0,
+      isAchievable: true,
+      reason: 'Target is already secured with minimum passing grades',
+    };
+  }
+
+  return {
+    requiredSgpa: rounded,
+    isAchievable: true,
+  };
+}
+
 

@@ -53,6 +53,7 @@ export const gradingSchemeDataSchema = z.object({
   cgpa_to_percentage: cgpaToPercentageRuleSchema,
   rounding: roundingRuleSchema,
   division_thresholds: z.array(divisionThresholdSchema).optional(),
+  repeat_handling: z.enum(['replace_old', 'keep_best']).default('replace_old').optional(),
   notes: z.string().optional(),
 });
 
@@ -115,6 +116,10 @@ export const courseSchema = baseEntitySchema.extend({
   initial_attended: z.number().min(0).default(0).optional(),
   initial_conducted: z.number().min(0).default(0).optional(),
   tracking_start_date: z.string().nullable().optional(),
+  min_internal_marks: z.number().min(0).nullable().optional(),
+  min_end_sem_marks: z.number().min(0).nullable().optional(),
+  pass_marks: z.number().min(0).nullable().optional(),
+  grade_band_override: z.array(gradeScaleEntrySchema).nullable().optional(),
 });
 
 export const timetableVersionSchema = baseEntitySchema.extend({
@@ -203,11 +208,13 @@ export const assessmentComponentSchema = baseEntitySchema.extend({
 
 export const markSchema = baseEntitySchema.extend({
   component_id: z.string().uuid(),
-  obtained_marks: z.number().min(0),
+  obtained_marks: z.number().min(0).nullable().optional(),
+  status: z.enum(['entered', 'absent', 'not_held']).default('entered').optional(),
 });
 
 export const gradeResultSchema = baseEntitySchema.extend({
   course_id: z.string().uuid(),
+  term_id: z.string().uuid().nullable().optional(),
   letter_grade: z.string().nullable().optional(),
   grade_points: z.number().nullable().optional(),
   attempt_number: z.number().int().min(1).default(1),

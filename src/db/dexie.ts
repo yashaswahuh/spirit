@@ -97,6 +97,37 @@ export class SpiritDatabase extends Dexie {
         if (term.period_timings === undefined) term.period_timings = [];
       });
     });
+
+    this.version(3).stores({
+      profile: '&id, user_id, updated_at, deleted_at',
+      grading_scheme: '&id, user_id, updated_at, deleted_at',
+      program: '&id, user_id, grading_scheme_id, updated_at, deleted_at',
+      term: '&id, user_id, program_id, status, updated_at, deleted_at',
+      course: '&id, user_id, term_id, updated_at, deleted_at',
+      timetable_version: '&id, user_id, term_id, effective_from, updated_at, deleted_at',
+      timetable_slot: '&id, user_id, version_id, course_id, weekday, updated_at, deleted_at',
+      timetable_override: '&id, user_id, term_id, date, course_id, updated_at, deleted_at',
+      calendar_event: '&id, user_id, date, updated_at, deleted_at',
+      attendance_record: '&id, user_id, course_id, date, slot_id, [course_id+date], updated_at, deleted_at',
+      assessment_component: '&id, user_id, course_id, is_end_sem, updated_at, deleted_at',
+      mark: '&id, user_id, component_id, status, updated_at, deleted_at',
+      grade_result: '&id, user_id, course_id, term_id, attempt_number, [course_id+attempt_number], updated_at, deleted_at',
+      task: '&id, user_id, course_id, due_at, done, updated_at, deleted_at',
+    }).upgrade(async tx => {
+      // Data preservation and default backfills for version 2 records
+      await tx.table('mark').toCollection().modify((mark: any) => {
+        if (mark.status === undefined) mark.status = 'entered';
+      });
+      await tx.table('course').toCollection().modify((course: any) => {
+        if (course.min_internal_marks === undefined) course.min_internal_marks = null;
+        if (course.min_end_sem_marks === undefined) course.min_end_sem_marks = null;
+        if (course.pass_marks === undefined) course.pass_marks = null;
+        if (course.grade_band_override === undefined) course.grade_band_override = null;
+      });
+      await tx.table('grade_result').toCollection().modify((gr: any) => {
+        if (gr.term_id === undefined) gr.term_id = null;
+      });
+    });
   }
 }
 

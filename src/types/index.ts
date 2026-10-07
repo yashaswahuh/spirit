@@ -158,6 +158,7 @@ export interface GradingSchemeData {
   cgpa_to_percentage: CgpaToPercentageRule;
   rounding: RoundingRule;
   division_thresholds?: DivisionThreshold[]; // For annual or division-based degrees
+  repeat_handling?: 'replace_old' | 'keep_best';
   notes?: string; // Preset approximation disclaimer
 }
 
@@ -210,6 +211,10 @@ export interface Course extends BaseEntity {
   initial_attended?: number; // Opening balance: attended classes before tracking started
   initial_conducted?: number; // Opening balance: conducted classes before tracking started
   tracking_start_date?: string | null; // Date tracking started (YYYY-MM-DD)
+  min_internal_marks?: number | null; // Minimum internal marks to be eligible for end-sem
+  min_end_sem_marks?: number | null; // Separate minimum pass marks in end-sem
+  pass_marks?: number | null; // Overall pass mark for course (e.g. 40 or 50)
+  grade_band_override?: GradeScaleEntry[] | null; // Optional course-specific grade bands
 }
 
 // ============================================================================
@@ -307,9 +312,12 @@ export interface AssessmentComponent extends BaseEntity {
 // 10. MARK
 // ============================================================================
 
+export type MarkStatus = 'entered' | 'absent' | 'not_held';
+
 export interface Mark extends BaseEntity {
   component_id: string; // Foreign key to assessment_component.id
-  obtained_marks: number; // e.g. 42.5
+  obtained_marks: number | null; // null if not_held
+  status?: MarkStatus; // 'entered' | 'absent' | 'not_held'
 }
 
 // ============================================================================
@@ -318,8 +326,9 @@ export interface Mark extends BaseEntity {
 
 export interface GradeResult extends BaseEntity {
   course_id: string; // Foreign key to course.id
-  letter_grade: string | null; // e.g. "A+", "B", "RA" (Re-appear)
-  grade_points: number | null; // e.g. 9.0
+  term_id?: string | null; // Foreign key to term.id
+  letter_grade: string | null; // e.g. "A+", "B", "AB", "I", "W", "P", "F"
+  grade_points: number | null; // e.g. 9.0 (null for P/F or audit)
   attempt_number: number; // 1 for regular, 2+ for backlog/arrear/improvement/repeat
   is_passing: boolean; // true if passed, false if backlog/arrear
 }
@@ -379,8 +388,10 @@ export interface WhatIfSubjectImpact {
 
 export interface CourseGradeCreditInput {
   credits: number;
-  grade_points: number;
+  grade_points?: number | null;
   counts_toward_gpa: boolean;
+  letter_grade?: string | null;
+  is_audit?: boolean;
 }
 
 export interface SgpaResult {

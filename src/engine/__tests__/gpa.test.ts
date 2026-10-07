@@ -4,6 +4,7 @@ import {
   calculateCgpa,
   convertCgpaToPercentage,
   applyRounding,
+  calculateRequiredSgpaForTarget,
   CourseAttemptRecord,
 } from '../gpa';
 import { CourseGradeCreditInput } from '../../types';
@@ -117,6 +118,87 @@ describe('GPA & CGPA Engine', () => {
       expect(applyRounding(8.256, { precision: 2, mode: 'floor' })).toBe(8.25);
       expect(applyRounding(8.251, { precision: 2, mode: 'ceil' })).toBe(8.26);
       expect(applyRounding(8.256, { precision: 1, mode: 'round' })).toBe(8.3);
+    });
+  });
+
+  describe('Special Grades Handling in SGPA', () => {
+    it('handles AB (absent), W (withdrawn), and I (incomplete) accurately', () => {
+      const courses: CourseGradeCreditInput[] = [
+        // Graded course: 4 credits, 8.0 points -> 32
+        { credits: 4, grade_points: 8.0, counts_toward_gpa: true },
+        // Absent course: 4 credits, AB -> 0 points, counted in GPA -> 0 points
+        { credits: 4, letter_grade: 'AB', grade_points: null, counts_toward_gpa: true },
+        // Withdrawn course: 3 credits, W -> completely excluded from GPA and credits
+        { credits: 3, letter_grade: 'W', grade_points: null, counts_toward_gpa: true },
+        // Incomplete course: 2 credits, I -> excluded from GPA until completed
+        { credits: 2, letter_grade: 'I', grade_points: null, counts_toward_gpa: true },
+      ];
+
+      const result = calculateSgpa(courses);
+      // Evaluated GPA credits = 4 (first) + 4 (AB) = 8 credits
+      // Points = 32 + 0 = 32
+      // SGPA = 32 / 8 = 4.0
+      expect(result.sgpa).toBe(4.0);
+      expect(result.gpa_credits).toBe(8);
+      // Total credits (excluding W) = 4 + 4 + 2 = 10
+      expect(result.total_credits).toBe(10);
+    });
+  });
+
+  describe('Lateral Entry in CGPA', () => {
+    it('skips terms prior to entry term (e.g. Terms 1 and 2 for lateral entry starting at Term 3)', () => {
+      const attempts: CourseAttemptRecord[] = [
+        // Term 1 & 2 legacy dummy courses or transferred courses
+        { course_id: 't1_course', credits: 4, grade_points: 5.0, counts_toward_gpa: true, attempt_number: 1, term_number: 1 },
+        { course_id: 't2_course', credits: 4, grade_points: 5.0, counts_toward_gpa: true, attempt_number: 1, term_number: 2 },
+        // Term 3 (Lateral Entry Start)
+        { course_id: 't3_course', credits: 4, grade_points: 9.0, counts_toward_gpa: true, attempt_number: 1, term_number: 3 },
+        { course_id: 't4_course', credits: 4, grade_points: 9.0, counts_toward_gpa: true, attempt_number: 1, term_number: 4 },
+      ];
+
+      const result = calculateCgpa(attempts, {
+        repeat_handling: 'replace_old',
+        entry_term: 3,
+      });
+
+      // Only term 3 and term 4 are evaluated
+      // Credits = 8, Points = 36 + 36 = 72, CGPA = 9.0
+      expect(result.cgpa).toBe(9.0);
+      expect(result.total_gpa_credits).toBe(8);
+      expect(result.evaluated_courses_count).toBe(2);
+    });
+  });
+
+  describe('calculateRequiredSgpaForTarget', () => {
+    it('calculates achievable required SGPA in remaining credits', () => {
+      // Current CGPA = 7.5 over 60 credits. Target CGPA = 8.0 with 20 credits remaining.
+      // Total = 80 credits. Needed points = 80 * 8.0 = 640. Current points = 60 * 7.5 = 450.
+      // Remaining needed = 640 - 450 = 190 over 20 credits -> 190 / 20 = 9.5 SGPA
+      const res = calculateRequiredSgpaForTarget({
+        currentCgpa: 7.5,
+        completedCredits: 60,
+        targetCgpa: 8.0,
+        remainingCredits: 20,
+        maxPoint: 10.0,
+      });
+
+      expect(res.isAchievable).toBe(true);
+      expect(res.requiredSgpa).toBe(9.5);
+    });
+
+    it('detects mathematically impossible target exceeding maxPoint scale', () => {
+      // Current CGPA = 6.0 over 80 credits. Target CGPA = 8.5 with only 10 credits remaining.
+      const res = calculateRequiredSgpaForTarget({
+        currentCgpa: 6.0,
+        completedCredits: 80,
+        targetCgpa: 8.5,
+        remainingCredits: 10,
+        maxPoint: 10.0,
+      });
+
+      expect(res.isAchievable).toBe(false);
+      expect(res.requiredSgpa).toBeGreaterThan(10.0);
+      expect(res.reason).toContain('exceeds the maximum scale limit');
     });
   });
 });
