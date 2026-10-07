@@ -8,11 +8,14 @@ import { I18nProvider } from './i18n';
 import { AppShell } from './components/layout/AppShell';
 import { NavTab } from './components/layout/BottomNav';
 import { OnboardingWizard } from './components/onboarding/OnboardingWizard';
-import { HomeScreen } from './screens/HomeScreen';
-import { AttendanceScreen } from './screens/AttendanceScreen';
-import { TimetableScreen } from './screens/TimetableScreen';
-import { GradesScreen } from './screens/GradesScreen';
-import { MoreScreen } from './screens/MoreScreen';
+import { LoadingSpinner } from './components/common/LoadingSpinner';
+
+// Route-level code splitting via React.lazy
+const HomeScreen = React.lazy(() => import('./screens/HomeScreen').then(m => ({ default: m.HomeScreen })));
+const AttendanceScreen = React.lazy(() => import('./screens/AttendanceScreen').then(m => ({ default: m.AttendanceScreen })));
+const TimetableScreen = React.lazy(() => import('./screens/TimetableScreen').then(m => ({ default: m.TimetableScreen })));
+const GradesScreen = React.lazy(() => import('./screens/GradesScreen').then(m => ({ default: m.GradesScreen })));
+const MoreScreen = React.lazy(() => import('./screens/MoreScreen').then(m => ({ default: m.MoreScreen })));
 import {
   ThemePreference,
   getThemePreference,
@@ -113,28 +116,30 @@ const MainApp: React.FC = () => {
       onToggleTheme={handleToggleTheme}
       termName={activeTerm?.name}
     >
-      <Routes>
-        <Route path="/" element={<HomeScreen onNavigateToAttendance={() => handleTabChange('attendance')} />} />
-        <Route path="/home" element={<HomeScreen onNavigateToAttendance={() => handleTabChange('attendance')} />} />
-        <Route path="/attendance" element={<AttendanceScreen />} />
-        <Route path="/timetable" element={<TimetableScreen />} />
-        <Route path="/grades" element={<GradesScreen />} />
-        <Route
-          path="/more"
-          element={
-            <MoreScreen
-              isDark={isDark}
-              themePref={themePref}
-              onThemePrefChange={p => {
-                setThemePreference(p);
-                setThemePrefState(p);
-              }}
-              onToggleTheme={handleToggleTheme}
-              onResetApp={() => navigate('/')}
-            />
-          }
-        />
-      </Routes>
+      <React.Suspense fallback={<LoadingSpinner message="Loading..." size="lg" className="min-h-[50vh]" />}>
+        <Routes>
+          <Route path="/" element={<HomeScreen onNavigateToAttendance={() => handleTabChange('attendance')} />} />
+          <Route path="/home" element={<HomeScreen onNavigateToAttendance={() => handleTabChange('attendance')} />} />
+          <Route path="/attendance" element={<AttendanceScreen />} />
+          <Route path="/timetable" element={<TimetableScreen />} />
+          <Route path="/grades" element={<GradesScreen />} />
+          <Route
+            path="/more"
+            element={
+              <MoreScreen
+                isDark={isDark}
+                themePref={themePref}
+                onThemePrefChange={p => {
+                  setThemePreference(p);
+                  setThemePrefState(p);
+                }}
+                onToggleTheme={handleToggleTheme}
+                onResetApp={() => navigate('/')}
+              />
+            }
+          />
+        </Routes>
+      </React.Suspense>
     </AppShell>
   );
 };

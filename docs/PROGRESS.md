@@ -105,9 +105,41 @@
   - **PWA Installation & iOS Protection (`InstallGuidanceModal.tsx`)**: Direct installation prompt button where supported; comprehensive step-by-step Add-to-Home-Screen guidance for iOS Safari with detailed explanation of Apple WebKit ITP 7-day storage eviction rules.
   - **Plain-Language Privacy Policy (`PrivacyModal.tsx`)**: Transparent explanation of 100% on-device storage, zero cloud servers, zero analytics/trackers, and browser cache data retention warnings.
   - **Comprehensive Unit Tests (`backup.test.ts`, `storage.test.ts`)**: 27 new unit tests (116 total passing tests across 11 test suites) covering CSV escaping, merge conflict resolution, Zod validation rejections, malformed JSON handling, byte formatting, and backup reminder evaluation logic.
+- **Phase 6 (Part A): PWA and Reliability**:
+  - Configured `vite-plugin-pwa` with full offline caching, Workbox service worker (`sw.js`), and generated web manifest with custom theme colors (`#4f46e5`).
+  - Generated standard PWA and Apple touch icons (`pwa-192x192.png`, `pwa-512x512.png`, `maskable-icon-512x512.png`, `apple-touch-icon.png`, `favicon.svg`, `favicon.ico`).
+  - Built `PwaReloadPrompt.tsx` with `useRegisterSW` for "New version available" one-click refresh prompt.
+  - Implemented `pwa.ts` listening to `beforeinstallprompt` with 1-click install button for Chromium and clear iOS Safari Add-to-Home-Screen instructions in `InstallGuidanceModal.tsx`.
+  - Upgraded Dexie schema to `v4` with non-destructive `.upgrade()` adding `is_demo: false` default flag across all existing user records without wiping user data.
+  - Added React `ErrorBoundary.tsx` catching runtime exceptions with copyable debug details, reload button, and safe database reset fallback.
+  - Added reusable `EmptyState.tsx` and `LoadingSpinner.tsx` components.
+  - Built demo data isolation (`is_demo` field on all base entities, `hasDemoData()`, `clearDemoData()`, `resetDatabase()`), clear demo warning banner on Home screen, and demo data clearing in onboarding and settings without affecting real data.
+  - Added one-click option to revert a day marked as a holiday by mistake (`revertHolidayForDate` in `calendar.repo.ts` and `DayPickerView.tsx`).
+- **Phase 6 (Part B): Reminders, Settings & Attendance Reports**:
+  - Built honestly scoped reminders: clearly explains UI limitations (no background server for Web Push; browser notifications work only while app/PWA is active).
+  - Implemented browser Notification API helper (`notifications.ts`) with permission requesting and live test alert dispatcher.
+  - Created RFC 5545 `.ics` iCalendar generator (`ics.ts`) for weekly timetable slots (`RRULE:FREQ=WEEKLY` with 15-minute `VALARM`) and tasks/exams (with 1-day and 2-hour `VALARM`) allowing native OS alarms in Google Calendar, Apple Calendar, and Outlook when Spirit is closed.
+  - Built centralized string dictionary (`src/i18n/strings.ts` & `src/i18n/index.tsx`) with `en-IN` default dictionary and expandable architecture for future regional locales.
+  - Expanded Settings (`MoreScreen.tsx`): Theme mode (Light, Dark, System auto-detecting OS), 6 selectable accent colors (Indigo, Emerald, Violet, Rose, Amber, Cyan), default attendance threshold input, week start day (Monday vs Sunday), 12h vs 24h time format, date formats (DD/MM/YYYY, YYYY-MM-DD, MM/DD/YYYY), default grading scheme selector, and period timings configuration modal (`PeriodTimingsModal.tsx`).
+  - Built Print/PDF Attendance Report (`AttendanceReportModal.tsx`): Date range filters, subject selector pills, summary cards (conducted, attended, leaves, overall %), per-subject detailed table with safe bunks / must-attend guidance, and print-optimized CSS (`@media print`).
+- **Phase 6 (Part C): Quality, Performance & Deploy**:
+  - Accessibility pass: Full keyboard navigation, visible `:focus-visible` rings, `aria-label` attributes on icon-only buttons, non-color-alone status indicators (icons + text), contrast verification, and global `prefers-reduced-motion` CSS overrides.
+  - Automated `axe-core` accessibility test suite in vitest (`src/a11y.test.ts`) covering app shell, marking flow, status indicators, and report semantics (all 4 axe tests passing with 0 violations).
+  - Route-level code splitting via `React.lazy` and `React.Suspense` for all top-level screens.
+  - Configured Rollup manual vendor chunks (`vendor-react`, `vendor-dexie`, `vendor-zod`, `vendor-icons`), reducing all bundle chunks under 160 kB (gzip initial index payload ~17 kB).
+  - Created `.github/workflows/deploy.yml` with automated test, build, and deploy to GitHub Pages (`actions/deploy-pages`) using configurable base path `VITE_BASE_PATH` (default `/spirit/`).
+  - Created comprehensive `README.md` and manual verification test plan in `docs/QA_CHECKLIST.md`.
+  - All 122 unit and accessibility tests passing across 13 test suites.
+
+### Schema Changes & Migration History (Dexie v3 -> v4)
+- **New Columns Added**:
+  - `BaseEntity`: Added `is_demo?: boolean` flag across all 14 Dexie tables to isolate demo records from user data.
+- **Database Version Upgrade**:
+  - `Dexie.version(4)` implemented with safe in-place upgrade backfilling `is_demo: false` on existing records without data loss.
 
 ## Remaining
-- **Phase 6**: PWA offline worker, install manifest, PDF/print attendance report, final polish.
+- All planned phases (0 through 6) fully implemented, tested, and verified.
 
 ## Known Issues
 - None.
+

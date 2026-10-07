@@ -78,6 +78,18 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-dexie': ['dexie', 'dexie-react-hooks'],
+          'vendor-zod': ['zod'],
+          'vendor-icons': ['lucide-react'],
+        },
+      },
+    },
+  },
   test: {
     globals: true,
     environment: 'node',
