@@ -90,6 +90,24 @@ describe('Zod Validation Schemas', () => {
       };
       expect(() => validateEntity(courseSchema, invalidCourse)).toThrow();
     });
+
+    it('validates a course with optional faculty name', () => {
+      const validCourseWithFaculty = {
+        ...validBase,
+        term_id: 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
+        name: 'Distributed Systems',
+        code: 'CS401',
+        credits: 4,
+        type: 'theory' as const,
+        counts_toward_gpa: true,
+        attendance_threshold_override: null,
+        color: '#6366f1',
+        medical_counts_as_present: false,
+        duty_leave_counts_as_present: true,
+        faculty: 'Prof. E. W. Dijkstra',
+      };
+      expect(() => validateEntity(courseSchema, validCourseWithFaculty)).not.toThrow();
+    });
   });
 
   describe('timetableSlotSchema', () => {

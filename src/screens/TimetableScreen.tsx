@@ -375,9 +375,12 @@ export const TimetableScreen: React.FC = () => {
                             {slot.room}
                           </span>
                         )}
-                        {slot.faculty && (
-                          <span className="block text-[11px] text-gray-500 dark:text-gray-400 truncate max-w-[120px]">
-                            {slot.faculty}
+                        {(slot.faculty || course?.faculty) && (
+                          <span
+                            className="block text-[11px] text-gray-500 dark:text-gray-400 truncate max-w-[140px]"
+                            title={slot.faculty || course?.faculty || undefined}
+                          >
+                            {slot.faculty || course?.faculty}
                           </span>
                         )}
                       </div>

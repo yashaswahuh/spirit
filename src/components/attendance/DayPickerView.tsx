@@ -413,7 +413,7 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
                         {slot.start_time} - {slot.end_time}
                       </span>
                       {slot.room && <span>• {slot.room}</span>}
-                      {slot.faculty && <span>• {slot.faculty}</span>}
+                      {(slot.faculty || course?.faculty) && <span>• {slot.faculty || course?.faculty}</span>}
                     </div>
                   </div>
                 </div>

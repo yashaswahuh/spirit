@@ -18,6 +18,7 @@ interface SubjectModalProps {
     initial_attended?: number;
     initial_conducted?: number;
     tracking_start_date?: string | null;
+    faculty?: string | null;
   }) => void;
   initialCourse?: Course;
 }
@@ -30,6 +31,7 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
 }) => {
   const [name, setName] = useState(initialCourse?.name || '');
   const [code, setCode] = useState(initialCourse?.code || '');
+  const [faculty, setFaculty] = useState(initialCourse?.faculty || '');
   const [credits, setCredits] = useState(initialCourse?.credits ?? 4);
   const [type, setType] = useState<CourseType>(initialCourse?.type || 'theory');
   const [color, setColor] = useState(initialCourse?.color || '#6366f1');
@@ -56,6 +58,7 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
     if (initialCourse) {
       setName(initialCourse.name);
       setCode(initialCourse.code);
+      setFaculty(initialCourse.faculty || '');
       setCredits(initialCourse.credits);
       setType(initialCourse.type);
       setColor(initialCourse.color);
@@ -68,6 +71,7 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
     } else {
       setName('');
       setCode('');
+      setFaculty('');
       setCredits(4);
       setType('theory');
       setColor('#6366f1');
@@ -87,6 +91,7 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
     onSave({
       name: name.trim(),
       code: code.trim().toUpperCase(),
+      faculty: faculty.trim() || null,
       credits: Number(credits) || 3,
       type,
       color,
@@ -150,6 +155,23 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
               className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[44px]"
             />
           </div>
+        </div>
+
+        {/* Professor / Faculty Name */}
+        <div>
+          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+            Faculty / Professor / Teacher Name (Optional)
+          </label>
+          <input
+            type="text"
+            placeholder="e.g. Dr. A. Sharma / Prof. Rao"
+            value={faculty}
+            onChange={e => setFaculty(e.target.value)}
+            className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[44px]"
+          />
+          <p className="text-[11px] text-gray-400 mt-1">
+            Applies to this subject across your timetable schedule, today&apos;s classes, and attendance reports.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

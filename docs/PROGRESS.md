@@ -173,13 +173,36 @@
   - **Bidirectional Period Timings Storage Sync**: Synced period timings edits between `PeriodTimingsModal.tsx` (More screen), active term in Dexie (`Term.period_timings`), and global preferences (`preferences.ts`).
   - **Engine Unit Tests**: Added pure engine tests for `calculateEndTimeForPeriod` and `findNextAvailablePeriodTiming` in `src/engine/__tests__/timetable.test.ts`. All 147 tests passing across 15 test files.
 
-### Schema Changes & Migration History (Dexie v3 -> v4)
+- **Subject-Wide Professor / Faculty Name Synchronization**:
+  - **Course-Level Faculty Property**: Added `faculty?: string | null` to `Course` across `types/index.ts`, `docs/types.ts`, `docs/SPEC.md`, and Zod validation in `schemas.ts`.
+  - **Dexie Schema v5 Non-Destructive Upgrade**: Added `version(5)` to Dexie database (`dexie.ts`) with safe in-place upgrade function that preserves all existing user data, backfilling `faculty: null` while harvesting any existing `slot.faculty` values to auto-populate courses.
+  - **Automatic Slot & Subject Propagation (`updateCourseFaculty`)**:
+    - `course.repo.ts`: Created `updateCourseFaculty` and wired into `createCourse` and `updateCourse` to propagate teacher names to all timetable slots for that course across every weekday.
+    - `timetable.repo.ts`: Updated `createTimetableSlot` and `updateTimetableSlot` so editing or entering a faculty name on a slot automatically updates the parent course and synchronizes all other slots for that course across the week. Automatically inherits course faculty if omitted when creating slots.
+  - **UI Integration Across All Screens**:
+    - `SubjectModal.tsx`: Added form input "Faculty / Professor / Teacher Name (Optional)" with helper description explaining that it applies across the timetable, today's classes, and attendance cards.
+    - `SlotModal.tsx`: Auto-fills faculty name from the selected course on load and when switching courses, with helper label explaining subject-wide propagation.
+    - `TimetableScreen.tsx`: Slot card rendering falls back to `course.faculty` (`slot.faculty || course?.faculty`) so teacher names appear immediately across all weekday schedules.
+    - `HomeScreen.tsx` & `TodayClassesSection.tsx`: Displays teacher name badge (`👤 Prof. Name`) on today's class cards.
+    - `CourseAttendanceCard.tsx`: Displays `Prof: Name` under course title on subject attendance cards.
+    - `DayPickerView.tsx`: Displays professor name in the date-by-date schedule view.
+  - **Timetable Upload & Parser Engine**:
+    - `timetableParser.ts`: Extracts faculty from uploaded files and synchronizes across all parsed slots and `ParsedCourseItem`.
+    - `TimetableUploadModal.tsx`: Persists recognized faculty directly onto newly created courses and updates existing courses if empty.
+  - **Unit Tests & Build**:
+    - Added unit test in `src/utils/__tests__/timetableParser.test.ts` verifying faculty propagation across parsed slots and detected courses.
+    - Added schema validation test in `src/db/__tests__/schemas.test.ts` for optional course faculty.
+    - All 149 tests pass across 15 test suites with 0 build errors.
+
+### Schema Changes & Migration History (Dexie v3 -> v4 -> v5)
 - **New Columns Added**:
   - `BaseEntity`: Added `is_demo?: boolean` flag across all 14 Dexie tables to isolate demo records from user data.
   - `Term`: Added `saturday_rule?: SaturdayRule` to support alternate Saturday holiday rules (2nd Saturday off, 2nd & 4th Saturday off, all off).
   - `AttendanceRecord`: Added `component_type?: CourseType` to track whether logged attendance was for a theory lecture or lab session.
-- **Database Version Upgrade**:
-  - `Dexie.version(4)` implemented with safe in-place upgrade backfilling `is_demo: false` on existing records without data loss.
+  - `Course`: Added `faculty?: string | null` to track the subject instructor/professor globally.
+- **Database Version Upgrades**:
+  - `Dexie.version(4)`: Non-destructive in-place upgrade backfilling `is_demo: false` on existing records without data loss.
+  - `Dexie.version(5)`: Non-destructive in-place upgrade backfilling `faculty: null` on `Course`, harvesting any existing `slot.faculty` names from timetable slots to maintain full data consistency.
 
 ## Remaining
 - All planned phases, user features, and integrated theory/lab workflows fully implemented, tested, and verified.

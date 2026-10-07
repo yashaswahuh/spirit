@@ -14,6 +14,7 @@ export interface ParsedCourseItem {
   color: string;
   isExisting: boolean;
   existingCourseId?: string;
+  faculty?: string | null;
 }
 
 export interface ParsedSlotItem {
@@ -483,6 +484,10 @@ function finalizeResult(
       if (normalizedExplicitCode && existingItem.code.endsWith('L') && !explicitCode?.endsWith('L')) {
         existingItem.code = explicitCode || normalizedExplicitCode;
       }
+      // If slot has faculty and existing item doesn't have it yet, attach it
+      if (!existingItem.faculty && slot.faculty) {
+        existingItem.faculty = slot.faculty;
+      }
       // Point this slot to the primary course
       slot.courseRawName = existingRawName;
       slot.componentType = type === 'lab' ? 'lab' : 'theory';
@@ -510,10 +515,19 @@ function finalizeResult(
         color: existing ? existing.color : PALETTE[paletteIdx % PALETTE.length],
         isExisting: !!existing,
         existingCourseId: existing?.id,
+        faculty: existing?.faculty || slot.faculty || null,
       });
 
       baseKeyToRawName.set(baseKey, rawName);
       paletteIdx++;
+    }
+  }
+
+  // Ensure all slots for the same course share the detected faculty
+  for (const slot of rawSlots) {
+    const courseItem = courseMap.get(slot.courseRawName);
+    if (courseItem?.faculty && !slot.faculty) {
+      slot.faculty = courseItem.faculty;
     }
   }
 

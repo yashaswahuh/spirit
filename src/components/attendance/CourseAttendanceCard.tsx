@@ -53,6 +53,12 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
           <h2 className="text-base font-bold text-gray-900 dark:text-white mt-1 truncate">
             {course.name}
           </h2>
+          {course.faculty && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate flex items-center gap-1" title={course.faculty}>
+              <span className="opacity-75">Prof:</span>
+              <span className="font-medium text-gray-700 dark:text-gray-300">{course.faculty}</span>
+            </p>
+          )}
         </div>
 
         {/* Options Dropdown */}

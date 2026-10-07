@@ -12,6 +12,7 @@ import { Course, Term, TimetableVersion } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import { parseTimetableFile, ParsedTimetableResult } from '../../utils/timetableParser';
 import { createTimetableSlot } from '../../db/repositories/timetable.repo';
+import { updateCourseFaculty } from '../../db/repositories/course.repo';
 
 interface TimetableUploadModalProps {
   isOpen: boolean;
@@ -105,6 +106,12 @@ export const TimetableUploadModal: React.FC<TimetableUploadModalProps> = ({
       for (const detected of parseResult.detectedCourses) {
         if (detected.isExisting && detected.existingCourseId) {
           courseNameToIdMap.set(detected.rawName, detected.existingCourseId);
+          if (detected.faculty) {
+            const existingCourse = await db.course.get(detected.existingCourseId);
+            if (existingCourse && !existingCourse.faculty) {
+              await updateCourseFaculty(detected.existingCourseId, detected.faculty);
+            }
+          }
         } else {
           // Create new course
           const newCourseId = generateUUID();
@@ -121,6 +128,7 @@ export const TimetableUploadModal: React.FC<TimetableUploadModalProps> = ({
             color: detected.color,
             medical_counts_as_present: true,
             duty_leave_counts_as_present: true,
+            faculty: detected.faculty || null,
             created_at: now,
             updated_at: now,
             deleted_at: null,
@@ -157,7 +165,7 @@ export const TimetableUploadModal: React.FC<TimetableUploadModalProps> = ({
           start_time: slot.startTime,
           end_time: slot.endTime,
           room: slot.room,
-          faculty: slot.faculty,
+          faculty: slot.faculty || (parseResult.detectedCourses.find(c => c.rawName === slot.courseRawName)?.faculty) || null,
           component_type: slot.componentType,
           weight: slot.weight,
           period_name: null,

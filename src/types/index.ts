@@ -224,6 +224,7 @@ export interface Course extends BaseEntity {
   min_end_sem_marks?: number | null; // Separate minimum pass marks in end-sem
   pass_marks?: number | null; // Overall pass mark for course (e.g. 40 or 50)
   grade_band_override?: GradeScaleEntry[] | null; // Optional course-specific grade bands
+  faculty?: string | null; // e.g. "Dr. Sharma" or "Prof. Rao"
 }
 
 // ============================================================================

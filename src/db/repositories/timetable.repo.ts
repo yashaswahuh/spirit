@@ -18,6 +18,7 @@ import {
 } from '../schemas';
 import { generateUUID } from '../../utils/uuid';
 import { resolveDaySchedule, DayScheduleResolution } from '../../engine/timetable';
+import { updateCourseFaculty } from './course.repo';
 
 // ============================================================================
 // TIMETABLE SLOTS
@@ -51,8 +52,17 @@ export async function createTimetableSlot(
   data: Omit<TimetableSlot, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'deleted_at'>
 ): Promise<TimetableSlot> {
   const now = new Date().toISOString();
+  let slotFaculty = data.faculty !== undefined ? (data.faculty?.trim() || null) : null;
+  if (!slotFaculty && data.course_id) {
+    const course = await db.course.get(data.course_id);
+    if (course && !course.deleted_at && course.faculty) {
+      slotFaculty = course.faculty;
+    }
+  }
+
   const newSlot: TimetableSlot = {
     ...data,
+    faculty: slotFaculty,
     weight: data.weight && data.weight > 0 ? data.weight : 1,
     id: generateUUID(),
     user_id: LOCAL_USER_ID,
@@ -63,6 +73,12 @@ export async function createTimetableSlot(
 
   validateEntity(timetableSlotSchema, newSlot);
   await db.timetable_slot.put(newSlot);
+
+  // Synchronize professor/faculty name with the course and all its slots if explicitly provided
+  if (data.faculty !== undefined && newSlot.course_id) {
+    await updateCourseFaculty(newSlot.course_id, newSlot.faculty);
+  }
+
   return newSlot;
 }
 
@@ -79,12 +95,19 @@ export async function updateTimetableSlot(
   const updated: TimetableSlot = {
     ...existing,
     ...data,
+    faculty: data.faculty !== undefined ? (data.faculty?.trim() || null) : existing.faculty,
     weight: data.weight !== undefined ? data.weight : (existing.weight || 1),
     updated_at: now,
   };
 
   validateEntity(timetableSlotSchema, updated);
   await db.timetable_slot.put(updated);
+
+  // Synchronize professor/faculty name with the course and all its slots
+  if (data.faculty !== undefined && updated.course_id) {
+    await updateCourseFaculty(updated.course_id, data.faculty);
+  }
+
   return updated;
 }
 

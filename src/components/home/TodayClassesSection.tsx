@@ -105,6 +105,14 @@ export const TodayClassesSection: React.FC<TodayClassesSectionProps> = ({
                           Room {slot.room}
                         </span>
                       )}
+                      {(slot.faculty || course.faculty) && (
+                        <span
+                          className="px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-[10px] font-medium text-indigo-700 dark:text-indigo-300 truncate max-w-[150px]"
+                          title={slot.faculty || course.faculty || undefined}
+                        >
+                          👤 {slot.faculty || course.faculty}
+                        </span>
+                      )}
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase ${
                         slot.component_type === 'lab'
                           ? 'bg-purple-100 dark:bg-purple-950/70 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800'

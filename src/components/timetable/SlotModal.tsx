@@ -122,7 +122,8 @@ export const SlotModal: React.FC<SlotModalProps> = ({
       setStartTime(slot.start_time);
       setEndTime(slot.end_time);
       setRoom(slot.room || '');
-      setFaculty(slot.faculty || '');
+      const courseObj = courses.find(c => c.id === slot.course_id);
+      setFaculty(slot.faculty || courseObj?.faculty || '');
       setComponentType(slot.component_type);
       setWeight(slot.weight || 1);
       setPeriodName(slot.period_name || '');
@@ -147,7 +148,7 @@ export const SlotModal: React.FC<SlotModalProps> = ({
       setComponentType(initialType);
       setWeight(initialWeight);
       setRoom('');
-      setFaculty('');
+      setFaculty(initialCourse?.faculty || '');
 
       const nextPeriod = getNextAvailablePeriod(defaultWeekday);
       if (nextPeriod) {
@@ -178,11 +179,12 @@ export const SlotModal: React.FC<SlotModalProps> = ({
     }
   };
 
-  // When course changes, adapt default component type & sync timing if needed
+  // When course changes, adapt default component type, auto-fill faculty & sync timing if needed
   const handleCourseChange = (id: string) => {
     setCourseId(id);
     const selected = courses.find(c => c.id === id);
     if (selected) {
+      setFaculty(selected.faculty || '');
       if (selected.type === 'theory_and_lab') {
         handleSetComponentAndWeight('theory', 1);
       } else {
@@ -551,6 +553,9 @@ export const SlotModal: React.FC<SlotModalProps> = ({
               onChange={e => setFaculty(e.target.value)}
               className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500"
             />
+            <p className="text-[11px] text-gray-400 mt-1">
+              Applies across all days for this subject.
+            </p>
           </div>
         </div>
 

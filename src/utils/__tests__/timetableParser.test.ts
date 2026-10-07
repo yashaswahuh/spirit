@@ -107,6 +107,20 @@ Wednesday, 14:00 - 16:00, Data Structures Lab`;
       expect(result.detectedSlots[1].componentType).toBe('lab');
       expect(result.detectedSlots[1].weight).toBe(2);
     });
+
+    it('propagates faculty across all slots and to detectedCourses for the same subject', () => {
+      const csv = `Day, Time, Subject, Room, Faculty
+Monday, 09:00 - 10:00, Operating Systems, Room 102, Prof. Sharma
+Wednesday, 10:00 - 11:00, Operating Systems, Room 102,
+Friday, 11:00 - 12:00, Operating Systems, Room 102,`;
+
+      const result = parseTimetableFile(csv);
+      expect(result.detectedCourses.length).toBe(1);
+      expect(result.detectedCourses[0].faculty).toBe('Prof. Sharma');
+      expect(result.detectedSlots[0].faculty).toBe('Prof. Sharma');
+      expect(result.detectedSlots[1].faculty).toBe('Prof. Sharma');
+      expect(result.detectedSlots[2].faculty).toBe('Prof. Sharma');
+    });
   });
 });
 

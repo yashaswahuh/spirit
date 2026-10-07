@@ -121,6 +121,7 @@ export const courseSchema = baseEntitySchema.extend({
   min_end_sem_marks: z.number().min(0).nullable().optional(),
   pass_marks: z.number().min(0).nullable().optional(),
   grade_band_override: z.array(gradeScaleEntrySchema).nullable().optional(),
+  faculty: z.string().nullable().optional(),
 });
 
 export const timetableVersionSchema = baseEntitySchema.extend({

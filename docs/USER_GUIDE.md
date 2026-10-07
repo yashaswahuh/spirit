@@ -142,6 +142,7 @@ The **Timetable** tab provides a complete view of your weekly routine:
 - **Integrated Theory + Lab Slots:** When scheduling a class for an integrated subject, Spirit provides a 1-tap quick selector:
   - `[ 📘 Theory Lecture ]`: Automatically sets component to Theory and default weight to 1 period.
   - `[ 🧪 Lab Practical ]`: Automatically sets component to Lab and default weight to 2 periods.
+- **Subject-Wide Professor / Faculty Synchronization:** When adding or editing a professor/teacher name (e.g. "Dr. A. Sharma") on any timetable slot or in subject settings, Spirit automatically saves it to the subject and applies it across all other days and slots for that course. You only ever need to type your professor's name once!
 - **Overlap Detection:** If you have parallel elective slots or simultaneous lab batches, Spirit warns you of the overlap while allowing both slots to exist.
 
 ### Bell Schedule & Period Timings
