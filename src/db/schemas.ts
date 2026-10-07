@@ -7,10 +7,10 @@ import { z } from 'zod';
 
 export const baseEntitySchema = z.object({
   id: z.string().uuid(),
-  user_id: z.string().min(1),
-  created_at: z.string().datetime(),
-  updated_at: z.string().datetime(),
-  deleted_at: z.string().datetime().nullable(),
+  user_id: z.string().min(1).optional().default('00000000-0000-0000-0000-000000000001'),
+  created_at: z.string().datetime({ offset: true }),
+  updated_at: z.string().datetime({ offset: true }),
+  deleted_at: z.string().datetime({ offset: true }).nullable(),
 });
 
 export const profileSchema = baseEntitySchema.extend({
@@ -231,6 +231,32 @@ export const taskSchema = baseEntitySchema.extend({
   notes: z.string().nullable().optional(),
   venue: z.string().nullable().optional(),
 });
+
+export const backupPayloadSchema = z.object({
+  app: z.literal('spirit', {
+    message: 'Invalid backup file: not a Spirit application backup.',
+  }),
+  version: z.number().int().positive(),
+  exported_at: z.string(),
+  data: z.object({
+    profile: z.array(profileSchema).default([]),
+    program: z.array(programSchema).default([]),
+    grading_scheme: z.array(gradingSchemeSchema).default([]),
+    term: z.array(termSchema).default([]),
+    course: z.array(courseSchema).default([]),
+    timetable_version: z.array(timetableVersionSchema).default([]),
+    timetable_slot: z.array(timetableSlotSchema).default([]),
+    timetable_override: z.array(timetableOverrideSchema).default([]),
+    calendar_event: z.array(calendarEventSchema).default([]),
+    attendance_record: z.array(attendanceRecordSchema).default([]),
+    assessment_component: z.array(assessmentComponentSchema).default([]),
+    mark: z.array(markSchema).default([]),
+    grade_result: z.array(gradeResultSchema).default([]),
+    task: z.array(taskSchema).default([]),
+  }),
+});
+
+export type BackupPayload = z.infer<typeof backupPayloadSchema>;
 
 /**
  * Validates entity with Zod schema. Throws error if validation fails.

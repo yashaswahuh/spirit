@@ -1,10 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Sparkles, Trash2, Sun, Moon, ShieldCheck, User, CheckSquare } from 'lucide-react';
+import {
+  Sparkles,
+  Trash2,
+  Sun,
+  Moon,
+  ShieldCheck,
+  User,
+  CheckSquare,
+  HardDriveDownload,
+  Smartphone,
+  Calendar,
+} from 'lucide-react';
 import { db } from '../db/dexie';
-import { seedDemoData, resetDatabase } from '../db/repositories/setup.repo';
+import { seedDemoData } from '../db/repositories/setup.repo';
 import { PageContainer } from '../components/layout/PageContainer';
 import { TasksTrackerModal } from '../components/tasks/TasksTrackerModal';
+import { BackupModal } from '../components/safety/BackupModal';
+import { DeviceTransferModal } from '../components/safety/DeviceTransferModal';
+import { DeleteDataModal } from '../components/safety/DeleteDataModal';
+import { getLastBackupTimestamp } from '../utils/storage';
 
 interface MoreScreenProps {
   isDark: boolean;
@@ -21,18 +36,18 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   const program = useLiveQuery(() => db.program.filter(p => p.deleted_at === null).first());
   const activeTerm = useLiveQuery(() => db.term.filter(t => t.deleted_at === null && t.status === 'ongoing').first());
   const courses = useLiveQuery(() => db.course.filter(c => c.deleted_at === null).toArray()) || [];
-  const [isTasksOpen, setIsTasksOpen] = React.useState(false);
+  
+  // Modals state
+  const [isTasksOpen, setIsTasksOpen] = useState(false);
+  const [isBackupOpen, setIsBackupOpen] = useState(false);
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+
+  const lastBackupAt = getLastBackupTimestamp();
 
   const handleSeedDemo = async () => {
     if (confirm('Load demo semester data? This will add sample subjects and attendance logs.')) {
       await seedDemoData();
-    }
-  };
-
-  const handleResetData = async () => {
-    if (confirm('Are you sure you want to delete ALL local data? This action cannot be undone.')) {
-      await resetDatabase();
-      onResetApp();
     }
   };
 
@@ -99,10 +114,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
               </button>
             </div>
           </div>
-        </div>
 
-        {/* Right Column: Database Tools & Privacy */}
-        <div className="space-y-4 sm:space-y-6">
           {/* Tasks & Deadlines Card */}
           <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-3">
             <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -119,25 +131,77 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
               Open Tasks & Exams Manager
             </button>
           </div>
+        </div>
 
+        {/* Right Column: Backup, Storage & Privacy */}
+        <div className="space-y-4 sm:space-y-6">
+          {/* Backup & Restore Card */}
           <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                <HardDriveDownload className="w-3.5 h-3.5 text-indigo-600" />
+                Backup & Restore
+              </h3>
+              {lastBackupAt ? (
+                <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  {new Date(lastBackupAt).toLocaleDateString()}
+                </span>
+              ) : (
+                <span className="text-[11px] font-medium text-amber-500">
+                  Not backed up
+                </span>
+              )}
+            </div>
+
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Export your full data to versioned JSON or CSV spreadsheets. Import anytime with merge or replace.
+            </p>
+
+            <div className="space-y-2.5">
+              <button
+                onClick={() => setIsBackupOpen(true)}
+                className="w-full flex items-center justify-between py-3 px-4 rounded-xl border border-indigo-200 dark:border-indigo-800/80 bg-indigo-50/50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 font-bold text-xs sm:text-sm hover:bg-indigo-100/70 transition-colors min-h-[44px]"
+              >
+                <span className="flex items-center gap-2">
+                  <HardDriveDownload className="w-4 h-4" />
+                  Backup & Restore (JSON / CSV)
+                </span>
+                <span className="text-xs font-normal text-indigo-500">Open &rarr;</span>
+              </button>
+
+              <button
+                onClick={() => setIsTransferOpen(true)}
+                className="w-full flex items-center justify-between py-3 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-semibold text-xs sm:text-sm hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors min-h-[44px]"
+              >
+                <span className="flex items-center gap-2">
+                  <Smartphone className="w-4 h-4 text-indigo-600" />
+                  Transfer to Another Device
+                </span>
+                <span className="text-xs text-gray-400">&rarr;</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Database Tools & Danger Zone */}
+          <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-3">
             <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-              Database & Testing Tools
+              Data Tools
             </h3>
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <button
                 onClick={handleSeedDemo}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 font-semibold text-xs sm:text-sm hover:bg-indigo-100 transition-colors focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none min-h-[44px]"
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 font-semibold text-xs sm:text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors min-h-[44px]"
               >
-                <Sparkles className="w-4 h-4" />
+                <Sparkles className="w-4 h-4 text-indigo-500" />
                 Load Sample Demo Semester Data
               </button>
               <button
-                onClick={handleResetData}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/30 text-red-600 dark:text-red-400 font-semibold text-xs sm:text-sm hover:bg-red-100 transition-colors focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:outline-none min-h-[44px]"
+                onClick={() => setIsDeleteOpen(true)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50/40 dark:bg-red-950/20 text-red-600 dark:text-red-400 font-semibold text-xs sm:text-sm hover:bg-red-100/60 transition-colors min-h-[44px]"
               >
                 <Trash2 className="w-4 h-4" />
-                Reset All Data & Start Fresh
+                Delete All My Data
               </button>
             </div>
           </div>
@@ -149,7 +213,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
               100% Local-First & Private
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto">
-              All records are stored securely in your browser's IndexedDB. Zero login required, no tracking, and no external dependencies.
+              All records are stored securely in your browser's IndexedDB. Zero accounts, no tracking, and no external network calls.
             </p>
           </div>
         </div>
@@ -160,6 +224,28 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
           isOpen={isTasksOpen}
           onClose={() => setIsTasksOpen(false)}
           courses={courses}
+        />
+      )}
+
+      {isBackupOpen && (
+        <BackupModal
+          isOpen={isBackupOpen}
+          onClose={() => setIsBackupOpen(false)}
+        />
+      )}
+
+      {isTransferOpen && (
+        <DeviceTransferModal
+          isOpen={isTransferOpen}
+          onClose={() => setIsTransferOpen(false)}
+        />
+      )}
+
+      {isDeleteOpen && (
+        <DeleteDataModal
+          isOpen={isDeleteOpen}
+          onClose={() => setIsDeleteOpen(false)}
+          onDeleted={onResetApp}
         />
       )}
     </PageContainer>
