@@ -5,6 +5,7 @@ import {
   calculateMustAttend,
   computeCourseAttendanceStats,
   normalizeThreshold,
+  countUnmarkedClasses,
 } from '../attendance';
 import { AttendanceRecord, CourseAttendanceRules } from '../../types';
 
@@ -161,6 +162,96 @@ describe('Attendance Engine', () => {
       expect(stats.is_in_danger).toBe(true);
       expect(stats.must_attend).toBeGreaterThan(0);
     });
+
+    it('incorporates opening balance into attendance stats', () => {
+      // Starting mid-semester with 20 conducted, 18 attended from college portal
+      const stats = computeCourseAttendanceStats(
+        [
+          { id: '10', user_id: 'u1', course_id: 'c1', date: '2026-10-01', slot_id: null, status: 'present', note: null, created_at: '', updated_at: '', deleted_at: null },
+          { id: '11', user_id: 'u1', course_id: 'c1', date: '2026-10-02', slot_id: null, status: 'absent', note: null, created_at: '', updated_at: '', deleted_at: null },
+        ],
+        rulesStrict,
+        75,
+        {
+          initialAttended: 18,
+          initialConducted: 20,
+        }
+      );
+
+      // Total attended: 18 + 1 = 19
+      // Total conducted: 20 + 2 = 22
+      // 19 / 22 = 86.36%
+      expect(stats.attended).toBe(19);
+      expect(stats.conducted).toBe(22);
+      expect(stats.percentage).toBeCloseTo(86.36, 1);
+      expect(stats.safe_bunks).toBe(3);
+    });
+
+    it('skips records prior to trackingStartDate when opening balance is active', () => {
+      const recordsWithOld: AttendanceRecord[] = [
+        { id: 'old1', user_id: 'u1', course_id: 'c1', date: '2026-09-10', slot_id: null, status: 'absent', note: null, created_at: '', updated_at: '', deleted_at: null },
+        { id: 'new1', user_id: 'u1', course_id: 'c1', date: '2026-10-05', slot_id: null, status: 'present', note: null, created_at: '', updated_at: '', deleted_at: null },
+      ];
+
+      const stats = computeCourseAttendanceStats(
+        recordsWithOld,
+        rulesStrict,
+        75,
+        {
+          initialAttended: 15,
+          initialConducted: 15,
+          trackingStartDate: '2026-10-01',
+        }
+      );
+
+      // Old record from 2026-09-10 is ignored
+      // Total attended: 15 + 1 = 16
+      // Total conducted: 15 + 1 = 16
+      expect(stats.attended).toBe(16);
+      expect(stats.conducted).toBe(16);
+      expect(stats.percentage).toBe(100.0);
+    });
+
+    it('multiplies attendance increments by slot weight (e.g. 2-period lab)', () => {
+      const labRecords: AttendanceRecord[] = [
+        { id: 'lab1', user_id: 'u1', course_id: 'c1', date: '2026-10-05', slot_id: null, status: 'present', weight: 2, note: null, created_at: '', updated_at: '', deleted_at: null },
+        { id: 'lab2', user_id: 'u1', course_id: 'c1', date: '2026-10-12', slot_id: null, status: 'absent', weight: 3, note: null, created_at: '', updated_at: '', deleted_at: null },
+      ];
+
+      const stats = computeCourseAttendanceStats(labRecords, rulesStrict, 75);
+      // Attended: 2 periods
+      // Conducted: 2 + 3 = 5 periods
+      // 2 / 5 = 40%
+      expect(stats.attended).toBe(2);
+      expect(stats.conducted).toBe(5);
+      expect(stats.percentage).toBe(40.0);
+    });
+  });
+
+  describe('countUnmarkedClasses', () => {
+    it('accurately counts unmarked classes in the past and ignores marked ones', () => {
+      const slots: any[] = [
+        { id: 's1', course_id: 'c1', weekday: 1, start_time: '09:00', end_time: '10:00', weight: 1, deleted_at: null },
+        { id: 's2', course_id: 'c2', weekday: 1, start_time: '10:00', end_time: '11:00', weight: 2, deleted_at: null },
+      ];
+
+      // Monday 2026-10-05 has both s1 and s2 (total 1 + 2 = 3 periods)
+      // If s1 is marked, only s2 remains unmarked (weight 2)
+      const records: any[] = [
+        { id: 'r1', course_id: 'c1', date: '2026-10-05', slot_id: 's1', status: 'present', deleted_at: null },
+      ];
+
+      const count = countUnmarkedClasses({
+        startDate: '2026-10-05',
+        endDate: '2026-10-05',
+        slots,
+        records,
+        courses: [{ id: 'c1' }, { id: 'c2' }],
+      });
+
+      expect(count).toBe(2); // s2 weight is 2
+    });
   });
 });
+
 

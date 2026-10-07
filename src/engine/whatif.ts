@@ -98,46 +98,216 @@ export function simulateSkippingClasses(
  * Simulates skipping a set of dates (e.g. "If I take off this Friday and next Monday").
  * Determines which slots happen on each skipped date, considering holidays and swap days.
  */
+import {
+  TimetableVersion,
+  TimetableOverride,
+} from '../types';
+import { resolveDaySchedule } from './timetable';
+
+export interface WhatIfScheduleContext {
+  versions?: TimetableVersion[];
+  slots: TimetableSlot[];
+  calendarEvents: CalendarEvent[];
+  overrides?: TimetableOverride[];
+  workingDays?: Weekday[];
+}
+
+/**
+ * Simulates skipping a set of dates (e.g. specific dates).
+ * Accurately calculates missed periods taking into account versions, overrides, range holidays, and weights.
+ */
 export function simulateSkippingDates(
   datesToSkip: string[], // YYYY-MM-DD
   subjects: SubjectAttendanceState[],
   slots: TimetableSlot[],
-  events: CalendarEvent[]
+  events: CalendarEvent[],
+  context?: Partial<WhatIfScheduleContext>
 ): WhatIfSimulationResult {
-  const holidayDates = new Set<string>();
-  const swapDays = new Map<string, Weekday>();
+  const versions = context?.versions || [];
+  const overrides = context?.overrides || [];
+  const workingDays = context?.workingDays || [1, 2, 3, 4, 5, 6];
 
-  for (const event of events) {
-    if (event.deleted_at) continue;
-    if (event.type === 'holiday') {
-      holidayDates.add(event.date);
-    } else if (event.type === 'swap_day' && event.swap_target_weekday !== null) {
-      swapDays.set(event.date, event.swap_target_weekday);
-    }
-  }
-
-  // Count how many classes for each course are on these dates
   const skipCounts: Record<string, number> = {};
 
   for (const dateStr of datesToSkip) {
-    // If it's a holiday, skipping it doesn't count as missing classes
-    if (holidayDates.has(dateStr)) continue;
+    const daySchedule = resolveDaySchedule({
+      date: dateStr,
+      versions,
+      slots,
+      calendarEvents: events,
+      overrides,
+      workingDays,
+    });
 
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) continue;
-
-    const regularWeekday = date.getDay() as Weekday;
-    const effectiveWeekday = swapDays.has(dateStr)
-      ? swapDays.get(dateStr)!
-      : regularWeekday;
-
-    // Find slots on this day
-    const activeSlots = slots.filter(s => !s.deleted_at && s.weekday === effectiveWeekday);
-    for (const slot of activeSlots) {
-      skipCounts[slot.course_id] = (skipCounts[slot.course_id] || 0) + 1;
+    if (!daySchedule.is_holiday) {
+      for (const slot of daySchedule.slots) {
+        skipCounts[slot.course_id] = (skipCounts[slot.course_id] || 0) + slot.weight;
+      }
     }
   }
 
   return simulateSkippingClasses(subjects, skipCounts);
+}
+
+/**
+ * Simulates skipping "every [Weekday]" (e.g. every Friday) from startDate to endDate.
+ */
+export function simulateSkippingRecurringWeekday(
+  weekday: Weekday,
+  startDateStr: string,
+  endDateStr: string,
+  subjects: SubjectAttendanceState[],
+  context: WhatIfScheduleContext
+): WhatIfSimulationResult {
+  const dates: string[] = [];
+  const current = new Date(startDateStr + 'T00:00:00Z');
+  const end = new Date(endDateStr + 'T00:00:00Z');
+
+  while (current <= end) {
+    if (current.getUTCDay() === weekday) {
+      dates.push(current.toISOString().slice(0, 10));
+    }
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+
+  return simulateSkippingDates(dates, subjects, context.slots, context.calendarEvents, context);
+}
+
+/**
+ * Simulates skipping the next N upcoming instructional days.
+ */
+export function simulateSkippingNUpcomingDays(
+  nDays: number,
+  startDateStr: string,
+  subjects: SubjectAttendanceState[],
+  context: WhatIfScheduleContext
+): WhatIfSimulationResult {
+  const dates: string[] = [];
+  const current = new Date(startDateStr + 'T00:00:00Z');
+  let counted = 0;
+  let safetyLimit = 60; // Max scan limit
+
+  while (counted < nDays && safetyLimit > 0) {
+    const dateStr = current.toISOString().slice(0, 10);
+    const daySchedule = resolveDaySchedule({
+      date: dateStr,
+      versions: context.versions || [],
+      slots: context.slots,
+      calendarEvents: context.calendarEvents,
+      overrides: context.overrides || [],
+      workingDays: context.workingDays || [1, 2, 3, 4, 5, 6],
+    });
+
+    if (!daySchedule.is_holiday && daySchedule.is_working_day && daySchedule.slots.length > 0) {
+      dates.push(dateStr);
+      counted++;
+    }
+
+    current.setUTCDate(current.getUTCDate() + 1);
+    safetyLimit--;
+  }
+
+  return simulateSkippingDates(dates, subjects, context.slots, context.calendarEvents, context);
+}
+
+export interface CanISkipTomorrowSubjectStatus {
+  course_id: string;
+  course_name: string;
+  classes_tomorrow: number; // Periods scheduled tomorrow
+  current_percentage: number;
+  new_percentage: number;
+  threshold: number;
+  can_skip: boolean;
+  safe_bunks_remaining: number;
+}
+
+export interface CanISkipTomorrowResult {
+  date: string;
+  is_holiday: boolean;
+  holiday_note: string | null;
+  has_classes: boolean;
+  can_skip_all: boolean;
+  subjects: CanISkipTomorrowSubjectStatus[];
+  in_danger_courses_count: number;
+}
+
+/**
+ * Computes whether a student can safely skip tomorrow's classes without any subject dropping below threshold.
+ */
+export function canISkipTomorrow(
+  tomorrowDateStr: string,
+  subjects: SubjectAttendanceState[],
+  context: WhatIfScheduleContext
+): CanISkipTomorrowResult {
+  const daySchedule = resolveDaySchedule({
+    date: tomorrowDateStr,
+    versions: context.versions || [],
+    slots: context.slots,
+    calendarEvents: context.calendarEvents,
+    overrides: context.overrides || [],
+    workingDays: context.workingDays || [1, 2, 3, 4, 5, 6],
+  });
+
+  if (daySchedule.is_holiday) {
+    return {
+      date: tomorrowDateStr,
+      is_holiday: true,
+      holiday_note: daySchedule.holiday_note,
+      has_classes: false,
+      can_skip_all: true,
+      subjects: [],
+      in_danger_courses_count: 0,
+    };
+  }
+
+  // Count tomorrow's scheduled classes per course
+  const tomorrowClassesByCourse: Record<string, number> = {};
+  for (const slot of daySchedule.slots) {
+    tomorrowClassesByCourse[slot.course_id] =
+      (tomorrowClassesByCourse[slot.course_id] || 0) + slot.weight;
+  }
+
+  const subjectResults: CanISkipTomorrowSubjectStatus[] = [];
+  let inDangerCount = 0;
+
+  for (const sub of subjects) {
+    const classesTomorrow = tomorrowClassesByCourse[sub.course_id] || 0;
+    const currentPct = calculateAttendancePercentage(sub.attended, sub.conducted);
+    const newConducted = sub.conducted + classesTomorrow;
+    const newAttended = sub.attended;
+    const newPct = calculateAttendancePercentage(newAttended, newConducted);
+    const normThreshold = normalizeThreshold(sub.threshold) * 100;
+
+    const canSkip = newPct >= normThreshold || classesTomorrow === 0;
+    if (!canSkip && (currentPct >= normThreshold || sub.conducted === 0)) {
+      inDangerCount++;
+    }
+
+    const safeBunksAfter = calculateSafeBunks(newAttended, newConducted, sub.threshold);
+
+    subjectResults.push({
+      course_id: sub.course_id,
+      course_name: sub.course_name,
+      classes_tomorrow: classesTomorrow,
+      current_percentage: currentPct,
+      new_percentage: newPct,
+      threshold: normThreshold,
+      can_skip: canSkip,
+      safe_bunks_remaining: safeBunksAfter,
+    });
+  }
+
+  const hasClasses = daySchedule.slots.length > 0;
+  const canSkipAll = inDangerCount === 0;
+
+  return {
+    date: tomorrowDateStr,
+    is_holiday: false,
+    holiday_note: null,
+    has_classes: hasClasses,
+    can_skip_all: canSkipAll,
+    subjects: subjectResults,
+    in_danger_courses_count: inDangerCount,
+  };
 }
 

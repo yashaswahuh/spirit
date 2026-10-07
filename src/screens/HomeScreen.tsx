@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { AlertTriangle, CheckCircle2, ShieldCheck, ArrowRight, BookOpen, Clock } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ShieldCheck, ArrowRight, BookOpen, Clock, CalendarCheck } from 'lucide-react';
 import { db } from '../db/dexie';
-import type { TimetableSlot } from '../types';
-import { computeCourseAttendanceStats } from '../engine/attendance';
+import type { TimetableSlot, Course } from '../types';
+import { computeCourseAttendanceStats, countUnmarkedClasses } from '../engine/attendance';
+import { canISkipTomorrow } from '../engine/whatif';
 import { getTodayTimetableSlots } from '../db/repositories/timetable.repo';
 import { markAttendance } from '../db/repositories/attendance.repo';
 import { TodayClassesSection } from '../components/home/TodayClassesSection';
+import { CanISkipTomorrowCard } from '../components/home/CanISkipTomorrowCard';
+import { CatchUpModal } from '../components/attendance/CatchUpModal';
+import { WhatIfModal } from '../components/attendance/WhatIfModal';
 import { PageContainer } from '../components/layout/PageContainer';
 
 interface HomeScreenProps {
@@ -18,6 +22,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
   const activeTerm = useLiveQuery(() => db.term.filter(t => t.deleted_at === null && t.status === 'ongoing').first());
   const courses = useLiveQuery(() => db.course.filter(c => c.deleted_at === null).toArray()) || [];
   const records = useLiveQuery(() => db.attendance_record.filter(r => r.deleted_at === null).toArray()) || [];
+  const slots = useLiveQuery(() => db.timetable_slot.filter(s => s.deleted_at === null).toArray()) || [];
+  const versions = useLiveQuery(() => db.timetable_version.filter(v => v.deleted_at === null).toArray()) || [];
+  const overrides = useLiveQuery(() => db.timetable_override.filter(o => o.deleted_at === null).toArray()) || [];
+  const calendarEvents = useLiveQuery(() => db.calendar_event.filter(e => e.deleted_at === null).toArray()) || [];
+
+  // Modals state
+  const [isCatchUpOpen, setIsCatchUpOpen] = useState(false);
+  const [isWhatIfOpen, setIsWhatIfOpen] = useState(false);
 
   // Today's schedule state
   const [todaySlots, setTodaySlots] = useState<TimetableSlot[]>([]);
@@ -39,7 +51,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
     });
   }, [records, courses]);
 
-  // Overall attendance calculation across all courses
+  // Overall attendance calculation across all courses with opening balances
   let totalAttended = 0;
   let totalConducted = 0;
   let inDangerCount = 0;
@@ -53,7 +65,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
         medical_counts_as_present: c.medical_counts_as_present,
         duty_leave_counts_as_present: c.duty_leave_counts_as_present,
       },
-      c.attendance_threshold_override || threshold
+      c.attendance_threshold_override || threshold,
+      {
+        initialAttended: c.initial_attended,
+        initialConducted: c.initial_conducted,
+        trackingStartDate: c.tracking_start_date,
+      }
     );
 
     totalAttended += stats.attended;
@@ -65,6 +82,46 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
 
   const overallPercentage = totalConducted > 0 ? (totalAttended / totalConducted) * 100 : 100.0;
   const isOverallSafe = totalConducted === 0 || overallPercentage >= threshold;
+
+  // Unmarked classes count in the past
+  const unmarkedCount = countUnmarkedClasses({
+    startDate: activeTerm?.start_date || todayStr,
+    endDate: todayStr,
+    slots,
+    versions,
+    overrides,
+    calendarEvents,
+    records,
+    courses,
+    workingDays: activeTerm?.working_days || [1, 2, 3, 4, 5, 6],
+  });
+
+  // Tomorrow calculation for "Can I Skip Tomorrow?"
+  const tomorrowDate = new Date();
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrowStr = tomorrowDate.toISOString().slice(0, 10);
+
+  const subjectStates = courseStatsList.map(({ course, stats }) => ({
+    course_id: course.id,
+    course_name: course.name,
+    attended: stats.attended,
+    conducted: stats.conducted,
+    threshold: course.attendance_threshold_override || threshold,
+  }));
+
+  const skipTomorrowResult = canISkipTomorrow(
+    tomorrowStr,
+    subjectStates,
+    {
+      versions,
+      slots,
+      calendarEvents,
+      overrides,
+      workingDays: activeTerm?.working_days || [1, 2, 3, 4, 5, 6],
+    }
+  );
+
+  const courseMap = new Map<string, Course>(courses.map(c => [c.id, c]));
 
   const handleMarkToday = async (courseId: string, slotId: string | null, status: any) => {
     await markAttendance({
@@ -102,10 +159,43 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
         </div>
       </div>
 
+      {/* Unmarked Classes Catch-Up Banner */}
+      {unmarkedCount > 0 && (
+        <div className="p-4 bg-amber-50 dark:bg-amber-950/40 rounded-3xl border border-amber-200 dark:border-amber-800/60 flex items-center justify-between gap-3 shadow-sm animate-fade-in">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 flex items-center justify-center flex-shrink-0">
+              <CalendarCheck className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-xs sm:text-sm font-bold text-amber-900 dark:text-amber-200 truncate">
+                {unmarkedCount} Unmarked {unmarkedCount === 1 ? 'Period' : 'Periods'} from Past Days
+              </h4>
+              <p className="text-[11px] sm:text-xs text-amber-700 dark:text-amber-300 truncate">
+                Unmarked classes are excluded from conducted totals until you log them.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsCatchUpOpen(true)}
+            className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex-shrink-0 min-h-[38px]"
+          >
+            Catch Up Now
+          </button>
+        </div>
+      )}
+
       {/* Multi-column layout on Desktop (lg:grid-cols-12), single column on Mobile */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left / Primary Column: Hero Card & Today's Schedule */}
+        {/* Left / Primary Column: Hero Card, Can I Skip Tomorrow & Today's Schedule */}
         <div className="lg:col-span-7 xl:col-span-7 space-y-6">
+          {/* Can I Skip Tomorrow Card */}
+          <CanISkipTomorrowCard
+            result={skipTomorrowResult}
+            courseMap={courseMap}
+            onOpenWhatIfModal={() => setIsWhatIfOpen(true)}
+          />
+
           {/* Overall Attendance Hero Card */}
           <div className="bg-gradient-to-br from-indigo-600 via-indigo-700 to-indigo-900 rounded-3xl p-5 sm:p-7 text-white shadow-xl shadow-indigo-100 dark:shadow-none space-y-5 relative overflow-hidden">
             <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-44 h-44 bg-white/5 rounded-full pointer-events-none" />
@@ -257,6 +347,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
           </div>
         </div>
       </div>
+
+      {/* Catch-Up Modal */}
+      <CatchUpModal
+        isOpen={isCatchUpOpen}
+        onClose={() => setIsCatchUpOpen(false)}
+      />
+
+      {/* What-If Simulation Modal */}
+      <WhatIfModal
+        isOpen={isWhatIfOpen}
+        onClose={() => setIsWhatIfOpen(false)}
+        courses={courses}
+        profileThreshold={threshold}
+      />
     </PageContainer>
   );
 };

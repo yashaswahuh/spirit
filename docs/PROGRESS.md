@@ -49,9 +49,18 @@
   - **Calculation Engine**: Extended `/src/engine/timetable.ts` with 18 unit tests covering slot weights, version transitions, overlap warnings, date range expansions, swap days, and term edge cases (75 passing tests total).
   - **Schema Updates**: Added `timetable_version`, `timetable_override`, and enhanced `term`, `course`, `timetable_slot`, `calendar_event`, `attendance_record` across `docs/SPEC.md`, `src/types/index.ts`, `src/db/schemas.ts`, and `docs/archive/supabase/migration.sql`.
 
+- **Phase 3 (Part B): Attendance Management, Catch-Up & Projections**:
+  - **Date-Picker Day View (`DayPickerView.tsx`)**: Pick any past date (and today) to inspect and log classes. One-tap Present/Absent/Cancelled/Medical/Duty leave; tapping active status toggles to clear; undo toast with timer for the last action; bulk day actions (All Present, All Absent, All Cancelled, Whole Day Holiday).
+  - **Unmarked Classes & Catch-Up Screen (`CatchUpModal.tsx`)**: Past scheduled classes without an attendance record are flagged as "unmarked" and excluded from conducted totals until logged. Prominent Home banner and Attendance header badge show total unmarked periods and launch the Catch Up modal with per-day bulk buttons.
+  - **Opening Balance (`initial_attended`, `initial_conducted`, `tracking_start_date`)**: Configured per subject via `SubjectModal.tsx` for mid-semester onboarding using college portal records. Built into `computeCourseAttendanceStats` and `countUnmarkedClasses`; records before `tracking_start_date` are excluded to avoid duplicate counting.
+  - **Per-Subject Calendar & Term Heatmap (`CourseCalendarModal.tsx`)**: Monthly calendar matrix using icons and text indicators alongside colors (never color alone). Tapping any date opens a quick-log editor that recalculates statistics immediately. Includes chronological term attendance heatmap.
+  - **Semester Attendance Projections**: Real-time projection strip on `CourseAttendanceCard.tsx` calculating best-case %, worst-case %, remaining scheduled classes count, and minimum classes needed to reach threshold based on timetable schedule to term end.
+  - **What-If Attendance Planner (`WhatIfModal.tsx`)**: Three simulation modes: (1) Specific Dates to skip, (2) Recurring Weekday to skip until semester end, and (3) N Upcoming Consecutive Days. Shows exact percentage drops, safe bunks left, and must-attend warnings.
+  - **"Can I Skip Tomorrow?" Card (`CanISkipTomorrowCard.tsx`)**: Prominent card on Home dashboard answering yes/no/risky with next-day percentage forecasts and expandable per-course impacts.
+  - **Engine & Testing**: Added unit tests for opening balances, slot weights, unmarked period counting, and `canISkipTomorrow` simulator. All 81 tests passing across 9 test files.
+
 ## Remaining
-- **Phase 3 (Part B)**: Date-picker day view, Unmarked classes & "Catch up" screen, Opening balances (attended/conducted before tracking started), Per-subject month calendar & term heatmap, Projections per subject (best/worst case & must attend), What-If planner & "Can I skip tomorrow?" card on Home.
-- **Phase 4**: Per-Subject Calendar View & Past Attendance Logs Editing.
+- **Phase 4**: Per-Subject Calendar View & Past Attendance Logs Editing (integrated into Phase 3B; remaining deeper analytics and history export).
 - **Phase 5**: Grades, Assessment Components (Best-of-N / Drop-Lowest), SGPA/CGPA Dashboard & Required Marks Solver UI.
 - **Phase 6**: Tasks & Exams Tracker, PDF/Print Attendance Report, Backup & Restore (JSON/CSV) with persistent storage & reminders, and Offline PWA Manifest/Worker.
 

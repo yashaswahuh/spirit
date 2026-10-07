@@ -14,6 +14,9 @@ interface SubjectModalProps {
     attendance_threshold_override: number | null;
     medical_counts_as_present: boolean;
     duty_leave_counts_as_present: boolean;
+    initial_attended?: number;
+    initial_conducted?: number;
+    tracking_start_date?: string | null;
   }) => void;
   initialCourse?: Course;
 }
@@ -49,6 +52,15 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
   const [dutyLeaveCounts, setDutyLeaveCounts] = useState(
     initialCourse?.duty_leave_counts_as_present ?? true
   );
+  const [initialAttended, setInitialAttended] = useState<number>(
+    initialCourse?.initial_attended ?? 0
+  );
+  const [initialConducted, setInitialConducted] = useState<number>(
+    initialCourse?.initial_conducted ?? 0
+  );
+  const [trackingStartDate, setTrackingStartDate] = useState<string>(
+    initialCourse?.tracking_start_date ?? ''
+  );
 
   useEffect(() => {
     if (initialCourse) {
@@ -60,6 +72,9 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
       setThresholdOverride(initialCourse.attendance_threshold_override?.toString() || '');
       setMedicalCounts(initialCourse.medical_counts_as_present);
       setDutyLeaveCounts(initialCourse.duty_leave_counts_as_present);
+      setInitialAttended(initialCourse.initial_attended ?? 0);
+      setInitialConducted(initialCourse.initial_conducted ?? 0);
+      setTrackingStartDate(initialCourse.tracking_start_date ?? '');
     } else {
       setName('');
       setCode('');
@@ -69,6 +84,9 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
       setThresholdOverride('');
       setMedicalCounts(false);
       setDutyLeaveCounts(true);
+      setInitialAttended(0);
+      setInitialConducted(0);
+      setTrackingStartDate('');
     }
   }, [initialCourse, isOpen]);
 
@@ -85,6 +103,9 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
       attendance_threshold_override: thresholdOverride ? Number(thresholdOverride) : null,
       medical_counts_as_present: medicalCounts,
       duty_leave_counts_as_present: dutyLeaveCounts,
+      initial_attended: Math.max(0, Number(initialAttended) || 0),
+      initial_conducted: Math.max(0, Number(initialConducted) || 0),
+      tracking_start_date: trackingStartDate ? trackingStartDate : null,
     });
     onClose();
   };
@@ -219,6 +240,58 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
               checked={dutyLeaveCounts}
               onChange={e => setDutyLeaveCounts(e.target.checked)}
               className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+
+        {/* Opening Balance (Mid-Semester Start) */}
+        <div className="pt-3 border-t border-gray-100 dark:border-gray-800 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
+              Opening Balance (Mid-Semester Start)
+            </label>
+            <span className="text-[11px] text-gray-400">Optional</span>
+          </div>
+          <p className="text-[11px] text-gray-500 dark:text-gray-400">
+            Enter counts from your college portal to begin tracking mid-semester.
+          </p>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                Attended Before Tracking
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={initialAttended}
+                onChange={e => setInitialAttended(Math.max(0, parseInt(e.target.value) || 0))}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                Conducted Before Tracking
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={initialConducted}
+                onChange={e => setInitialConducted(Math.max(0, parseInt(e.target.value) || 0))}
+                className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">
+              Tracking Start Date
+            </label>
+            <input
+              type="date"
+              value={trackingStartDate}
+              onChange={e => setTrackingStartDate(e.target.value)}
+              className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono"
             />
           </div>
         </div>

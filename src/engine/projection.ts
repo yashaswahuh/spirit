@@ -58,56 +58,66 @@ export function calculateAttendanceProjection(input: ProjectionInput): Attendanc
  * - Calendar holidays (classes cancelled)
  * - Swap days (e.g. Saturday follows Monday timetable)
  */
+import {
+  TimetableVersion,
+  TimetableOverride,
+} from '../types';
+import { resolveDaySchedule } from './timetable';
+
+export interface RemainingScheduledClassesOptions {
+  versions?: TimetableVersion[];
+  overrides?: TimetableOverride[];
+  workingDays?: Weekday[];
+}
+
+/**
+ * Calculates remaining scheduled occurrences / periods for a specific course
+ * from startDate to endDate inclusive, accounting for:
+ * - Timetable versions with effective_from
+ * - Calendar holidays (single & range holidays)
+ * - Swap days (e.g. Saturday follows Monday timetable)
+ * - One-off overrides (cancels, substitutes, extra classes)
+ * - Slot weights (e.g. 2-period lab counts as 2)
+ * - Configurable working days
+ */
 export function countRemainingScheduledClasses(
   courseId: string,
   startDateStr: string, // YYYY-MM-DD
   endDateStr: string,   // YYYY-MM-DD
   slots: TimetableSlot[],
-  events: CalendarEvent[]
+  events: CalendarEvent[],
+  options?: RemainingScheduledClassesOptions
 ): number {
-  const courseSlots = slots.filter(s => s.course_id === courseId && !s.deleted_at);
-  if (courseSlots.length === 0) return 0;
+  if (startDateStr > endDateStr) return 0;
 
-  // Map events by date (YYYY-MM-DD)
-  const holidayDates = new Set<string>();
-  const swapDays = new Map<string, Weekday>();
-
-  for (const event of events) {
-    if (event.deleted_at) continue;
-    if (event.type === 'holiday') {
-      holidayDates.add(event.date);
-    } else if (event.type === 'swap_day' && event.swap_target_weekday !== null) {
-      swapDays.set(event.date, event.swap_target_weekday);
-    }
-  }
-
-  const start = new Date(startDateStr);
-  const end = new Date(endDateStr);
-
-  if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) {
-    return 0;
-  }
+  const versions = options?.versions || [];
+  const overrides = options?.overrides || [];
+  const workingDays = options?.workingDays || [1, 2, 3, 4, 5, 6];
 
   let totalClasses = 0;
-  const current = new Date(start);
+  const current = new Date(startDateStr + 'T00:00:00Z');
+  const end = new Date(endDateStr + 'T00:00:00Z');
 
   while (current <= end) {
     const dateStr = current.toISOString().slice(0, 10);
+    const daySchedule = resolveDaySchedule({
+      date: dateStr,
+      versions,
+      slots,
+      calendarEvents: events,
+      overrides,
+      workingDays,
+    });
 
-    // If it's a holiday, no classes conducted
-    if (!holidayDates.has(dateStr)) {
-      // Determine effective weekday (0 = Sun, 1 = Mon ... 6 = Sat)
-      const regularWeekday = current.getDay() as Weekday;
-      const effectiveWeekday = swapDays.has(dateStr)
-        ? swapDays.get(dateStr)!
-        : regularWeekday;
-
-      // Count slots matching this effective weekday
-      const slotsForDay = courseSlots.filter(s => s.weekday === effectiveWeekday);
-      totalClasses += slotsForDay.length;
+    if (!daySchedule.is_holiday) {
+      // Find all slots for this course on this day and sum their weights
+      const courseSlots = daySchedule.slots.filter(s => s.course_id === courseId);
+      for (const cs of courseSlots) {
+        totalClasses += cs.weight;
+      }
     }
 
-    current.setDate(current.getDate() + 1);
+    current.setUTCDate(current.getUTCDate() + 1);
   }
 
   return totalClasses;

@@ -9,6 +9,13 @@ interface CourseAttendanceCardProps {
   onMark: (status: AttendanceStatus) => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onViewCalendar?: () => void;
+  projection?: {
+    bestCase: number;
+    worstCase: number;
+    remainingClasses: number;
+    classesNeeded: number;
+  };
 }
 
 export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
@@ -17,6 +24,8 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
   onMark,
   onEdit,
   onDelete,
+  onViewCalendar,
+  projection,
 }) => {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const isSafe = !stats.is_in_danger;
@@ -56,7 +65,18 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
             <MoreVertical className="w-4 h-4" />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-8 z-20 w-32 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 py-1 text-xs">
+            <div className="absolute right-0 top-8 z-20 w-36 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 py-1 text-xs">
+              {onViewCalendar && (
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onViewCalendar();
+                  }}
+                  className="w-full text-left px-3 py-2 text-indigo-600 dark:text-indigo-400 hover:bg-gray-50 dark:hover:bg-gray-700 font-medium"
+                >
+                  View Calendar
+                </button>
+              )}
               {onEdit && (
                 <button
                   onClick={() => {
@@ -132,6 +152,11 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
       <div className="mt-3 pt-2.5 border-t border-gray-50 dark:border-gray-800/80 flex items-center justify-between text-xs">
         <span className="text-gray-500 dark:text-gray-400 font-medium">
           {stats.attended} of {stats.conducted} attended
+          {course.initial_conducted ? (
+            <span className="text-[10px] text-gray-400 block font-mono">
+              (Includes {course.initial_attended}/{course.initial_conducted} portal balance)
+            </span>
+          ) : null}
         </span>
 
         {isSafe ? (
@@ -144,6 +169,18 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
           </span>
         )}
       </div>
+
+      {/* Semester Projection Strip */}
+      {projection && projection.remainingClasses > 0 && (
+        <div className="mt-2.5 p-2 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 text-[11px] flex items-center justify-between">
+          <span className="text-gray-600 dark:text-gray-300 font-medium">
+            Projections ({projection.remainingClasses} left):
+          </span>
+          <span className="font-mono font-bold text-gray-700 dark:text-gray-200">
+            Best: <span className="text-emerald-600">{projection.bestCase.toFixed(1)}%</span> | Worst: <span className="text-rose-600">{projection.worstCase.toFixed(1)}%</span>
+          </span>
+        </div>
+      )}
 
       {/* Quick Attendance Marking Row */}
       <div className="mt-3 grid grid-cols-3 gap-2">

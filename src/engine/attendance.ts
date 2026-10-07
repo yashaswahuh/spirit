@@ -71,9 +71,18 @@ export function calculateMustAttend(attended: number, conducted: number, thresho
   return Math.max(0, needed);
 }
 
+export interface CourseAttendanceCalculationOptions {
+  initialAttended?: number;
+  initialConducted?: number;
+  trackingStartDate?: string | null;
+}
+
 /**
- * Computes comprehensive attendance stats for a course given its historical records.
+ * Computes comprehensive attendance stats for a course given its historical records and opening balance.
  * Follows rules:
+ * - Opening balance (initialAttended, initialConducted) included in totals.
+ * - Records prior to trackingStartDate (if set) are skipped to prevent double counting.
+ * - Each record counts for record.weight periods (default 1).
  * - 'cancelled' and 'holiday' are excluded from conducted count.
  * - 'medical' counts as present if rules.medical_counts_as_present is true.
  * - 'duty_leave' counts as present if rules.duty_leave_counts_as_present is true.
@@ -81,32 +90,37 @@ export function calculateMustAttend(attended: number, conducted: number, thresho
 export function computeCourseAttendanceStats(
   records: AttendanceRecord[],
   rules: CourseAttendanceRules,
-  threshold: number
+  threshold: number,
+  options?: CourseAttendanceCalculationOptions
 ): AttendanceStats {
-  let attended = 0;
-  let conducted = 0;
+  let attended = Math.max(0, options?.initialAttended || 0);
+  let conducted = Math.max(0, options?.initialConducted || 0);
+  const trackingStart = options?.trackingStartDate;
 
   for (const record of records) {
     if (record.deleted_at) continue;
+    if (trackingStart && record.date < trackingStart) continue;
+
+    const weight = record.weight && record.weight > 0 ? record.weight : 1;
 
     switch (record.status) {
       case 'present':
-        conducted += 1;
-        attended += 1;
+        conducted += weight;
+        attended += weight;
         break;
       case 'absent':
-        conducted += 1;
+        conducted += weight;
         break;
       case 'medical':
-        conducted += 1;
+        conducted += weight;
         if (rules.medical_counts_as_present) {
-          attended += 1;
+          attended += weight;
         }
         break;
       case 'duty_leave':
-        conducted += 1;
+        conducted += weight;
         if (rules.duty_leave_counts_as_present) {
-          attended += 1;
+          attended += weight;
         }
         break;
       case 'cancelled':
@@ -130,5 +144,79 @@ export function computeCourseAttendanceStats(
     must_attend,
     is_in_danger: conducted > 0 && percentage < normThreshold,
   };
+}
+
+import { TimetableSlot, CalendarEvent, TimetableVersion, TimetableOverride, Weekday } from '../types';
+import { resolveDaySchedule } from './timetable';
+
+export interface UnmarkedCountParams {
+  startDate: string;
+  endDate: string;
+  slots: TimetableSlot[];
+  versions?: TimetableVersion[];
+  overrides?: TimetableOverride[];
+  calendarEvents?: CalendarEvent[];
+  records: AttendanceRecord[];
+  courses: { id: string; tracking_start_date?: string | null }[];
+  workingDays?: Weekday[];
+}
+
+/**
+ * Counts total unmarked scheduled periods across past dates from startDate to endDate inclusive.
+ * Classes before a course's tracking_start_date are excluded.
+ */
+export function countUnmarkedClasses(params: UnmarkedCountParams): number {
+  const {
+    startDate,
+    endDate,
+    slots,
+    versions = [],
+    overrides = [],
+    calendarEvents = [],
+    records,
+    courses,
+    workingDays = [1, 2, 3, 4, 5, 6],
+  } = params;
+
+  if (startDate > endDate) return 0;
+
+  const courseMap = new Map(courses.map(c => [c.id, c]));
+  const markedSet = new Set(
+    records.filter(r => !r.deleted_at).map(r => `${r.course_id}:${r.date}:${r.slot_id || ''}`)
+  );
+
+  let totalUnmarked = 0;
+  const current = new Date(startDate + 'T00:00:00Z');
+  const end = new Date(endDate + 'T00:00:00Z');
+
+  while (current <= end) {
+    const dateStr = current.toISOString().slice(0, 10);
+    const schedule = resolveDaySchedule({
+      date: dateStr,
+      versions,
+      slots,
+      calendarEvents,
+      overrides,
+      workingDays,
+    });
+
+    if (!schedule.is_holiday && schedule.slots.length > 0) {
+      for (const s of schedule.slots) {
+        const course = courseMap.get(s.course_id);
+        if (course?.tracking_start_date && dateStr < course.tracking_start_date) {
+          continue;
+        }
+        const keyWithSlot = `${s.course_id}:${dateStr}:${s.slot_id || ''}`;
+        const keyWithoutSlot = `${s.course_id}:${dateStr}:`;
+        if (!markedSet.has(keyWithSlot) && !markedSet.has(keyWithoutSlot)) {
+          totalUnmarked += s.weight;
+        }
+      }
+    }
+
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+
+  return totalUnmarked;
 }
 
