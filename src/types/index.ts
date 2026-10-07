@@ -168,8 +168,16 @@ export interface GradingScheme extends BaseEntity {
 }
 
 // ============================================================================
-// 4. TERM
+// 4. TERM & PERIOD TIMING
 // ============================================================================
+
+export interface PeriodTiming {
+  id: string;
+  name: string; // e.g. "P1", "Break", "P2", "Lunch"
+  start_time: string; // "09:00"
+  end_time: string; // "09:55"
+  is_break: boolean;
+}
 
 export interface Term extends BaseEntity {
   program_id: string; // Foreign key to program.id
@@ -179,6 +187,9 @@ export interface Term extends BaseEntity {
   end_date: string; // YYYY-MM-DD
   sgpa: number | null; // Computed SGPA (null until grades entered)
   status: TermStatus; // 'upcoming' | 'ongoing' | 'completed'
+  attendance_threshold?: number; // Target attendance threshold for the term (default 75)
+  working_days?: Weekday[]; // Working days of week (default Mon-Sat: [1, 2, 3, 4, 5, 6])
+  period_timings?: PeriodTiming[]; // Custom period timings
 }
 
 // ============================================================================
@@ -192,23 +203,57 @@ export interface Course extends BaseEntity {
   credits: number; // e.g. 4
   type: CourseType; // 'theory' | 'lab' | 'tutorial' | 'project' | 'elective' | 'audit'
   counts_toward_gpa: boolean; // false for audit/non-credit courses
-  attendance_threshold_override: number | null; // null uses profile default, number overrides (e.g. 85)
+  attendance_threshold_override: number | null; // null uses profile/term default, number overrides (e.g. 85)
   color: string; // Hex color or palette key for badges/charts
   medical_counts_as_present: boolean; // Setting: whether medical leave is counted as present
   duty_leave_counts_as_present: boolean; // Setting: whether duty leave is counted as present
+  initial_attended?: number; // Opening balance: attended classes before tracking started
+  initial_conducted?: number; // Opening balance: conducted classes before tracking started
+  tracking_start_date?: string | null; // Date tracking started (YYYY-MM-DD)
 }
 
 // ============================================================================
-// 6. TIMETABLE SLOT
+// 6. TIMETABLE VERSION & SLOTS
 // ============================================================================
+
+export interface TimetableVersion extends BaseEntity {
+  term_id: string; // Foreign key to term.id
+  name: string; // e.g. "Semester Start Timetable", "Revised Timetable"
+  effective_from: string; // YYYY-MM-DD
+}
 
 export interface TimetableSlot extends BaseEntity {
   course_id: string; // Foreign key to course.id
+  version_id?: string | null; // Foreign key to timetable_version.id
   weekday: Weekday; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
   start_time: string; // HH:mm (24-hour format, e.g. "09:00")
   end_time: string; // HH:mm (24-hour format, e.g. "09:50")
   room: string | null; // e.g. "Hall 302", "Lab 3"
+  faculty?: string | null; // Optional faculty/instructor name
   component_type: CourseType; // 'theory' | 'lab' | 'tutorial' | etc.
+  weight?: number; // Period weight (default 1; e.g. 2 or 3 for 2-3 hour lab)
+  period_name?: string | null; // Optional label like "Period 1"
+}
+
+// ============================================================================
+// 6B. TIMETABLE ONE-OFF OVERRIDE (Specific Date Changes)
+// ============================================================================
+
+export type OneOffOverrideAction = 'cancel' | 'substitute' | 'extra' | 'reschedule';
+
+export interface TimetableOverride extends BaseEntity {
+  term_id: string;
+  date: string; // YYYY-MM-DD
+  action: OneOffOverrideAction;
+  original_slot_id: string | null; // null if extra class
+  course_id: string; // Course ID for the slot (substituted, extra, or original)
+  start_time: string; // HH:mm
+  end_time: string; // HH:mm
+  room: string | null;
+  faculty: string | null;
+  component_type: CourseType;
+  weight: number; // default 1
+  note: string | null;
 }
 
 // ============================================================================
@@ -216,7 +261,8 @@ export interface TimetableSlot extends BaseEntity {
 // ============================================================================
 
 export interface CalendarEvent extends BaseEntity {
-  date: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD (start date)
+  end_date?: string | null; // YYYY-MM-DD (optional end date for range holidays)
   type: CalendarEventType; // 'holiday' | 'exam' | 'swap_day' | 'event'
   swap_target_weekday: Weekday | null; // If swap_day, timetable day to follow (e.g. 1 for Monday timetable)
   note: string | null; // e.g. "Diwali Holiday", "Mid-term exam week", "Follow Monday timetable"
@@ -231,6 +277,8 @@ export interface AttendanceRecord extends BaseEntity {
   date: string; // YYYY-MM-DD
   slot_id: string | null; // Foreign key to timetable_slot.id (nullable for unscheduled/extra classes)
   status: AttendanceStatus; // 'present' | 'absent' | 'cancelled' | 'medical' | 'duty_leave' | 'holiday'
+  weight?: number; // Period weight for this session (default 1)
+  override_id?: string | null; // Optional foreign key to timetable_override.id
   note: string | null; // e.g. "Proxy missed", "NSS Duty Leave", "Teacher absent"
 }
 
@@ -387,7 +435,9 @@ export type TableName =
   | 'grading_scheme'
   | 'term'
   | 'course'
+  | 'timetable_version'
   | 'timetable_slot'
+  | 'timetable_override'
   | 'calendar_event'
   | 'attendance_record'
   | 'assessment_component'

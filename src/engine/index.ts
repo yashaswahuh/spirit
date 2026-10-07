@@ -11,4 +11,5 @@ export * from './gpa';
 export * from './annual-division';
 export * from './marks';
 export * from './required-marks';
+export * from './timetable';
 

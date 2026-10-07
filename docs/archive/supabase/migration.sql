@@ -475,3 +475,85 @@ create policy "Users can update their own tasks"
 create policy "Users can delete their own tasks"
     on public.task for delete
     using (auth.uid() = user_id);
+
+-- ----------------------------------------------------------------------------
+-- 13. TIMETABLE VERSION (Phase 3)
+-- ----------------------------------------------------------------------------
+create table if not exists public.timetable_version (
+    id uuid primary key,
+    user_id uuid not null references auth.users(id) on delete cascade,
+    term_id uuid not null references public.term(id) on delete cascade,
+    name text not null,
+    effective_from date not null,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    deleted_at timestamptz
+);
+
+create index if not exists idx_timetable_version_user_updated on public.timetable_version (user_id, updated_at);
+create index if not exists idx_timetable_version_term_id on public.timetable_version (term_id);
+
+alter table public.timetable_version enable row level security;
+
+create policy "Users can view their own timetable versions"
+    on public.timetable_version for select
+    using (auth.uid() = user_id);
+
+create policy "Users can insert their own timetable versions"
+    on public.timetable_version for insert
+    with check (auth.uid() = user_id);
+
+create policy "Users can update their own timetable versions"
+    on public.timetable_version for update
+    using (auth.uid() = user_id)
+    with check (auth.uid() = user_id);
+
+create policy "Users can delete their own timetable versions"
+    on public.timetable_version for delete
+    using (auth.uid() = user_id);
+
+-- ----------------------------------------------------------------------------
+-- 14. TIMETABLE OVERRIDE (Phase 3)
+-- ----------------------------------------------------------------------------
+create table if not exists public.timetable_override (
+    id uuid primary key,
+    user_id uuid not null references auth.users(id) on delete cascade,
+    term_id uuid not null references public.term(id) on delete cascade,
+    date date not null,
+    action text not null check (action in ('cancel', 'substitute', 'extra', 'reschedule')),
+    original_slot_id uuid references public.timetable_slot(id) on delete set null,
+    course_id uuid not null references public.course(id) on delete cascade,
+    start_time text not null,
+    end_time text not null,
+    room text,
+    faculty text,
+    component_type text not null default 'theory',
+    weight integer not null default 1,
+    note text,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    deleted_at timestamptz
+);
+
+create index if not exists idx_timetable_override_user_updated on public.timetable_override (user_id, updated_at);
+create index if not exists idx_timetable_override_date on public.timetable_override (date);
+
+alter table public.timetable_override enable row level security;
+
+create policy "Users can view their own timetable overrides"
+    on public.timetable_override for select
+    using (auth.uid() = user_id);
+
+create policy "Users can insert their own timetable overrides"
+    on public.timetable_override for insert
+    with check (auth.uid() = user_id);
+
+create policy "Users can update their own timetable overrides"
+    on public.timetable_override for update
+    using (auth.uid() = user_id)
+    with check (auth.uid() = user_id);
+
+create policy "Users can delete their own timetable overrides"
+    on public.timetable_override for delete
+    using (auth.uid() = user_id);
+

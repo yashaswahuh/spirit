@@ -72,6 +72,14 @@ export const programSchema = baseEntitySchema.extend({
   grading_scheme_id: z.string().uuid(),
 });
 
+export const periodTimingSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  start_time: z.string(),
+  end_time: z.string(),
+  is_break: z.boolean().default(false),
+});
+
 export const termSchema = baseEntitySchema.extend({
   program_id: z.string().uuid(),
   number: z.number().int().min(1),
@@ -80,6 +88,17 @@ export const termSchema = baseEntitySchema.extend({
   end_date: z.string(),
   sgpa: z.number().nullable().optional(),
   status: z.enum(['upcoming', 'ongoing', 'completed']).default('ongoing'),
+  attendance_threshold: z.number().min(0).max(100).default(75).optional(),
+  working_days: z.array(z.union([
+    z.literal(0),
+    z.literal(1),
+    z.literal(2),
+    z.literal(3),
+    z.literal(4),
+    z.literal(5),
+    z.literal(6),
+  ])).optional(),
+  period_timings: z.array(periodTimingSchema).optional(),
 });
 
 export const courseSchema = baseEntitySchema.extend({
@@ -93,10 +112,20 @@ export const courseSchema = baseEntitySchema.extend({
   color: z.string().default('#4f46e5'),
   medical_counts_as_present: z.boolean().default(false),
   duty_leave_counts_as_present: z.boolean().default(true),
+  initial_attended: z.number().min(0).default(0).optional(),
+  initial_conducted: z.number().min(0).default(0).optional(),
+  tracking_start_date: z.string().nullable().optional(),
+});
+
+export const timetableVersionSchema = baseEntitySchema.extend({
+  term_id: z.string().uuid(),
+  name: z.string().min(1),
+  effective_from: z.string(),
 });
 
 export const timetableSlotSchema = baseEntitySchema.extend({
   course_id: z.string().uuid(),
+  version_id: z.string().uuid().nullable().optional(),
   weekday: z.union([
     z.literal(0),
     z.literal(1),
@@ -109,11 +138,30 @@ export const timetableSlotSchema = baseEntitySchema.extend({
   start_time: z.string(),
   end_time: z.string(),
   room: z.string().nullable().optional(),
+  faculty: z.string().nullable().optional(),
   component_type: z.enum(['theory', 'lab', 'tutorial', 'project', 'elective', 'audit']).default('theory'),
+  weight: z.number().int().min(1).default(1).optional(),
+  period_name: z.string().nullable().optional(),
+});
+
+export const timetableOverrideSchema = baseEntitySchema.extend({
+  term_id: z.string().uuid(),
+  date: z.string(),
+  action: z.enum(['cancel', 'substitute', 'extra', 'reschedule']),
+  original_slot_id: z.string().uuid().nullable().optional(),
+  course_id: z.string().uuid(),
+  start_time: z.string(),
+  end_time: z.string(),
+  room: z.string().nullable().optional(),
+  faculty: z.string().nullable().optional(),
+  component_type: z.enum(['theory', 'lab', 'tutorial', 'project', 'elective', 'audit']).default('theory'),
+  weight: z.number().int().min(1).default(1),
+  note: z.string().nullable().optional(),
 });
 
 export const calendarEventSchema = baseEntitySchema.extend({
   date: z.string(),
+  end_date: z.string().nullable().optional(),
   type: z.enum(['holiday', 'exam', 'swap_day', 'event']),
   swap_target_weekday: z.union([
     z.literal(0),
@@ -133,6 +181,8 @@ export const attendanceRecordSchema = baseEntitySchema.extend({
   date: z.string(),
   slot_id: z.string().uuid().nullable().optional(),
   status: z.enum(['present', 'absent', 'cancelled', 'medical', 'duty_leave', 'holiday']),
+  weight: z.number().int().min(1).default(1).optional(),
+  override_id: z.string().uuid().nullable().optional(),
   note: z.string().nullable().optional(),
 });
 

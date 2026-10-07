@@ -119,6 +119,15 @@ export async function saveOnboardingSetup(data: OnboardingData): Promise<void> {
 
   // 4. Term
   const termId = generateUUID();
+  const defaultPeriodTimings = [
+    { id: 'p1', name: 'Period 1', start_time: '09:00', end_time: '09:55', is_break: false },
+    { id: 'p2', name: 'Period 2', start_time: '10:00', end_time: '10:55', is_break: false },
+    { id: 'b1', name: 'Short Break', start_time: '10:55', end_time: '11:15', is_break: true },
+    { id: 'p3', name: 'Period 3', start_time: '11:15', end_time: '12:10', is_break: false },
+    { id: 'lunch', name: 'Lunch', start_time: '12:10', end_time: '13:00', is_break: true },
+    { id: 'p4', name: 'Period 4 / Lab', start_time: '13:00', end_time: '15:00', is_break: false },
+  ];
+
   const term: Term = {
     id: termId,
     user_id: LOCAL_USER_ID,
@@ -129,11 +138,27 @@ export async function saveOnboardingSetup(data: OnboardingData): Promise<void> {
     end_date: data.endDate,
     sgpa: null,
     status: 'ongoing',
+    attendance_threshold: data.attendanceThreshold,
+    working_days: [1, 2, 3, 4, 5, 6], // Monday to Saturday
+    period_timings: defaultPeriodTimings,
     created_at: now,
     updated_at: now,
     deleted_at: null,
   };
   validateEntity(termSchema, term);
+
+  // 4b. Initial Timetable Version
+  const initialVersionId = generateUUID();
+  await db.timetable_version.put({
+    id: initialVersionId,
+    user_id: LOCAL_USER_ID,
+    term_id: termId,
+    name: 'Initial Timetable',
+    effective_from: data.startDate,
+    created_at: now,
+    updated_at: now,
+    deleted_at: null,
+  });
 
   // 5. Courses
   const createdCourses: Course[] = [];
@@ -151,6 +176,9 @@ export async function saveOnboardingSetup(data: OnboardingData): Promise<void> {
       color: c.color,
       medical_counts_as_present: false,
       duty_leave_counts_as_present: true,
+      initial_attended: 0,
+      initial_conducted: 0,
+      tracking_start_date: null,
       created_at: now,
       updated_at: now,
       deleted_at: null,
@@ -164,15 +192,18 @@ export async function saveOnboardingSetup(data: OnboardingData): Promise<void> {
   if (data.slots && data.slots.length > 0) {
     for (const s of data.slots) {
       if (s.courseIndex < createdCourses.length) {
+        const targetCourse = createdCourses[s.courseIndex];
         const slot: TimetableSlot = {
           id: generateUUID(),
           user_id: LOCAL_USER_ID,
-          course_id: createdCourses[s.courseIndex].id,
+          course_id: targetCourse.id,
+          version_id: initialVersionId,
           weekday: s.weekday,
           start_time: s.startTime,
           end_time: s.endTime,
           room: null,
-          component_type: createdCourses[s.courseIndex].type,
+          component_type: targetCourse.type,
+          weight: targetCourse.type === 'lab' ? 2 : 1,
           created_at: now,
           updated_at: now,
           deleted_at: null,
@@ -326,7 +357,9 @@ export async function resetDatabase(): Promise<void> {
     db.program.clear(),
     db.term.clear(),
     db.course.clear(),
+    db.timetable_version.clear(),
     db.timetable_slot.clear(),
+    db.timetable_override.clear(),
     db.calendar_event.clear(),
     db.attendance_record.clear(),
     db.assessment_component.clear(),
