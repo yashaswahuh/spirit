@@ -46,7 +46,8 @@ export interface EffectiveSlot {
   room: string | null;
   faculty: string | null;
   component_type: CourseType;
-  weight: number; // Periods it counts for (e.g. 1, 2, 3)
+  weight: number; // Periods it spans in time (e.g. 1, 2, 3)
+  attendance_weight: number; // Periods it counts for attendance (may differ from weight for labs)
   period_name: string | null;
   is_override: boolean;
   override_action?: 'cancel' | 'substitute' | 'extra' | 'reschedule';
@@ -348,18 +349,22 @@ export function resolveDaySchedule(params: ResolveDayScheduleParams): DaySchedul
   }
 
   // Map to EffectiveSlot
-  let effectiveSlots: EffectiveSlot[] = baseDaySlots.map(s => ({
-    slot_id: s.id,
-    course_id: s.course_id,
-    start_time: s.start_time,
-    end_time: s.end_time,
-    room: s.room,
-    faculty: s.faculty || null,
-    component_type: s.component_type,
-    weight: s.weight && s.weight > 0 ? s.weight : 1,
-    period_name: s.period_name || null,
-    is_override: false,
-  }));
+  let effectiveSlots: EffectiveSlot[] = baseDaySlots.map(s => {
+    const w = s.weight && s.weight > 0 ? s.weight : 1;
+    return {
+      slot_id: s.id,
+      course_id: s.course_id,
+      start_time: s.start_time,
+      end_time: s.end_time,
+      room: s.room,
+      faculty: s.faculty || null,
+      component_type: s.component_type,
+      weight: w,
+      attendance_weight: s.attendance_weight != null ? s.attendance_weight : w,
+      period_name: s.period_name || null,
+      is_override: false,
+    };
+  });
 
   // Apply one-off overrides for this date
   const dayOverrides = overrides.filter(o => !o.deleted_at && o.date === date);
@@ -414,6 +419,7 @@ export function resolveDaySchedule(params: ResolveDayScheduleParams): DaySchedul
         break;
       }
       case 'extra': {
+        const ow = override.weight > 0 ? override.weight : 1;
         effectiveSlots.push({
           slot_id: null,
           course_id: override.course_id,
@@ -422,7 +428,8 @@ export function resolveDaySchedule(params: ResolveDayScheduleParams): DaySchedul
           room: override.room,
           faculty: override.faculty,
           component_type: override.component_type,
-          weight: override.weight > 0 ? override.weight : 1,
+          weight: ow,
+          attendance_weight: ow,
           period_name: null,
           is_override: true,
           override_action: 'extra',

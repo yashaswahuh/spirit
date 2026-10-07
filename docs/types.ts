@@ -238,6 +238,7 @@ export interface TimetableSlot extends BaseEntity {
   faculty?: string | null; // Optional faculty/instructor name
   component_type: CourseType; // 'theory' | 'lab' | 'tutorial' | etc.
   weight?: number; // Period weight (default 1; e.g. 2 or 3 for 2-3 hour lab)
+  attendance_weight?: number | null; // How many periods this counts for attendance (null = same as weight)
   period_name?: string | null; // Optional label like "Period 1"
 }
 

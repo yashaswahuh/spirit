@@ -148,6 +148,7 @@ export const timetableSlotSchema = baseEntitySchema.extend({
   faculty: z.string().nullable().optional(),
   component_type: z.enum(['theory', 'lab', 'theory_and_lab', 'tutorial', 'project', 'elective', 'audit']).default('theory'),
   weight: z.number().int().min(1).default(1).optional(),
+  attendance_weight: z.number().int().min(1).nullable().optional(),
   period_name: z.string().nullable().optional(),
 });
 

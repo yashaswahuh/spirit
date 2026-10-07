@@ -290,7 +290,40 @@ describe('Timetable Engine Unit Tests', () => {
       expect(res.slots[0].weight).toBe(1);
       expect(res.slots[1].course_id).toBe('c-physics-lab');
       expect(res.slots[1].weight).toBe(2);
+      expect(res.slots[1].attendance_weight).toBe(2);
       expect(res.total_periods).toBe(3);
+    });
+
+    it('resolves custom attendance_weight independent of period weight (e.g. 2-hour lab counting as 1 period)', () => {
+      const labSlotWith1AttWeight: TimetableSlot = {
+        id: 'slot-chem-lab',
+        user_id: 'u1',
+        course_id: 'c-chem-lab',
+        version_id: 'v1',
+        weekday: 1, // Monday
+        start_time: '14:00',
+        end_time: '15:55',
+        room: 'Chem Lab 1',
+        faculty: 'Dr. Marie Curie',
+        component_type: 'lab',
+        weight: 2, // 2-period lab
+        attendance_weight: 1, // counts as 1 for attendance
+        period_name: 'P5-P6',
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+
+      const res = resolveDaySchedule({
+        date: '2026-10-05',
+        versions,
+        slots: [labSlotWith1AttWeight],
+        calendarEvents: [],
+      });
+
+      expect(res.slots).toHaveLength(1);
+      expect(res.slots[0].weight).toBe(2); // spans 2 periods in timetable
+      expect(res.slots[0].attendance_weight).toBe(1); // counts as 1 for attendance mark
     });
 
     it('excludes classes on holidays (conducted = 0)', () => {

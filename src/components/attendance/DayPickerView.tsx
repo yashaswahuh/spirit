@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Sun,
   AlertCircle,
+  HelpCircle,
 } from 'lucide-react';
 import { db } from '../../db/dexie';
 import { AttendanceStatus, Course, AttendanceRecord } from '../../types';
@@ -35,6 +36,55 @@ interface LastAction {
   statusLabel: string;
 }
 
+// Centralised config for status display
+const STATUS_CONFIG: Record<
+  AttendanceStatus | 'unmarked',
+  { label: string; icon: React.ReactNode; badgeCls: string }
+> = {
+  present: {
+    label: 'Present',
+    icon: <Check className="w-3 h-3" />,
+    badgeCls:
+      'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200',
+  },
+  absent: {
+    label: 'Absent',
+    icon: <X className="w-3 h-3" />,
+    badgeCls:
+      'bg-rose-100 dark:bg-rose-900/60 text-rose-800 dark:text-rose-200',
+  },
+  cancelled: {
+    label: 'Cancelled',
+    icon: <Ban className="w-3 h-3" />,
+    badgeCls:
+      'bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200',
+  },
+  medical: {
+    label: 'Medical',
+    icon: <Activity className="w-3 h-3" />,
+    badgeCls:
+      'bg-cyan-100 dark:bg-cyan-900/60 text-cyan-800 dark:text-cyan-200',
+  },
+  duty_leave: {
+    label: 'Duty Leave',
+    icon: <Shield className="w-3 h-3" />,
+    badgeCls:
+      'bg-violet-100 dark:bg-violet-900/60 text-violet-800 dark:text-violet-200',
+  },
+  holiday: {
+    label: 'Holiday',
+    icon: <Sun className="w-3 h-3" />,
+    badgeCls:
+      'bg-orange-100 dark:bg-orange-900/60 text-orange-800 dark:text-orange-200',
+  },
+  unmarked: {
+    label: 'Not marked',
+    icon: <HelpCircle className="w-3 h-3" />,
+    badgeCls:
+      'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400',
+  },
+};
+
 export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged }) => {
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().slice(0, 10)
@@ -54,7 +104,7 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
   const activeTerm = terms.find(t => t.status === 'ongoing') || terms[0];
   const workingDays = activeTerm?.working_days || [1, 2, 3, 4, 5, 6];
 
-  // Resolve day schedule using engine
+  // Resolve day schedule using engine — pass saturdayRule so 2nd/4th Sat shows as holiday
   const daySchedule: DayScheduleResolution = resolveDaySchedule({
     date: selectedDate,
     versions,
@@ -62,6 +112,7 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
     calendarEvents,
     overrides,
     workingDays,
+    saturdayRule: activeTerm?.saturday_rule,
   });
 
   // Clear undo toast after 6 seconds
@@ -93,11 +144,12 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
   };
 
   // One-tap mark or toggle/clear
+  // attendanceWeight: how many periods this counts for attendance (may differ from time-spanning weight)
   const handleToggleStatus = async (
     courseId: string,
     slotId: string | null,
     targetStatus: AttendanceStatus,
-    weight: number = 1
+    attendanceWeight: number = 1
   ) => {
     const existing = getSlotRecord(courseId, slotId);
     const course = courseMap.get(courseId);
@@ -124,9 +176,9 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
         status: targetStatus,
       });
 
-      // Update record weight if > 1
-      if (weight > 1) {
-        await db.attendance_record.update(saved.id, { weight });
+      // Store attendance_weight (not the time-spanning weight) as the record weight
+      if (attendanceWeight > 1) {
+        await db.attendance_record.update(saved.id, { weight: attendanceWeight });
       }
 
       setLastAction({
@@ -174,7 +226,7 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
     onRecordChanged?.();
   };
 
-  // Bulk actions
+  // Bulk actions — use attendance_weight (how many periods count for attendance)
   const handleBulkMarkDay = async (status: AttendanceStatus) => {
     for (const slot of daySchedule.slots) {
       const saved = await markAttendance({
@@ -183,8 +235,8 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
         slot_id: slot.slot_id,
         status,
       });
-      if (slot.weight > 1) {
-        await db.attendance_record.update(saved.id, { weight: slot.weight });
+      if (slot.attendance_weight > 1) {
+        await db.attendance_record.update(saved.id, { weight: slot.attendance_weight });
       }
     }
     onRecordChanged?.();
@@ -354,7 +406,7 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-700 dark:text-rose-300 font-bold text-xs transition-colors min-h-[38px] shadow-xs"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
-                Marked by mistake? Revert Holiday & Restore Classes
+                Marked by mistake? Revert Holiday &amp; Restore Classes
               </button>
             </div>
           </div>
@@ -367,68 +419,95 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
             const course = courseMap.get(slot.course_id);
             const record = getSlotRecord(slot.course_id, slot.slot_id);
             const status = record?.status;
+            const statusKey = status ?? 'unmarked';
+            const statusCfg = STATUS_CONFIG[statusKey];
+
+            // Show attendance_weight badge when it differs from the time-spanning weight
+            const showWeightNote =
+              slot.attendance_weight !== slot.weight;
 
             return (
               <div
                 key={slot.slot_id || `${slot.course_id}-${slot.start_time}`}
-                className={`p-4 bg-white dark:bg-gray-900 rounded-2xl border transition-all shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+                className={`p-4 bg-white dark:bg-gray-900 rounded-2xl border transition-all shadow-sm flex flex-col gap-3 ${
                   status === 'present'
-                    ? 'border-emerald-200 dark:border-emerald-800/80 bg-emerald-50/20'
+                    ? 'border-emerald-200 dark:border-emerald-800/80'
                     : status === 'absent'
-                    ? 'border-rose-200 dark:border-rose-800/80 bg-rose-50/20'
+                    ? 'border-rose-200 dark:border-rose-800/80'
                     : status === 'cancelled'
-                    ? 'border-amber-200 dark:border-amber-800/80 bg-amber-50/20'
+                    ? 'border-amber-200 dark:border-amber-800/80'
+                    : status === 'medical'
+                    ? 'border-cyan-200 dark:border-cyan-800/80'
+                    : status === 'duty_leave'
+                    ? 'border-violet-200 dark:border-violet-800/80'
                     : 'border-gray-100 dark:border-gray-800'
                 }`}
               >
-                {/* Class Details */}
-                <div className="flex items-center gap-3 min-w-0">
-                  <span
-                    className="w-2.5 h-11 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: course?.color || '#6366f1' }}
-                  />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="text-sm font-bold text-gray-900 dark:text-white truncate">
-                        {course?.name || 'Class'}
-                      </h4>
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 uppercase">
-                        {slot.component_type}
-                      </span>
-                      {slot.weight > 1 && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
-                          {slot.weight} periods
+                {/* Top row: class info + current status badge */}
+                <div className="flex items-start justify-between gap-3 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <span
+                      className="w-2.5 h-11 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: course?.color || '#6366f1' }}
+                    />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-sm font-bold text-gray-900 dark:text-white truncate">
+                          {course?.name || 'Class'}
+                        </h4>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 uppercase">
+                          {slot.component_type}
                         </span>
-                      )}
-                      {slot.is_override && (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
-                          {slot.override_action}
-                        </span>
-                      )}
-                    </div>
+                        {slot.weight > 1 && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-300">
+                            {slot.weight} periods
+                          </span>
+                        )}
+                        {showWeightNote && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300">
+                            Counts as {slot.attendance_weight}
+                          </span>
+                        )}
+                        {slot.is_override && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
+                            {slot.override_action}
+                          </span>
+                        )}
+                      </div>
 
-                    <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 font-mono">
-                      <span className="inline-flex items-center gap-1">
-                        <Clock className="w-3 h-3 text-indigo-500" />
-                        {slot.start_time} - {slot.end_time}
-                      </span>
-                      {slot.room && <span>• {slot.room}</span>}
-                      {(slot.faculty || course?.faculty) && <span>• {slot.faculty || course?.faculty}</span>}
+                      <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 font-mono">
+                        <span className="inline-flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-indigo-500" />
+                          {slot.start_time} - {slot.end_time}
+                        </span>
+                        {slot.room && <span>• {slot.room}</span>}
+                        {(slot.faculty || course?.faculty) && <span>• {slot.faculty || course?.faculty}</span>}
+                      </div>
                     </div>
                   </div>
+
+                  {/* Current status badge — always visible */}
+                  <span
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold flex-shrink-0 ${statusCfg.badgeCls}`}
+                    aria-label={`Status: ${statusCfg.label}`}
+                  >
+                    {statusCfg.icon}
+                    {statusCfg.label}
+                  </span>
                 </div>
 
-                {/* Status Badges & One-Tap Actions */}
+                {/* Status action buttons */}
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {/* Present Button */}
                   <button
                     type="button"
-                    onClick={() => handleToggleStatus(slot.course_id, slot.slot_id, 'present', slot.weight)}
+                    onClick={() => handleToggleStatus(slot.course_id, slot.slot_id, 'present', slot.attendance_weight)}
                     className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all min-h-[40px] ${
                       status === 'present'
                         ? 'bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-400 ring-offset-1'
                         : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100'
                     }`}
+                    aria-pressed={status === 'present'}
                   >
                     <Check className="w-3.5 h-3.5" />
                     Present
@@ -437,12 +516,13 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
                   {/* Absent Button */}
                   <button
                     type="button"
-                    onClick={() => handleToggleStatus(slot.course_id, slot.slot_id, 'absent', slot.weight)}
+                    onClick={() => handleToggleStatus(slot.course_id, slot.slot_id, 'absent', slot.attendance_weight)}
                     className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold transition-all min-h-[40px] ${
                       status === 'absent'
                         ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-400 ring-offset-1'
                         : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 hover:bg-rose-100'
                     }`}
+                    aria-pressed={status === 'absent'}
                   >
                     <X className="w-3.5 h-3.5" />
                     Absent
@@ -451,12 +531,13 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
                   {/* Cancelled Button */}
                   <button
                     type="button"
-                    onClick={() => handleToggleStatus(slot.course_id, slot.slot_id, 'cancelled', slot.weight)}
+                    onClick={() => handleToggleStatus(slot.course_id, slot.slot_id, 'cancelled', slot.attendance_weight)}
                     className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all min-h-[40px] ${
                       status === 'cancelled'
                         ? 'bg-amber-600 text-white shadow-sm ring-2 ring-amber-400 ring-offset-1'
                         : 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 hover:bg-amber-100'
                     }`}
+                    aria-pressed={status === 'cancelled'}
                   >
                     <Ban className="w-3.5 h-3.5" />
                     Cancelled
@@ -465,12 +546,13 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
                   {/* Medical Leave Button */}
                   <button
                     type="button"
-                    onClick={() => handleToggleStatus(slot.course_id, slot.slot_id, 'medical', slot.weight)}
+                    onClick={() => handleToggleStatus(slot.course_id, slot.slot_id, 'medical', slot.attendance_weight)}
                     className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all min-h-[40px] ${
                       status === 'medical'
                         ? 'bg-cyan-600 text-white shadow-sm ring-2 ring-cyan-400 ring-offset-1'
                         : 'bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 hover:bg-cyan-100'
                     }`}
+                    aria-pressed={status === 'medical'}
                   >
                     <Activity className="w-3.5 h-3.5" />
                     Medical
@@ -479,12 +561,13 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
                   {/* Duty Leave Button */}
                   <button
                     type="button"
-                    onClick={() => handleToggleStatus(slot.course_id, slot.slot_id, 'duty_leave', slot.weight)}
+                    onClick={() => handleToggleStatus(slot.course_id, slot.slot_id, 'duty_leave', slot.attendance_weight)}
                     className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all min-h-[40px] ${
                       status === 'duty_leave'
                         ? 'bg-violet-600 text-white shadow-sm ring-2 ring-violet-400 ring-offset-1'
                         : 'bg-violet-50 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 hover:bg-violet-100'
                     }`}
+                    aria-pressed={status === 'duty_leave'}
                   >
                     <Shield className="w-3.5 h-3.5" />
                     Duty

@@ -59,6 +59,7 @@ export const SlotModal: React.FC<SlotModalProps> = ({
   const [faculty, setFaculty] = useState<string>('');
   const [componentType, setComponentType] = useState<CourseType>('theory');
   const [weight, setWeight] = useState<number>(1);
+  const [attendanceWeight, setAttendanceWeight] = useState<number | null>(null);
   const [periodName, setPeriodName] = useState<string>('');
   const [isManualTime, setIsManualTime] = useState<boolean>(false);
   const [showCustomTime, setShowCustomTime] = useState<boolean>(false);
@@ -126,6 +127,7 @@ export const SlotModal: React.FC<SlotModalProps> = ({
       setFaculty(slot.faculty || courseObj?.faculty || '');
       setComponentType(slot.component_type);
       setWeight(slot.weight || 1);
+      setAttendanceWeight(slot.attendance_weight ?? null);
       setPeriodName(slot.period_name || '');
 
       // Check if current timing matches a standard period
@@ -147,6 +149,7 @@ export const SlotModal: React.FC<SlotModalProps> = ({
       setWeekday(defaultWeekday);
       setComponentType(initialType);
       setWeight(initialWeight);
+      setAttendanceWeight(null);
       setRoom('');
       setFaculty(initialCourse?.faculty || '');
 
@@ -250,6 +253,7 @@ export const SlotModal: React.FC<SlotModalProps> = ({
         faculty: faculty.trim() || null,
         component_type: componentType,
         weight: Math.max(1, weight),
+        attendance_weight: attendanceWeight,
         period_name: periodName.trim() || null,
       });
       onClose();
@@ -527,6 +531,42 @@ export const SlotModal: React.FC<SlotModalProps> = ({
             </select>
           </div>
         </div>
+
+        {/* Attendance Weight — only shown for multi-period slots */}
+        {weight > 1 && (
+          <div className="p-3 rounded-2xl bg-sky-50/70 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/50 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-xs font-bold text-sky-900 dark:text-sky-200">
+                  How many periods count for attendance?
+                </p>
+                <p className="text-[11px] text-sky-700 dark:text-sky-400 mt-0.5">
+                  e.g. a 2-period Chemistry lab that your college records as 1 attendance point.
+                </p>
+              </div>
+              <span className="text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-sky-100 dark:bg-sky-900/60 px-2 py-0.5 rounded-full whitespace-nowrap">
+                {attendanceWeight == null ? `${weight} (same as weight)` : `${attendanceWeight} period${attendanceWeight !== 1 ? 's' : ''}`}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {Array.from({ length: weight }, (_, i) => i + 1).map(n => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => setAttendanceWeight(n === weight ? null : n)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all min-h-[36px] ${
+                    (n === weight && attendanceWeight == null) || attendanceWeight === n
+                      ? 'bg-sky-600 text-white shadow-sm'
+                      : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-sky-50 dark:hover:bg-sky-950/30'
+                  }`}
+                >
+                  {n} period{n !== 1 ? 's' : ''}
+                  {n === weight ? ' (default)' : ''}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Room & Faculty */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

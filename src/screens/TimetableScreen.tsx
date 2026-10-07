@@ -668,18 +668,22 @@ export const TimetableScreen: React.FC = () => {
         isOpen={isOverrideModalOpen}
         onClose={() => setIsOverrideModalOpen(false)}
         date={overrideDate}
-        daySlots={daySlots.map(s => ({
-          slot_id: s.id,
-          course_id: s.course_id,
-          start_time: s.start_time,
-          end_time: s.end_time,
-          room: s.room,
-          faculty: s.faculty || null,
-          component_type: s.component_type,
-          weight: s.weight || 1,
-          period_name: s.period_name || null,
-          is_override: false,
-        }))}
+        daySlots={daySlots.map(s => {
+          const w = s.weight || 1;
+          return {
+            slot_id: s.id,
+            course_id: s.course_id,
+            start_time: s.start_time,
+            end_time: s.end_time,
+            room: s.room,
+            faculty: s.faculty || null,
+            component_type: s.component_type,
+            weight: w,
+            attendance_weight: s.attendance_weight != null ? s.attendance_weight : w,
+            period_name: s.period_name || null,
+            is_override: false,
+          };
+        })}
         courses={courses}
         termId={term?.id || ''}
         periodTimings={term?.period_timings}
