@@ -7,6 +7,7 @@ import { db, LOCAL_USER_ID } from '../dexie';
 import { AttendanceRecord, AttendanceStatus } from '../../types';
 import { attendanceRecordSchema, validateEntity } from '../schemas';
 import { generateUUID } from '../../utils/uuid';
+import { recordDataChange } from '../../utils/storage';
 
 export async function getAttendanceRecordsForCourse(courseId: string): Promise<AttendanceRecord[]> {
   return db.attendance_record
@@ -58,6 +59,7 @@ export async function markAttendance(params: MarkAttendanceParams): Promise<Atte
     };
     validateEntity(attendanceRecordSchema, updated);
     await db.attendance_record.put(updated);
+    recordDataChange();
     return updated;
   }
 
@@ -76,6 +78,7 @@ export async function markAttendance(params: MarkAttendanceParams): Promise<Atte
 
   validateEntity(attendanceRecordSchema, newRecord);
   await db.attendance_record.put(newRecord);
+  recordDataChange();
   return newRecord;
 }
 
@@ -86,5 +89,6 @@ export async function deleteAttendanceRecord(id: string): Promise<void> {
       deleted_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
+    recordDataChange();
   }
 }

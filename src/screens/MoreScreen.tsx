@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Sparkles,
@@ -11,6 +11,11 @@ import {
   HardDriveDownload,
   Smartphone,
   Calendar,
+  Database,
+  Download,
+  CheckCircle2,
+  Bell,
+  Save,
 } from 'lucide-react';
 import { db } from '../db/dexie';
 import { seedDemoData } from '../db/repositories/setup.repo';
@@ -19,7 +24,18 @@ import { TasksTrackerModal } from '../components/tasks/TasksTrackerModal';
 import { BackupModal } from '../components/safety/BackupModal';
 import { DeviceTransferModal } from '../components/safety/DeviceTransferModal';
 import { DeleteDataModal } from '../components/safety/DeleteDataModal';
-import { getLastBackupTimestamp } from '../utils/storage';
+import { InstallGuidanceModal } from '../components/safety/InstallGuidanceModal';
+import { PrivacyModal } from '../components/safety/PrivacyModal';
+import {
+  getLastBackupTimestamp,
+  getChangesSinceBackup,
+  checkPersistentStorage,
+  requestPersistentStorage,
+  getStorageEstimate,
+  getBackupThresholds,
+  setBackupThresholds,
+  StorageEstimateInfo,
+} from '../../src/utils/storage';
 
 interface MoreScreenProps {
   isDark: boolean;
@@ -42,8 +58,44 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   const [isBackupOpen, setIsBackupOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isInstallOpen, setIsInstallOpen] = useState(false);
+  const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
+
+  // Storage and Safety state
+  const [isPersisted, setIsPersisted] = useState<boolean | null>(null);
+  const [storageInfo, setStorageInfo] = useState<StorageEstimateInfo | null>(null);
+  const [daysThreshold, setDaysThreshold] = useState<number>(7);
+  const [changesThreshold, setChangesThreshold] = useState<number>(20);
+  const [thresholdSaved, setThresholdSaved] = useState(false);
 
   const lastBackupAt = getLastBackupTimestamp();
+  const changesCount = getChangesSinceBackup();
+
+  useEffect(() => {
+    checkPersistentStorage().then(setIsPersisted);
+    getStorageEstimate().then(setStorageInfo);
+    const thresholds = getBackupThresholds();
+    setDaysThreshold(thresholds.daysThreshold);
+    setChangesThreshold(thresholds.changesThreshold);
+  }, []);
+
+  const handleRequestPersistence = async () => {
+    const granted = await requestPersistentStorage();
+    setIsPersisted(granted);
+    if (granted) {
+      alert('Persistent storage granted! Your browser will protect Spirit data from eviction.');
+    } else {
+      alert('Persistent storage could not be enabled automatically. Installing Spirit as a PWA grants persistence.');
+    }
+    getStorageEstimate().then(setStorageInfo);
+  };
+
+  const handleSaveThresholds = (e: React.FormEvent) => {
+    e.preventDefault();
+    setBackupThresholds(daysThreshold, changesThreshold);
+    setThresholdSaved(true);
+    setTimeout(() => setThresholdSaved(false), 2000);
+  };
 
   const handleSeedDemo = async () => {
     if (confirm('Load demo semester data? This will add sample subjects and attendance logs.')) {
@@ -131,6 +183,27 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
               Open Tasks & Exams Manager
             </button>
           </div>
+
+          {/* Install Guidance Card */}
+          <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-3">
+            <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Download className="w-3.5 h-3.5 text-indigo-600" />
+              Install App & Offline Setup
+            </h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Add Spirit to your Home Screen to unlock persistent offline storage and protect attendance from iOS 7-day eviction.
+            </p>
+            <button
+              onClick={() => setIsInstallOpen(true)}
+              className="w-full flex items-center justify-between py-2.5 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-semibold text-xs sm:text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors min-h-[44px]"
+            >
+              <span className="flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-indigo-600" />
+                View Installation Guidance
+              </span>
+              <span className="text-xs text-gray-400">&rarr;</span>
+            </button>
+          </div>
         </div>
 
         {/* Right Column: Backup, Storage & Privacy */}
@@ -183,6 +256,118 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
             </div>
           </div>
 
+          {/* Storage & Persistence Status Card */}
+          <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
+            <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Database className="w-3.5 h-3.5 text-indigo-600" />
+              Device Storage & Persistence
+            </h3>
+
+            {/* Persistence Status */}
+            <div className="p-3.5 bg-gray-50 dark:bg-gray-800/60 rounded-2xl flex items-center justify-between gap-3 text-xs">
+              <div>
+                <span className="font-bold text-gray-900 dark:text-white block">
+                  Storage Status
+                </span>
+                <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                  {isPersisted
+                    ? 'Persistent (protected from browser cache eviction)'
+                    : 'Best-effort (may be cleared if device runs low on disk space)'}
+                </span>
+              </div>
+              {isPersisted ? (
+                <span className="px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold flex items-center gap-1 shrink-0 text-[11px]">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Active
+                </span>
+              ) : (
+                <button
+                  onClick={handleRequestPersistence}
+                  className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition-colors shrink-0 text-xs shadow-xs min-h-[36px]"
+                >
+                  Enable
+                </button>
+              )}
+            </div>
+
+            {/* Storage Quota Usage */}
+            {storageInfo && (
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500 dark:text-gray-400">IndexedDB Usage</span>
+                  <span className="font-semibold text-gray-800 dark:text-gray-200">
+                    {storageInfo.usageFormatted} of {storageInfo.quotaFormatted}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-100 dark:bg-gray-800 h-2 rounded-full overflow-hidden">
+                  <div
+                    className="bg-indigo-600 h-full rounded-full transition-all"
+                    style={{ width: `${Math.max(1, storageInfo.percentUsed)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Backup Reminder Thresholds */}
+            <form onSubmit={handleSaveThresholds} className="pt-2 border-t border-gray-100 dark:border-gray-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                  <Bell className="w-3.5 h-3.5 text-amber-500" />
+                  Backup Reminder Rules
+                </span>
+                <span className="text-[10px] text-gray-400">
+                  {changesCount} unbacked edits
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <label className="text-[11px] text-gray-500 dark:text-gray-400 block mb-1">
+                    Days without backup
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={60}
+                    value={daysThreshold}
+                    onChange={(e) => setDaysThreshold(parseInt(e.target.value, 10) || 1)}
+                    className="w-full px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-gray-500 dark:text-gray-400 block mb-1">
+                    Edits without backup
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={200}
+                    value={changesThreshold}
+                    onChange={(e) => setChangesThreshold(parseInt(e.target.value, 10) || 1)}
+                    className="w-full px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2 px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 font-semibold text-xs hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1.5 min-h-[38px]"
+              >
+                {thresholdSaved ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    Reminder Rules Saved
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-3.5 h-3.5 text-gray-500" />
+                    Save Reminder Rules
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
+
           {/* Database Tools & Danger Zone */}
           <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-3">
             <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -206,8 +391,11 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
             </div>
           </div>
 
-          {/* Local-First Privacy Notice */}
-          <div className="bg-gray-100/70 dark:bg-gray-800/40 rounded-3xl p-5 sm:p-6 text-center space-y-2">
+          {/* Local-First Privacy Notice (Clickable to open PrivacyModal) */}
+          <div
+            onClick={() => setIsPrivacyOpen(true)}
+            className="bg-gray-100/70 dark:bg-gray-800/40 hover:bg-gray-100 dark:hover:bg-gray-800/60 transition-colors cursor-pointer rounded-3xl p-5 sm:p-6 text-center space-y-2 group"
+          >
             <p className="text-xs sm:text-sm font-bold text-gray-800 dark:text-gray-200 flex items-center justify-center gap-2">
               <ShieldCheck className="w-5 h-5 text-emerald-600" />
               100% Local-First & Private
@@ -215,6 +403,9 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
             <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm mx-auto">
               All records are stored securely in your browser's IndexedDB. Zero accounts, no tracking, and no external network calls.
             </p>
+            <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 inline-block pt-1 group-hover:underline">
+              Read Plain-Language Privacy Policy &rarr;
+            </span>
           </div>
         </div>
       </div>
@@ -246,6 +437,21 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
           isOpen={isDeleteOpen}
           onClose={() => setIsDeleteOpen(false)}
           onDeleted={onResetApp}
+        />
+      )}
+
+      {isInstallOpen && (
+        <InstallGuidanceModal
+          isOpen={isInstallOpen}
+          onClose={() => setIsInstallOpen(false)}
+        />
+      )}
+
+      {isPrivacyOpen && (
+        <PrivacyModal
+          isOpen={isPrivacyOpen}
+          onClose={() => setIsPrivacyOpen(false)}
+          onOpenBackup={() => setIsBackupOpen(true)}
         />
       )}
     </PageContainer>

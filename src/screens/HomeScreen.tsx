@@ -12,6 +12,8 @@ import { CanISkipTomorrowCard } from '../components/home/CanISkipTomorrowCard';
 import { UpcomingTasksWidget } from '../components/home/UpcomingTasksWidget';
 import { CatchUpModal } from '../components/attendance/CatchUpModal';
 import { WhatIfModal } from '../components/attendance/WhatIfModal';
+import { BackupReminderBanner } from '../components/safety/BackupReminderBanner';
+import { BackupModal } from '../components/safety/BackupModal';
 import { PageContainer } from '../components/layout/PageContainer';
 
 interface HomeScreenProps {
@@ -31,6 +33,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
   // Modals state
   const [isCatchUpOpen, setIsCatchUpOpen] = useState(false);
   const [isWhatIfOpen, setIsWhatIfOpen] = useState(false);
+  const [isBackupOpen, setIsBackupOpen] = useState(false);
 
   // Today's schedule state
   const [todaySlots, setTodaySlots] = useState<TimetableSlot[]>([]);
@@ -159,6 +162,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
           </span>
         </div>
       </div>
+
+      {/* Backup Reminder Banner (Dismissible) */}
+      <BackupReminderBanner onOpenBackup={() => setIsBackupOpen(true)} />
 
       {/* Unmarked Classes Catch-Up Banner */}
       {unmarkedCount > 0 && (
@@ -365,6 +371,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
         courses={courses}
         profileThreshold={threshold}
       />
+
+      {/* Backup Modal from Banner */}
+      {isBackupOpen && (
+        <BackupModal
+          isOpen={isBackupOpen}
+          onClose={() => setIsBackupOpen(false)}
+        />
+      )}
     </PageContainer>
   );
 };

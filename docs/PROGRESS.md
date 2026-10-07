@@ -88,9 +88,26 @@
   - `docs/SPEC.md` section 3 and `docs/types.ts` synchronized with all schema extensions.
   - `docs/archive/supabase/migration.sql` synchronized with table DDL.
 
+- **Phase 5 (Part A): Backup and Restore**:
+  - Full versioned JSON export (`schema_version: 1`, app: `'spirit'`) covering all 14 Dexie tables.
+  - RFC 4180 CSV export for attendance logs (with course names, dates, statuses, notes).
+  - RFC 4180 CSV export for assessment marks (with course names, component names, max marks, weightage, scores).
+  - Mobile share sheet integration (`navigator.share` with file payload) for 1-tap sharing to Google Drive, WhatsApp, AirDrop, with seamless browser download fallback.
+  - Zod-validated restore engine (`parseAndValidateBackup`): validates version, root object, and strict Zod entity schemas. Rejects malformed JSON, foreign formats, and newer-version backups with clear error feedback.
+  - Previews record counts before restore (courses, attendance, timetable, marks, tasks).
+  - Dual restore modes: **Merge** (newer `updated_at` wins, preserving newer edits and missing records) and **Replace** (completely rewrites database to mirror backup file). Explicit confirmation modal required before overwriting.
+  - **Device Transfer Guide (`DeviceTransferModal.tsx`)**: Step-by-step visual workflow for migrating between phone, laptop, or tablet with 1-tap export button.
+  - **Typed Data Deletion (`DeleteDataModal.tsx`)**: Destructive reset requiring user to type `"DELETE"` before wiping database and clearing storage safety flags.
+- **Phase 5 (Part B): Storage Safety & Persistence**:
+  - **Persistent Storage**: Queries `navigator.storage.persisted()` and requests persistence via `navigator.storage.persist()`. Displays active/best-effort status badge in More/Settings.
+  - **Storage Quota & Usage**: Inspects `navigator.storage.estimate()` to show exact MB/GB used and visual percentage bar.
+  - **Backup Reminders (`BackupReminderBanner.tsx`)**: Tracks `last_backed_up` timestamp and change counter. Shows a dismissible reminder banner on Home and More screens when $N$ days (configurable, default 7) or $M$ changes (configurable, default 20) have passed. Dismissible for 24 hours.
+  - **PWA Installation & iOS Protection (`InstallGuidanceModal.tsx`)**: Direct installation prompt button where supported; comprehensive step-by-step Add-to-Home-Screen guidance for iOS Safari with detailed explanation of Apple WebKit ITP 7-day storage eviction rules.
+  - **Plain-Language Privacy Policy (`PrivacyModal.tsx`)**: Transparent explanation of 100% on-device storage, zero cloud servers, zero analytics/trackers, and browser cache data retention warnings.
+  - **Comprehensive Unit Tests (`backup.test.ts`, `storage.test.ts`)**: 27 new unit tests (116 total passing tests across 11 test suites) covering CSV escaping, merge conflict resolution, Zod validation rejections, malformed JSON handling, byte formatting, and backup reminder evaluation logic.
+
 ## Remaining
-- **Phase 5**: Backup and Restore (JSON export/import, CSV export) with "last backed up" status, PDF/print attendance report, storage-safety rules (`navigator.storage.persist()`, reminders, iOS install instructions).
-- **Phase 6**: PWA offline worker, install manifest, final polish.
+- **Phase 6**: PWA offline worker, install manifest, PDF/print attendance report, final polish.
 
 ## Known Issues
 - None.
