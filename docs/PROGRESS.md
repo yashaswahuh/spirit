@@ -1,3 +1,225 @@
 # Progress
 
-Nothing done yet.
+## Done
+- **Phase 0: Specifications, Architecture & Database Design**:
+  - Created `docs/PLAN.md` with complete architecture, folder structure, calculation engine formulas, offline sync protocol, and phase roadmaps.
+  - Defined strict TypeScript types for all 12 entities and engine interfaces.
+  - Created `supabase/migration.sql` with schema, composite indexes on `(user_id, updated_at)`, and RLS policies.
+- **Phase 1: Project Scaffolding, Pure Calculation Engine & Presets**:
+  - Scaffolded Vite + React + TypeScript + Tailwind CSS + Vitest project with configurable base path (`/spirit/`).
+  - Moved types into `src/types/index.ts`.
+  - Implemented pure TypeScript calculation engine in `src/engine/` (zero React imports) covering attendance formulas, safe bunks, must-attend, projections, what-if simulations, SGPA/CGPA with backlog/repeat resolution, annual divisions, and required end-sem solver.
+  - Created data presets in `src/presets/` for Indian degree programs and grading schemes with approximation notices.
+- **Phase 2: Local Storage (Dexie), Onboarding, One-Tap Attendance & Home Dashboard**:
+  - Integrated local-first storage using **Dexie.js** (`spirit_db` in IndexedDB) supporting all 12 entities with zero login required.
+  - Built Zod validation schemas in `src/db/schemas.ts` and type-safe repositories in `src/db/repositories/`.
+  - Built Onboarding Wizard (`OnboardingWizard.tsx`) with 1-tap "Skip & Load Demo" option.
+  - Subject management: View, add, edit, and delete courses with credits, types, colors, threshold overrides, and leave rules.
+  - One-tap attendance marking on today's classes and per-subject cards.
+  - Per-subject attendance cards with percentage, status badges (icon + text), safe bunks / must-attend counter, and conducted tally.
+- **Phase 2b: Responsive Layout Pass (Every Screen Size 320px–1920px)**:
+  - Built reusable responsive layout building blocks:
+    - `AppShell`: Handles left sidebar on desktop (`lg:flex` at $\ge 1024\text{px}$) vs bottom navigation on mobile/tablet (`lg:hidden` at $< 1024\text{px}$).
+    - `PageContainer`: Responsive maximum width container with sensible padding from phone to ultra-wide displays (`sm:max-w-3xl`, `lg:max-w-6xl`, `2xl:max-w-7xl`).
+    - `ResponsiveGrid`: Clean multi-column grids for dashboards, subjects, and timetable slots.
+    - `ResponsiveDialog`: Bottom-sheet modal on phones ($< 640\text{px}$), centered backdrop dialog on tablet/desktop ($\ge 640\text{px}$).
+    - `Sidebar`: Desktop navigation with logo, active pills, term subtitle, theme switcher, and offline indicator.
+  - Fixed Today's Class Cards:
+    - Time display rendered strictly on ONE line (`09:00 - 09:55`, `whitespace-nowrap`).
+    - Present/Absent/Cancelled buttons placed below class details on narrow mobile screens and beside it on wider displays.
+  - Enhanced desktop interactions: hover transitions, `focus-visible` accessibility rings, keyboard navigation, and touch targets $\ge 40\text{px}-44\text{px}$ on phones.
+  - Added "Responsive rules" subsection to `docs/SPEC.md` (Section 5).
+  - All 57 unit tests pass and clean production build verified.
+- **Specification Update: Local-Only Architecture (`spec-local-only`)**:
+  - Transitioned specification strictly to local-only architecture: no backend, no accounts, no sign-in, and no data leaving the user's device.
+  - Section 2 updated: data lives only in IndexedDB (Dexie).
+  - Section 3 updated: client-generated UUIDs, `created_at`, `updated_at`, and `deleted_at` retained for potential future sync, but `user_id` requirement removed.
+  - Section 5 ("More") updated: removed sign in/out; added Backup and Restore (JSON export/import, CSV export) with "last backed up" status.
+  - Section 6 replaced: Storage & Privacy rules defined (`navigator.storage.persist()`, periodic backup reminders, iOS PWA install-to-home-screen guidance).
+  - Section 7 updated: cloud sync and accounts added to "out of scope for now".
+  - Section 9 updated: removed rule about Supabase migration; phases must NOT create or update `supabase/migration.sql`.
+  - Moved `supabase/` directory to `docs/archive/supabase/` and marked unused.
+- **Phase 3 (Part A): Timetable & Manual Control**:
+  - **Weekly Timetable Editor**: Added, edited, duplicated, deleted slots with course, weekday, start/end time, room, faculty, component type, and slot weight (e.g. 2 or 3 for multi-hour labs).
+  - **Overlap Detection**: Pure TypeScript overlap engine detects time clashes on the same weekday, displaying real-time warning banners while allowing them for elective batches and parallel lab sections.
+  - **Timetable Versions**: Added `timetable_version` with `effective_from` dates. Creating a new version clones current slots so past attendance and past schedules are preserved without retroactive rewrites.
+  - **One-Off Date Overrides**: Added `timetable_override` supporting 4 single-day adjustment actions without altering recurring schedules: cancel class, substitute subject, add extra lecture, and reschedule class.
+  - **Holidays & Academic Calendar**: Added single-day holidays, date-range holidays (e.g. vacation weeks), swap days (following another weekday's timetable on a date), and bulk pasting holiday parser supporting ISO & DD/MM/YYYY formats. Holidays automatically exclude that day's classes from "conducted".
+  - **Term & Timings Settings**: Built full semester configuration modal for term start/end dates, term attendance threshold, working days selector (Mon-Sat, Sunday optional), custom period timings editor (named periods, breaks, lunch), and per-subject threshold overrides.
+  - **Calculation Engine**: Extended `/src/engine/timetable.ts` with 18 unit tests covering slot weights, version transitions, overlap warnings, date range expansions, swap days, and term edge cases (75 passing tests total).
+  - **Schema Updates**: Added `timetable_version`, `timetable_override`, and enhanced `term`, `course`, `timetable_slot`, `calendar_event`, `attendance_record` across `docs/SPEC.md`, `src/types/index.ts`, `src/db/schemas.ts`, and `docs/archive/supabase/migration.sql`.
+- **Phase 3 (Part B): Attendance Management, Catch-Up & Projections**:
+  - **Date-Picker Day View (`DayPickerView.tsx`)**: Pick any past date (and today) to inspect and log classes. One-tap Present/Absent/Cancelled/Medical/Duty leave; tapping active status toggles to clear; undo toast with timer for the last action; bulk day actions (All Present, All Absent, All Cancelled, Whole Day Holiday).
+  - **Unmarked Classes & Catch-Up Screen (`CatchUpModal.tsx`)**: Past scheduled classes without an attendance record are flagged as "unmarked" and excluded from conducted totals until logged. Prominent Home banner and Attendance header badge show total unmarked periods and launch the Catch Up modal with per-day bulk buttons.
+  - **Opening Balance (`initial_attended`, `initial_conducted`, `tracking_start_date`)**: Configured per subject via `SubjectModal.tsx` for mid-semester onboarding using college portal records. Built into `computeCourseAttendanceStats` and `countUnmarkedClasses`; records before `tracking_start_date` are excluded to avoid duplicate counting.
+  - **Per-Subject Calendar & Term Heatmap (`CourseCalendarModal.tsx`)**: Monthly calendar matrix using icons and text indicators alongside colors (never color alone). Tapping any date opens a quick-log editor that recalculates statistics immediately. Includes chronological term attendance heatmap.
+  - **Semester Attendance Projections**: Real-time projection strip on `CourseAttendanceCard.tsx` calculating best-case %, worst-case %, remaining scheduled classes count, and minimum classes needed to reach threshold based on timetable schedule to term end.
+  - **What-If Attendance Planner (`WhatIfModal.tsx`)**: Three simulation modes: (1) Specific Dates to skip, (2) Recurring Weekday to skip until semester end, and (3) N Upcoming Consecutive Days. Shows exact percentage drops, safe bunks left, and must-attend warnings.
+  - **Engine & Testing**: Added unit tests for opening balances, slot weights, unmarked period counting, and `canISkipTomorrow` simulator. All 81 tests passing across 9 test files.
+- **Phase 4 (Part A): Marks, Assessment Components & Grades**:
+  - **Courses per Term**: Editable credits, type, "counts toward GPA" toggle, and audit/non-credit courses (pass/fail only, no GPA impact).
+  - **Assessment Components per Course (`CourseMarksModal.tsx`)**: Fully editable components (name, max marks, weightage %, evaluation rules: normal / best-of-N / drop-lowest). Includes 4 quick university templates: Standard 40/60 Split, Engineering Best-of-2 (50/50), Lab-only, and Project-only. Marks entry supporting numeric scores, `absent` (0 score with full weight counted), and `not_held` (excluded from current evaluated weightage).
+  - **Institutional Eligibility Rules**: Per-course cutoffs for minimum internal marks for end-sem exam eligibility, separate end-sem minimum pass marks, and overall pass mark. Flags attendance detention risks with prominent warnings whenever course attendance is below the institutional threshold.
+  - **Final Course Result (`FinalGradeModal.tsx`)**: Supports direct university letter grade entry (relative grading), optional grade derivation from marks via grading scale bands, special grades (`AB` absent, `I` incomplete, `W` withdrawn, `P` pass only, `F` fail), and attempt history (regular vs retake/arrear attempt numbers).
+  - **Grading Scheme Editor (`GradingSchemeModal.tsx`)**: Letter-to-points scale editor, pass marks, max point, rounding rules, CGPA-to-percentage conversion (multiplier mode e.g. 9.5 or 10.0, and custom formulas e.g. `(CGPA - 0.75) * 10`), repeat handling (`replace_old` vs `keep_best`), division/class thresholds (Distinction/First/Second/Pass Class), and prominent "Check your university's rules" disclaimer.
+  - **Term SGPA & Cumulative CGPA**: Full SGPA per term and cumulative CGPA across terms, with lateral entry support (programs starting at semester 3), backlog repeat resolution, and equivalent percentage reporting.
+- **Phase 4 (Part B): Planning Tools, Terms, Tasks & Responsive Charts**:
+  - **Required-Marks Calculator (`RequiredMarksModal.tsx`)**: Calculates minimum end-sem marks to achieve a target letter grade or target percentage given internal scores and weightages. Accurately reports achievability status and enforces separate end-sem minimum pass thresholds.
+  - **Grade Simulator (`GradeSimulatorModal.tsx`)**: Interactive slider/selector per course predicting simulated term SGPA and cumulative CGPA in real time.
+  - **Target CGPA Planner (`TargetPlannerModal.tsx`)**: Given a target CGPA (e.g. 8.5) and target semester (e.g. Semester 6), calculates the required average SGPA in remaining semesters, flagging mathematically impossible targets (> max scale points).
+  - **Term Management & Backlog Tracker (`TermManagerModal.tsx`)**: Lists terms with locked/computed SGPA, switches active ongoing term, locks/finishes terms to freeze grades, and provides a cross-semester backlog tracker.
+  - **Start Next Semester Wizard (`NextSemesterWizardModal.tsx`)**: Easily roll forward to the next semester, locking the current term and optionally copying course structures with zeroed attendance and empty marks.
+  - **Tasks & Exams Tracker (`TasksTrackerModal.tsx`)**: Assignments, quizzes, mid-sems, end-sems, and exams with due dates, syllabus, exam hall/venue, notes, and countdown/overdue badges ("Due Today", "Due Tomorrow", "In X days", "Overdue by Y days").
+  - **Home Dashboard Widget (`UpcomingTasksWidget.tsx`)**: Displays top upcoming deadlines and exams directly on the Home dashboard with one-tap completion. Automatic sync of exams to `CalendarEvent` for timetable/calendar visibility. Also accessible via "More" tab.
+  - **Lazy-Loaded Responsive Charts (`LazyCharts.tsx`)**: Code-split into on-demand bundles with Suspense fallback and responsive layouts from 320px to 1920px:
+    - `SgpaTrendChart.tsx`: SVG trend of SGPA and CGPA across terms with tooltips and accessible table fallback.
+    - `MarksBreakdownChart.tsx`: Visual component-by-component bar chart of scored vs maximum marks and weightages.
+    - `AttendanceThresholdChart.tsx`: Course attendance bars compared directly against the institutional 75% threshold marker.
+
+### Schema Changes & Migration History (Dexie v2 -> v3)
+- **New Columns Added**:
+  - `course`: Added `min_internal_marks` (nullable), `min_end_sem_marks` (nullable), `pass_marks` (nullable), `grade_band_override` (nullable JSON array of grade bands).
+  - `mark`: Added `status` (`'entered' | 'absent' | 'not_held'`). Existing marks backfilled with `'entered'`.
+  - `grade_result`: Added `term_id` (nullable foreign key to `term.id`).
+  - `grading_scheme`: Added `repeat_handling` (`'replace_old' | 'keep_best'`).
+  - `task`: Added `syllabus` (nullable), `venue` (nullable), `notes` (nullable), and expanded `type` to `'assignment' | 'quiz' | 'mid_sem' | 'end_sem' | 'exam' | 'project' | 'other'`.
+- **Database Version Upgrade**:
+  - `Dexie.version(3)` implemented with `.upgrade(async tx => ...)` callback preserving all existing tables and data.
+  - `docs/SPEC.md` section 3 and `docs/types.ts` synchronized with all schema extensions.
+  - `docs/archive/supabase/migration.sql` synchronized with table DDL.
+
+- **Phase 5 (Part A): Backup and Restore**:
+  - Full versioned JSON export (`schema_version: 1`, app: `'spirit'`) covering all 14 Dexie tables.
+  - RFC 4180 CSV export for attendance logs (with course names, dates, statuses, notes).
+  - RFC 4180 CSV export for assessment marks (with course names, component names, max marks, weightage, scores).
+  - Mobile share sheet integration (`navigator.share` with file payload) for 1-tap sharing to Google Drive, WhatsApp, AirDrop, with seamless browser download fallback.
+  - Zod-validated restore engine (`parseAndValidateBackup`): validates version, root object, and strict Zod entity schemas. Rejects malformed JSON, foreign formats, and newer-version backups with clear error feedback.
+  - Previews record counts before restore (courses, attendance, timetable, marks, tasks).
+  - Dual restore modes: **Merge** (newer `updated_at` wins, preserving newer edits and missing records) and **Replace** (completely rewrites database to mirror backup file). Explicit confirmation modal required before overwriting.
+  - **Device Transfer Guide (`DeviceTransferModal.tsx`)**: Step-by-step visual workflow for migrating between phone, laptop, or tablet with 1-tap export button.
+  - **Typed Data Deletion (`DeleteDataModal.tsx`)**: Destructive reset requiring user to type `"DELETE"` before wiping database and clearing storage safety flags.
+- **Phase 5 (Part B): Storage Safety & Persistence**:
+  - **Persistent Storage**: Queries `navigator.storage.persisted()` and requests persistence via `navigator.storage.persist()`. Displays active/best-effort status badge in More/Settings.
+  - **Storage Quota & Usage**: Inspects `navigator.storage.estimate()` to show exact MB/GB used and visual percentage bar.
+  - **Backup Reminders (`BackupReminderBanner.tsx`)**: Tracks `last_backed_up` timestamp and change counter. Shows a dismissible reminder banner on Home and More screens when $N$ days (configurable, default 7) or $M$ changes (configurable, default 20) have passed. Dismissible for 24 hours.
+  - **PWA Installation & iOS Protection (`InstallGuidanceModal.tsx`)**: Direct installation prompt button where supported; comprehensive step-by-step Add-to-Home-Screen guidance for iOS Safari with detailed explanation of Apple WebKit ITP 7-day storage eviction rules.
+  - **Plain-Language Privacy Policy (`PrivacyModal.tsx`)**: Transparent explanation of 100% on-device storage, zero cloud servers, zero analytics/trackers, and browser cache data retention warnings.
+  - **Comprehensive Unit Tests (`backup.test.ts`, `storage.test.ts`)**: 27 new unit tests (116 total passing tests across 11 test suites) covering CSV escaping, merge conflict resolution, Zod validation rejections, malformed JSON handling, byte formatting, and backup reminder evaluation logic.
+- **Phase 6 (Part A): PWA and Reliability**:
+  - Configured `vite-plugin-pwa` with full offline caching, Workbox service worker (`sw.js`), and generated web manifest with custom theme colors (`#4f46e5`).
+  - Generated standard PWA and Apple touch icons (`pwa-192x192.png`, `pwa-512x512.png`, `maskable-icon-512x512.png`, `apple-touch-icon.png`, `favicon.svg`, `favicon.ico`).
+  - Built `PwaReloadPrompt.tsx` with `useRegisterSW` for "New version available" one-click refresh prompt.
+  - Implemented `pwa.ts` listening to `beforeinstallprompt` with 1-click install button for Chromium and clear iOS Safari Add-to-Home-Screen instructions in `InstallGuidanceModal.tsx`.
+  - Upgraded Dexie schema to `v4` with non-destructive `.upgrade()` adding `is_demo: false` default flag across all existing user records without wiping user data.
+  - Added React `ErrorBoundary.tsx` catching runtime exceptions with copyable debug details, reload button, and safe database reset fallback.
+  - Added reusable `EmptyState.tsx` and `LoadingSpinner.tsx` components.
+  - Built demo data isolation (`is_demo` field on all base entities, `hasDemoData()`, `clearDemoData()`, `resetDatabase()`), clear demo warning banner on Home screen, and demo data clearing in onboarding and settings without affecting real data.
+  - Added one-click option to revert a day marked as a holiday by mistake (`revertHolidayForDate` in `calendar.repo.ts` and `DayPickerView.tsx`).
+- **Phase 6 (Part B): Reminders, Settings & Attendance Reports**:
+  - Built honestly scoped reminders: clearly explains UI limitations (no background server for Web Push; browser notifications work only while app/PWA is active).
+  - Implemented browser Notification API helper (`notifications.ts`) with permission requesting and live test alert dispatcher.
+  - Created RFC 5545 `.ics` iCalendar generator (`ics.ts`) for weekly timetable slots (`RRULE:FREQ=WEEKLY` with 15-minute `VALARM`) and tasks/exams (with 1-day and 2-hour `VALARM`) allowing native OS alarms in Google Calendar, Apple Calendar, and Outlook when Spirit is closed.
+  - Built centralized string dictionary (`src/i18n/strings.ts` & `src/i18n/index.tsx`) with `en-IN` default dictionary and expandable architecture for future regional locales.
+  - Expanded Settings (`MoreScreen.tsx`): Theme mode (Light, Dark, System auto-detecting OS), 6 selectable accent colors (Indigo, Emerald, Violet, Rose, Amber, Cyan), default attendance threshold input, week start day (Monday vs Sunday), 12h vs 24h time format, date formats (DD/MM/YYYY, YYYY-MM-DD, MM/DD/YYYY), default grading scheme selector, and period timings configuration modal (`PeriodTimingsModal.tsx`).
+  - Built Print/PDF Attendance Report (`AttendanceReportModal.tsx`): Date range filters, subject selector pills, summary cards (conducted, attended, leaves, overall %), per-subject detailed table with safe bunks / must-attend guidance, and print-optimized CSS (`@media print`).
+- **Phase 6 (Part C): Quality, Performance & Deploy**:
+  - Accessibility pass: Full keyboard navigation, visible `:focus-visible` rings, `aria-label` attributes on icon-only buttons, non-color-alone status indicators (icons + text), contrast verification, and global `prefers-reduced-motion` CSS overrides.
+  - Automated `axe-core` accessibility test suite in vitest (`src/a11y.test.ts`) covering app shell, marking flow, status indicators, and report semantics (all 4 axe tests passing with 0 violations).
+  - Route-level code splitting via `React.lazy` and `React.Suspense` for all top-level screens.
+  - Configured Rollup manual vendor chunks (`vendor-react`, `vendor-dexie`, `vendor-zod`, `vendor-icons`), reducing all bundle chunks under 160 kB (gzip initial index payload ~17 kB).
+  - Created `.github/workflows/deploy.yml` with automated test, build, and deploy to GitHub Pages (`actions/deploy-pages`) using configurable base path `VITE_BASE_PATH` (default `/spirit/`).
+  - Created comprehensive `README.md` and manual verification test plan in `docs/QA_CHECKLIST.md`.
+  - All 122 unit and accessibility tests passing across 13 test suites.
+- **Comprehensive UI Polish & Feature Completion Pass**:
+  - **Sleek Custom Scrollbars**: Replaced default browser scrollbars with modern theme-aware scrollbars (`::-webkit-scrollbar` and Firefox `scrollbar-width: thin`) styled seamlessly for light and dark modes.
+  - **Text Overflow & Bounds Safeguards**: Added universal `overflow-wrap: break-word`, `min-w-0`, and text clipping protections across all cards, modals, grids, and tables to eliminate text spilling.
+  - **Alternate Saturdays (2nd & 4th Saturday Off) Rule**:
+    - Added `SaturdayRule` (`all_working`, `second_saturday_off`, `second_fourth_saturday_off`, `all_saturdays_off`) to `Term`.
+    - Implemented exact calendar mathematical detection (`isSaturdayOff`) and integrated it into `resolveDaySchedule`, `countUnmarkedClasses`, `canISkipTomorrow`, `simulateSkippingDates`, `getEffectiveDaySchedule`, `SemesterSwitcherModal`, and `TermSettingsModal`.
+  - **Timetable File Upload & Auto-Recognition Engine**:
+    - Created `timetableParser.ts` supporting Matrix grids and Line/Row formats (.csv, .tsv, .txt, .json), auto-detecting subjects, codes, period times, labs, and faculty.
+    - Created `TimetableUploadModal.tsx` with drag-and-drop, sample timetable loader, live recognition preview, auto-creation of missing subjects with distinct colors, and 1-tap import.
+    - Added "Upload Timetable" action in `TimetableScreen.tsx`.
+  - **Manual Semester Switching & Management**:
+    - Created `SemesterSwitcherModal.tsx` for 1-tap switching of ongoing active terms, date editing, threshold adjustments, Saturday rules, and new term creation.
+    - Integrated global semester switcher into `AppShell.tsx`, mobile/tablet `Header.tsx`, desktop `Sidebar.tsx`, `TimetableScreen.tsx`, and `MoreScreen.tsx`.
+  - **Task, Exam & Deadline Editing**: Added full edit workflow in `TasksTrackerModal.tsx` with prefilled forms, edit mode indicators, and `updateTask` persistence.
+  - **Student Profile Customization**: Created `ProfileEditModal.tsx` to customize name, degree program, branch/department, admission year, and threshold, accessible from `MoreScreen.tsx`.
+  - **Daily Backup Reminder**: Added 1-day threshold setting and "Daily (1 Day)" preset option in `MoreScreen.tsx` with storage safety reassurance banner.
+  - **Testing**: Added unit tests for Saturday rules, timetable parser, and verified all 131 tests passing across 14 test suites.
+- **Production Polish, Deployment & Customization Upgrades**:
+  - **GitHub Actions Deployment Pipeline**: Configured `.github/workflows/deploy.yml` for automated CI/CD with `workflow_dispatch`, push triggers for `main` and `master`, build artifact upload (`actions/upload-artifact@v4`), and deployment via GitHub Actions (`actions/deploy-pages@v4`).
+  - **Site-Wide Dynamic Accent Color System**: Remapped Tailwind's `indigo` palette to dynamic CSS variables `rgb(var(--color-accent-*) / <alpha-value>)` in `tailwind.config.js` and defined RGB color values for all 6 presets (`indigo`, `emerald`, `violet`, `rose`, `amber`, `cyan`) in `src/index.css`. Added `applyAccent` in `preferences.ts` and called it in `App.tsx` on mount, ensuring switching accent color in settings immediately changes buttons, badges, tabs, borders, and scrollbars site-wide.
+  - **Interactive Course Color Picker**: Created reusable `CourseColorPicker.tsx` with 17 curated course swatches, native OS color picker (`<input type="color">`), and monospace hex text input with live validation. Integrated into `SubjectModal.tsx` (course creation and edit), `OnboardingWizard.tsx` (setup wizard), and `TimetableUploadModal.tsx` (uploaded timetable preview).
+  - **Period Timings & Form Contrast Fixes**: Corrected styling in `TermSettingsModal.tsx` and `PeriodTimingsModal.tsx` where inputs lacked explicit backgrounds, resolving white-on-white text readability issues across both light and dark modes.
+  - **Unit Test Suite Expansion**: Added `src/utils/__tests__/preferences.test.ts` testing accent and theme application, date/time format preferences, and color palette presets. All 138 tests pass across 15 test files.
+- **Integrated Theory + Practical / Lab Course Support**:
+  - **Unified Course Type (`theory_and_lab`)**: Added `theory_and_lab` to `CourseType` and schema validations across `courseSchema`, `timetableSlotSchema`, `timetableOverrideSchema`, and `attendanceRecordSchema`. Enables a single subject entry to represent both classroom lectures and practical lab sessions without duplicate course entries.
+  - **Dual Attendance Tracking & Calculation Engine**: Enhanced `computeCourseAttendanceStats` to calculate overall attendance percentage while computing distinct `theory` (`attended`, `conducted`, `percentage`) and `lab` breakdown statistics using slot lookup and record `component_type`.
+  - **Slot & Attendance Marking Flow**:
+    - `SubjectModal.tsx`: Added "Theory + Practical / Lab (Integrated)" option with explanatory helper text.
+    - `SlotModal.tsx`: Added 1-tap quick selector `[ 📘 Theory Lecture (1 period) ]` vs `[ 🧪 Lab Practical (2 periods) ]` when an integrated subject is selected, automatically configuring component type and slot weight.
+    - `HomeScreen.tsx` & `TodayClassesSection.tsx`: Integrated slot `component_type` and `weight` into 1-tap attendance marking, displaying badges for `📘 Theory` vs `🧪 Lab (N hrs)`.
+    - `CourseAttendanceCard.tsx`: Displays unified attendance percentage alongside an informative breakdown strip (`📘 Theory: A/B (X%) • 🧪 Lab: C/D (Y%)`).
+  - **Smart Timetable Auto-Detection & Merging**:
+    - `timetableParser.ts`: Upgraded parser to detect theory lectures and practical lab sessions with the same base name or code (e.g., "Data Structures" and "Data Structures Lab" or "CS201" and "CS201L"), automatically unifying them under a single `theory_and_lab` course instead of generating duplicate subjects.
+  - **Unit Tests**: Added unit tests in `src/engine/__tests__/attendance.test.ts` and `src/utils/__tests__/timetableParser.test.ts` verifying breakdown calculations and file upload grouping. 140 passing tests across 15 test files.
+- **Period Timings Auto-Sync & Quick Timings Flow**:
+  - **Auto-Sync to Next Available Period**: In `SlotModal.tsx`, opening the modal automatically calculates existing slots on the active weekday and auto-fills the start time, end time, and period name of the next unscheduled period. Switching weekdays inside the modal immediately re-syncs to the next free period on that new day.
+  - **Quick Timings Bell Schedule Grid**: Rendered responsive 1-tap period cards showing period name, timing, and `In use` status badges, with active highlights and checkmarks.
+  - **Multi-Period Lab Span Calculation**: Implemented `calculateEndTimeForPeriod` in `timetable.ts` to automatically extend end times across consecutive periods when weight is 2 or 3 (e.g. 2-hour labs).
+  - **Manual Entry On-Demand**: Custom time input fields tucked under an accessible toggle (`Need custom times? Edit start/end manually`) with a quick "Reset to Period" button, ensuring manual entry is only needed for non-standard times.
+  - **One-Off Date Overrides Integration**: Added Quick Timings selection to `OneOffOverrideModal.tsx` for rescheduling and extra classes.
+  - **Bidirectional Period Timings Storage Sync**: Synced period timings edits between `PeriodTimingsModal.tsx` (More screen), active term in Dexie (`Term.period_timings`), and global preferences (`preferences.ts`).
+  - **Engine Unit Tests**: Added pure engine tests for `calculateEndTimeForPeriod` and `findNextAvailablePeriodTiming` in `src/engine/__tests__/timetable.test.ts`. All 147 tests passing across 15 test files.
+
+- **Subject-Wide Professor / Faculty Name Synchronization**:
+  - **Course-Level Faculty Property**: Added `faculty?: string | null` to `Course` across `types/index.ts`, `docs/types.ts`, `docs/SPEC.md`, and Zod validation in `schemas.ts`.
+  - **Dexie Schema v5 Non-Destructive Upgrade**: Added `version(5)` to Dexie database (`dexie.ts`) with safe in-place upgrade function that preserves all existing user data, backfilling `faculty: null` while harvesting any existing `slot.faculty` values to auto-populate courses.
+  - **Automatic Slot & Subject Propagation (`updateCourseFaculty`)**:
+    - `course.repo.ts`: Created `updateCourseFaculty` and wired into `createCourse` and `updateCourse` to propagate teacher names to all timetable slots for that course across every weekday.
+    - `timetable.repo.ts`: Updated `createTimetableSlot` and `updateTimetableSlot` so editing or entering a faculty name on a slot automatically updates the parent course and synchronizes all other slots for that course across the week. Automatically inherits course faculty if omitted when creating slots.
+  - **UI Integration Across All Screens**:
+    - `SubjectModal.tsx`: Added form input "Faculty / Professor / Teacher Name (Optional)" with helper description explaining that it applies across the timetable, today's classes, and attendance cards.
+    - `SlotModal.tsx`: Auto-fills faculty name from the selected course on load and when switching courses, with helper label explaining subject-wide propagation.
+    - `TimetableScreen.tsx`: Slot card rendering falls back to `course.faculty` (`slot.faculty || course?.faculty`) so teacher names appear immediately across all weekday schedules.
+    - `HomeScreen.tsx` & `TodayClassesSection.tsx`: Displays teacher name badge (`👤 Prof. Name`) on today's class cards.
+    - `CourseAttendanceCard.tsx`: Displays `Prof: Name` under course title on subject attendance cards.
+    - `DayPickerView.tsx`: Displays professor name in the date-by-date schedule view.
+  - **Timetable Upload & Parser Engine**:
+    - `timetableParser.ts`: Extracts faculty from uploaded files and synchronizes across all parsed slots and `ParsedCourseItem`.
+    - `TimetableUploadModal.tsx`: Persists recognized faculty directly onto newly created courses and updates existing courses if empty.
+  - **Day-by-Day Log Improvements & Configurable Lab Attendance**:
+    - **Status Visibility in Day Picker (`DayPickerView.tsx`)**: Added clear, prominent status pills on every slot card displaying the current attendance status (Present, Absent, Cancelled, Medical, Duty, or "Not marked") with corresponding icons and contrast styling, so students immediately know their mark without relying on subtle border tints.
+    - **Saturday Off Rule Displayed as Holiday**: Passed `saturdayRule: activeTerm?.saturday_rule` to `resolveDaySchedule` in `DayPickerView.tsx`, ensuring 2nd Saturday and 2nd/4th Saturday off rules configured for the term immediately render as holidays in the day-by-day log.
+    - **Configurable Attendance Count for Multi-Period Labs (`attendance_weight`)**:
+      - Added `attendance_weight` to `TimetableSlot` (types, zod schema, Dexie v6 upgrade, and calculation engine `EffectiveSlot`).
+      - In `SlotModal.tsx`, when a slot spans multiple periods (e.g. a 2-hour Chemistry lab with weight 2), students can select whether the session counts as 1 period for attendance (e.g. +1 attendance for 2 hours) or spans its full duration.
+      - In `DayPickerView.tsx`, one-tap logging and bulk actions record `slot.attendance_weight` rather than the slot's timetable duration, ensuring attendance stats remain completely accurate according to university policy.
+      - Slot cards in `DayPickerView.tsx` display a "Counts as X" indicator badge whenever attendance weight differs from time-spanning period duration.
+  - **Unit Tests & Build**:
+    - Added unit test in `src/engine/__tests__/timetable.test.ts` verifying `attendance_weight` mapping and separation from slot duration weight.
+    - Added unit test in `src/utils/__tests__/timetableParser.test.ts` verifying faculty propagation across parsed slots and detected courses.
+    - Added schema validation test in `src/db/__tests__/schemas.test.ts` for optional course faculty.
+    - All 150 tests pass across 15 test suites with 0 build errors.
+
+### Schema Changes & Migration History (Dexie v3 -> v4 -> v5 -> v6)
+- **New Columns Added**:
+  - `BaseEntity`: Added `is_demo?: boolean` flag across all 14 Dexie tables to isolate demo records from user data.
+  - `Term`: Added `saturday_rule?: SaturdayRule` to support alternate Saturday holiday rules (2nd Saturday off, 2nd & 4th Saturday off, all off).
+  - `AttendanceRecord`: Added `component_type?: CourseType` to track whether logged attendance was for a theory lecture or lab session.
+  - `Course`: Added `faculty?: string | null` to track the subject instructor/professor globally.
+  - `TimetableSlot`: Added `attendance_weight?: number | null` to configure how many periods a multi-period slot counts for attendance.
+- **Database Version Upgrades**:
+  - `Dexie.version(4)`: Non-destructive in-place upgrade backfilling `is_demo: false` on existing records without data loss.
+  - `Dexie.version(5)`: Non-destructive in-place upgrade backfilling `faculty: null` on `Course`, harvesting any existing `slot.faculty` names from timetable slots to maintain full data consistency.
+  - `Dexie.version(6)`: Non-destructive in-place upgrade backfilling `attendance_weight: null` on `TimetableSlot`.
+
+## Remaining
+- All planned phases, user features, and integrated theory/lab workflows fully implemented, tested, and verified.
+
+## Known Issues
+- None.
+
+
+
