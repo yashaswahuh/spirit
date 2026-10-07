@@ -12,9 +12,35 @@ import {
   CalendarEvent,
   Weekday,
   CourseType,
+  Course,
   SaturdayRule,
   PeriodTiming,
+  LabAttendanceRule,
 } from '../types';
+
+/**
+ * Resolves the attendance weight for a slot, taking into account:
+ * 1. An explicit slot-level attendance_weight override
+ * 2. Course-level lab_attendance_rule ('single_session' vs 'per_hour')
+ * 3. Global lab_attendance_rule setting
+ * For multi-period lab classes in colleges that count 1 attendance point per lab session,
+ * returns 1 instead of the slot's multi-period duration.
+ */
+export function resolveSlotAttendanceWeight(
+  slot: { weight?: number; attendance_weight?: number | null; component_type?: CourseType },
+  course?: { lab_attendance_rule?: LabAttendanceRule | null; type?: CourseType } | null,
+  globalLabRule: LabAttendanceRule = 'per_hour'
+): number {
+  if (slot.attendance_weight != null && slot.attendance_weight > 0) {
+    return slot.attendance_weight;
+  }
+  const isLab = slot.component_type ? slot.component_type === 'lab' : course?.type === 'lab';
+  const effectiveRule = course?.lab_attendance_rule || globalLabRule;
+  if (isLab && effectiveRule === 'single_session') {
+    return 1;
+  }
+  return slot.weight && slot.weight > 0 ? slot.weight : 1;
+}
 
 /**
  * Evaluates whether a given date is an off Saturday based on the specified Saturday rule.
@@ -241,6 +267,8 @@ export interface ResolveDayScheduleParams {
   overrides?: TimetableOverride[];
   workingDays?: Weekday[]; // default [1, 2, 3, 4, 5, 6] (Mon-Sat)
   saturdayRule?: SaturdayRule;
+  courses?: Course[];
+  labAttendanceRule?: LabAttendanceRule;
 }
 
 /**
@@ -251,7 +279,7 @@ export interface ResolveDayScheduleParams {
  * 3. Working days of the term
  * 4. Saturday working rules (e.g. 2nd Saturday off, 2nd & 4th Saturday off)
  * 5. One-off date overrides (cancel, substitute, extra, reschedule)
- * 6. Slot weights
+ * 6. Slot weights & Lab attendance counting rules (per-hour vs single session)
  */
 export function resolveDaySchedule(params: ResolveDayScheduleParams): DayScheduleResolution {
   const {
@@ -262,6 +290,8 @@ export function resolveDaySchedule(params: ResolveDayScheduleParams): DaySchedul
     overrides = [],
     workingDays = [1, 2, 3, 4, 5, 6],
     saturdayRule,
+    courses = [],
+    labAttendanceRule = 'per_hour',
   } = params;
 
   const dateObj = new Date(date + 'T00:00:00Z');
@@ -348,9 +378,13 @@ export function resolveDaySchedule(params: ResolveDayScheduleParams): DaySchedul
     });
   }
 
+  const courseMap = new Map(courses.map(c => [c.id, c]));
+
   // Map to EffectiveSlot
   let effectiveSlots: EffectiveSlot[] = baseDaySlots.map(s => {
     const w = s.weight && s.weight > 0 ? s.weight : 1;
+    const course = courseMap.get(s.course_id);
+    const attWeight = resolveSlotAttendanceWeight(s, course, labAttendanceRule);
     return {
       slot_id: s.id,
       course_id: s.course_id,
@@ -360,7 +394,7 @@ export function resolveDaySchedule(params: ResolveDayScheduleParams): DaySchedul
       faculty: s.faculty || null,
       component_type: s.component_type,
       weight: w,
-      attendance_weight: s.attendance_weight != null ? s.attendance_weight : w,
+      attendance_weight: attWeight,
       period_name: s.period_name || null,
       is_override: false,
     };

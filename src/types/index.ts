@@ -90,6 +90,8 @@ export type SaturdayRule =
   | 'second_fourth_saturday_off'
   | 'all_saturdays_off';
 
+export type LabAttendanceRule = 'per_hour' | 'single_session';
+
 export type CalendarEventType = 'holiday' | 'exam' | 'swap_day' | 'event';
 
 export type AttendanceStatus =
@@ -200,6 +202,7 @@ export interface Term extends BaseEntity {
   working_days?: Weekday[]; // Working days of week (default Mon-Sat: [1, 2, 3, 4, 5, 6])
   period_timings?: PeriodTiming[]; // Custom period timings
   saturday_rule?: SaturdayRule; // e.g. 'second_saturday_off' or 'second_fourth_saturday_off'
+  lab_attendance_rule?: LabAttendanceRule; // e.g. 'per_hour' or 'single_session'
 }
 
 // ============================================================================
@@ -225,6 +228,7 @@ export interface Course extends BaseEntity {
   pass_marks?: number | null; // Overall pass mark for course (e.g. 40 or 50)
   grade_band_override?: GradeScaleEntry[] | null; // Optional course-specific grade bands
   faculty?: string | null; // e.g. "Dr. Sharma" or "Prof. Rao"
+  lab_attendance_rule?: LabAttendanceRule | null; // Optional course-level override for lab attendance counting
 }
 
 // ============================================================================

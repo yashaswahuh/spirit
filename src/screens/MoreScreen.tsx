@@ -54,6 +54,9 @@ import {
   DateFormatPattern,
   getDateFormat,
   setDateFormat,
+  LabAttendanceRule,
+  getLabAttendanceRule,
+  setLabAttendanceRule,
 } from '../utils/preferences';
 import {
   getNotificationPermission,
@@ -122,10 +125,16 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   const [weekStart, setWeekStartState] = useState<WeekStartDay>(getWeekStartDay);
   const [timeFormat, setTimeFormatState] = useState<TimeFormat>(getTimeFormat);
   const [dateFormat, setDateFormatState] = useState<DateFormatPattern>(getDateFormat);
+  const [labAttendanceRule, setLabAttendanceRuleState] = useState<LabAttendanceRule>(getLabAttendanceRule);
 
   // Default target threshold state
   const [defaultThreshold, setDefaultThreshold] = useState<number>(profile?.default_attendance_threshold || 75);
   const [thresholdGoalSaved, setThresholdGoalSaved] = useState(false);
+
+  const handleLabAttendanceRuleChange = (rule: LabAttendanceRule) => {
+    setLabAttendanceRule(rule);
+    setLabAttendanceRuleState(rule);
+  };
 
   // Notification status
   const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>(getNotificationPermission);
@@ -503,6 +512,51 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
                   className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1.5 min-h-[34px]"
                 >
                   <Clock className="w-3.5 h-3.5 text-indigo-600" /> Configure
+                </button>
+              </div>
+            </div>
+
+            {/* Lab Attendance Counting Policy */}
+            <div className="pt-2.5 border-t border-gray-100 dark:border-gray-800 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block">
+                  🧪 Lab Attendance Counting Rule
+                </label>
+                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono">
+                  {labAttendanceRule === 'single_session' ? '1 per lab session' : '1 per lab hour'}
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
+                How does your college count attendance for multi-hour labs?
+              </p>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleLabAttendanceRuleChange('per_hour')}
+                  className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left flex flex-col justify-between min-h-[52px] ${
+                    labAttendanceRule === 'per_hour'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  }`}
+                >
+                  <span className="font-bold">1 per hour</span>
+                  <span className={`text-[10px] font-normal ${labAttendanceRule === 'per_hour' ? 'text-indigo-100' : 'text-gray-400'}`}>
+                    2-hr lab = 2 points
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLabAttendanceRuleChange('single_session')}
+                  className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left flex flex-col justify-between min-h-[52px] ${
+                    labAttendanceRule === 'single_session'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  }`}
+                >
+                  <span className="font-bold">1 per lab session</span>
+                  <span className={`text-[10px] font-normal ${labAttendanceRule === 'single_session' ? 'text-indigo-100' : 'text-gray-400'}`}>
+                    2-hr lab = 1 point
+                  </span>
                 </button>
               </div>
             </div>

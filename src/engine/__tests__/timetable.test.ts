@@ -9,6 +9,7 @@ import {
   isSaturdayOff,
   calculateEndTimeForPeriod,
   findNextAvailablePeriodTiming,
+  resolveSlotAttendanceWeight,
 } from '../timetable';
 import {
   TimetableSlot,
@@ -16,6 +17,8 @@ import {
   TimetableOverride,
   CalendarEvent,
   PeriodTiming,
+  Course,
+  LabAttendanceRule,
 } from '../../types';
 
 describe('Timetable Engine Unit Tests', () => {
@@ -685,5 +688,121 @@ describe('Timetable Engine Unit Tests', () => {
       });
     });
   });
+
+  describe('resolveSlotAttendanceWeight & Lab Counting Rules', () => {
+    const dummySlot = (overrides: Partial<TimetableSlot> = {}): TimetableSlot => ({
+      id: 'slot-1',
+      user_id: 'u1',
+      course_id: 'c-lab',
+      weekday: 1,
+      start_time: '14:00',
+      end_time: '16:00',
+      component_type: 'lab',
+      weight: 2,
+      room: null,
+      faculty: null,
+      created_at: '',
+      updated_at: '',
+      deleted_at: null,
+      ...overrides,
+    });
+
+    const dummyCourse = (rule?: LabAttendanceRule | null): Course => ({
+      id: 'c-lab',
+      user_id: 'u1',
+      name: 'Chemistry Lab',
+      code: 'CH102',
+      credits: 2,
+      type: 'lab',
+      color: '#3b82f6',
+      term_id: 't1',
+      attendance_threshold_override: null,
+      counts_toward_gpa: true,
+      lab_attendance_rule: rule,
+      medical_counts_as_present: false,
+      duty_leave_counts_as_present: true,
+      created_at: '',
+      updated_at: '',
+      deleted_at: null,
+    });
+
+    it('respects explicit slot.attendance_weight as highest priority override', () => {
+      const slot = dummySlot({ attendance_weight: 1, weight: 3 });
+      const course = dummyCourse('per_hour');
+      expect(resolveSlotAttendanceWeight(slot, course, 'per_hour')).toBe(1);
+    });
+
+    it('applies course-level single_session rule to lab slots (counts as 1 regardless of weight)', () => {
+      const slot = dummySlot({ weight: 2 });
+      const course = dummyCourse('single_session');
+      // Global setting is per_hour, but course override is single_session -> returns 1
+      expect(resolveSlotAttendanceWeight(slot, course, 'per_hour')).toBe(1);
+    });
+
+    it('applies course-level per_hour rule to lab slots (counts as slot.weight)', () => {
+      const slot = dummySlot({ weight: 3 });
+      const course = dummyCourse('per_hour');
+      // Global setting is single_session, but course override is per_hour -> returns 3
+      expect(resolveSlotAttendanceWeight(slot, course, 'single_session')).toBe(3);
+    });
+
+    it('falls back to globalLabRule when course has no override', () => {
+      const slot = dummySlot({ weight: 2 });
+      const course = dummyCourse(null);
+
+      // Global: single_session -> 1
+      expect(resolveSlotAttendanceWeight(slot, course, 'single_session')).toBe(1);
+      // Global: per_hour -> 2
+      expect(resolveSlotAttendanceWeight(slot, course, 'per_hour')).toBe(2);
+    });
+
+    it('does not reduce non-lab components (theory slots preserve duration weight)', () => {
+      const theorySlot = dummySlot({ component_type: 'theory', weight: 2 });
+      const course = dummyCourse('single_session');
+      expect(resolveSlotAttendanceWeight(theorySlot, course, 'single_session')).toBe(2);
+    });
+
+    it('integrates into resolveDaySchedule providing correct attendance_weight in resolved slots', () => {
+      const labSlot = dummySlot({ weight: 2, attendance_weight: null });
+      const labCourse = dummyCourse(null);
+      const version: TimetableVersion = {
+        id: 'v1',
+        user_id: 'u1',
+        term_id: 't1',
+        name: 'V1',
+        effective_from: '2026-01-01',
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+
+      const resolvedSingleSession = resolveDaySchedule({
+        date: '2026-01-05', // Monday
+        versions: [version],
+        slots: [{ ...labSlot, version_id: 'v1' }],
+        calendarEvents: [],
+        courses: [labCourse],
+        labAttendanceRule: 'single_session',
+      });
+
+      expect(resolvedSingleSession.slots).toHaveLength(1);
+      expect(resolvedSingleSession.slots[0].weight).toBe(2);
+      expect(resolvedSingleSession.slots[0].attendance_weight).toBe(1);
+
+      const resolvedPerHour = resolveDaySchedule({
+        date: '2026-01-05',
+        versions: [version],
+        slots: [{ ...labSlot, version_id: 'v1' }],
+        calendarEvents: [],
+        courses: [labCourse],
+        labAttendanceRule: 'per_hour',
+      });
+
+      expect(resolvedPerHour.slots).toHaveLength(1);
+      expect(resolvedPerHour.slots[0].weight).toBe(2);
+      expect(resolvedPerHour.slots[0].attendance_weight).toBe(2);
+    });
+  });
 });
+
 

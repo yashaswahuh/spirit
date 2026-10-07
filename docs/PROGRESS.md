@@ -189,34 +189,41 @@
   - **Timetable Upload & Parser Engine**:
     - `timetableParser.ts`: Extracts faculty from uploaded files and synchronizes across all parsed slots and `ParsedCourseItem`.
     - `TimetableUploadModal.tsx`: Persists recognized faculty directly onto newly created courses and updates existing courses if empty.
-  - **Day-by-Day Log Improvements & Configurable Lab Attendance**:
-    - **Status Visibility in Day Picker (`DayPickerView.tsx`)**: Added clear, prominent status pills on every slot card displaying the current attendance status (Present, Absent, Cancelled, Medical, Duty, or "Not marked") with corresponding icons and contrast styling, so students immediately know their mark without relying on subtle border tints.
-    - **Saturday Off Rule Displayed as Holiday**: Passed `saturdayRule: activeTerm?.saturday_rule` to `resolveDaySchedule` in `DayPickerView.tsx`, ensuring 2nd Saturday and 2nd/4th Saturday off rules configured for the term immediately render as holidays in the day-by-day log.
-    - **Configurable Attendance Count for Multi-Period Labs (`attendance_weight`)**:
-      - Added `attendance_weight` to `TimetableSlot` (types, zod schema, Dexie v6 upgrade, and calculation engine `EffectiveSlot`).
-      - In `SlotModal.tsx`, when a slot spans multiple periods (e.g. a 2-hour Chemistry lab with weight 2), students can select whether the session counts as 1 period for attendance (e.g. +1 attendance for 2 hours) or spans its full duration.
-      - In `DayPickerView.tsx`, one-tap logging and bulk actions record `slot.attendance_weight` rather than the slot's timetable duration, ensuring attendance stats remain completely accurate according to university policy.
-      - Slot cards in `DayPickerView.tsx` display a "Counts as X" indicator badge whenever attendance weight differs from time-spanning period duration.
-  - **Unit Tests & Build**:
-    - Added unit test in `src/engine/__tests__/timetable.test.ts` verifying `attendance_weight` mapping and separation from slot duration weight.
-    - Added unit test in `src/utils/__tests__/timetableParser.test.ts` verifying faculty propagation across parsed slots and detected courses.
-    - Added schema validation test in `src/db/__tests__/schemas.test.ts` for optional course faculty.
-    - All 150 tests pass across 15 test suites with 0 build errors.
+  - **Configurable Lab Attendance Counting Policy & Day-by-Day Log UI Overhaul**:
+    - **Institutional Lab Attendance Counting Policy (`LabAttendanceRule = 'per_hour' | 'single_session'`)**:
+      - Added support for institutions that award 1 attendance point per lab session regardless of multi-hour duration (e.g. 2-hour lab counts as +1 attendance) vs institutions that award 1 point per hour/period (+2 attendance for 2 hours).
+      - **Hierarchical Configuration**:
+        1. **Global App Setting** (`preferences.ts`, `MoreScreen.tsx`): Interactive settings card allowing users to set default college lab attendance rule with instant persistence.
+        2. **Per-Subject Override** (`SubjectModal.tsx`): Dedicated lab rule dropdown on lab and integrated (theory + lab) subjects allowing individual course overrides (Default, 1 per hour, or 1 per lab session).
+        3. **Slot-Level Override** (`SlotModal.tsx`): Multi-period slots automatically compute dynamic default attendance weight based on effective course/app rule while allowing manual period weight overrides.
+      - **Engine Resolution (`resolveSlotAttendanceWeight`)**: Evaluates `slot.attendance_weight` > `course.lab_attendance_rule` > `globalLabRule` to determine exact attendance points awarded.
+      - Synchronized across HomeScreen quick marks, CatchUpModal bulk actions, DayPickerView logs, and timetable resolution.
+    - **Day-by-Day Log Button Selection Visibility (`DayPickerView.tsx`)**:
+      - Replaced ambiguous all-tinted button styling with high-contrast, accessible controls: unselected buttons are clean neutral gray with dark text, while the selected button features vibrant solid color, bold typography, 2px ring with offset, subtle drop shadow, and a prominent `Selected` badge pill.
+      - Added a dedicated Status Indicator Banner on every slot card displaying the current attendance mark and awarded periods with a 1-tap "Clear" button.
+      - Dynamic card border tinting (emerald, rose, amber, cyan, violet) providing instant visual feedback on marked slots.
+      - Robust fallback record matching ensuring attendance logged with or without explicit slot IDs is accurately displayed and toggleable.
+    - **Database Migration (Dexie v7)**:
+      - `Dexie.version(7)` non-destructive upgrade backfilling `lab_attendance_rule: null` on existing course records.
+    - **Testing & Verification**:
+      - Added unit tests for `resolveSlotAttendanceWeight` and lab counting rules in `timetable.test.ts`.
+      - All 156 unit and accessibility tests pass across 15 test suites with 0 errors. Clean production build verified.
 
-### Schema Changes & Migration History (Dexie v3 -> v4 -> v5 -> v6)
+### Schema Changes & Migration History (Dexie v3 -> v4 -> v5 -> v6 -> v7)
 - **New Columns Added**:
   - `BaseEntity`: Added `is_demo?: boolean` flag across all 14 Dexie tables to isolate demo records from user data.
-  - `Term`: Added `saturday_rule?: SaturdayRule` to support alternate Saturday holiday rules (2nd Saturday off, 2nd & 4th Saturday off, all off).
+  - `Term`: Added `saturday_rule?: SaturdayRule` to support alternate Saturday holiday rules (2nd Saturday off, 2nd & 4th Saturday off, all off), and `lab_attendance_rule?: LabAttendanceRule`.
   - `AttendanceRecord`: Added `component_type?: CourseType` to track whether logged attendance was for a theory lecture or lab session.
-  - `Course`: Added `faculty?: string | null` to track the subject instructor/professor globally.
+  - `Course`: Added `faculty?: string | null` to track the subject instructor/professor globally, and `lab_attendance_rule?: LabAttendanceRule | null`.
   - `TimetableSlot`: Added `attendance_weight?: number | null` to configure how many periods a multi-period slot counts for attendance.
 - **Database Version Upgrades**:
   - `Dexie.version(4)`: Non-destructive in-place upgrade backfilling `is_demo: false` on existing records without data loss.
   - `Dexie.version(5)`: Non-destructive in-place upgrade backfilling `faculty: null` on `Course`, harvesting any existing `slot.faculty` names from timetable slots to maintain full data consistency.
   - `Dexie.version(6)`: Non-destructive in-place upgrade backfilling `attendance_weight: null` on `TimetableSlot`.
+  - `Dexie.version(7)`: Non-destructive in-place upgrade backfilling `lab_attendance_rule: null` on `Course`.
 
 ## Remaining
-- All planned phases, user features, and integrated theory/lab workflows fully implemented, tested, and verified.
+- All planned phases, user features, and configurable lab attendance policies fully implemented, tested, and verified.
 
 ## Known Issues
 - None.

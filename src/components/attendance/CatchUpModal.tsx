@@ -4,9 +4,10 @@ import { Check, X, Ban, Sun, Calendar, CheckCircle } from 'lucide-react';
 import { db } from '../../db/dexie';
 import { AttendanceStatus, Course } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
-import { resolveDaySchedule, EffectiveSlot } from '../../engine/timetable';
+import { resolveDaySchedule, EffectiveSlot, resolveSlotAttendanceWeight } from '../../engine/timetable';
 import { markAttendance } from '../../db/repositories/attendance.repo';
 import { createCalendarEvent } from '../../db/repositories/calendar.repo';
+import { getLabAttendanceRule } from '../../utils/preferences';
 
 interface CatchUpModalProps {
   isOpen: boolean;
@@ -97,6 +98,7 @@ export const CatchUpModal: React.FC<CatchUpModalProps> = ({
   const handleBulkAction = async (item: UnmarkedDayItem, status: AttendanceStatus) => {
     setProcessingDate(item.date);
     try {
+      const globalLabRule = getLabAttendanceRule();
       for (const slot of item.unmarkedSlots) {
         const saved = await markAttendance({
           course_id: slot.course_id,
@@ -104,8 +106,9 @@ export const CatchUpModal: React.FC<CatchUpModalProps> = ({
           slot_id: slot.slot_id,
           status,
         });
-        if (slot.weight > 1) {
-          await db.attendance_record.update(saved.id, { weight: slot.weight });
+        const attWeight = resolveSlotAttendanceWeight(slot, courseMap.get(slot.course_id), globalLabRule);
+        if (attWeight > 1) {
+          await db.attendance_record.update(saved.id, { weight: attWeight });
         }
       }
       onCatchUpDone?.();

@@ -3,7 +3,7 @@ import { Trash2, AlertTriangle, Clock, Check, CheckCircle2, ChevronDown, Chevron
 import { Course, TimetableSlot, Weekday, CourseType, PeriodTiming } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import { timeToMinutes, calculateEndTimeForPeriod, findNextAvailablePeriodTiming } from '../../engine/timetable';
-import { getPeriodTimings, PeriodTimingConfig } from '../../utils/preferences';
+import { getPeriodTimings, PeriodTimingConfig, getLabAttendanceRule } from '../../utils/preferences';
 
 interface SlotModalProps {
   isOpen: boolean;
@@ -265,6 +265,10 @@ export const SlotModal: React.FC<SlotModalProps> = ({
   const visibleDays = WEEKDAYS.filter(d => workingDays.includes(d.day) || d.day === weekday);
   const selectedCourse = courses.find(c => c.id === courseId);
   const matchedPeriod = teachingPeriods.find(p => p.start_time === startTime);
+
+  const globalLabRule = getLabAttendanceRule();
+  const effectiveLabRule = selectedCourse?.lab_attendance_rule || globalLabRule;
+  const defaultAttendanceWeight = (componentType === 'lab' && effectiveLabRule === 'single_session') ? 1 : weight;
 
   return (
     <ResponsiveDialog
@@ -541,29 +545,38 @@ export const SlotModal: React.FC<SlotModalProps> = ({
                   How many periods count for attendance?
                 </p>
                 <p className="text-[11px] text-sky-700 dark:text-sky-400 mt-0.5">
-                  e.g. a 2-period Chemistry lab that your college records as 1 attendance point.
+                  {componentType === 'lab' && effectiveLabRule === 'single_session'
+                    ? 'Your lab rule is set to "1 per lab session" (defaults to 1 attendance point).'
+                    : 'e.g. a 2-period Chemistry lab that your college records as 1 attendance point.'}
                 </p>
               </div>
               <span className="text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-sky-100 dark:bg-sky-900/60 px-2 py-0.5 rounded-full whitespace-nowrap">
-                {attendanceWeight == null ? `${weight} (same as weight)` : `${attendanceWeight} period${attendanceWeight !== 1 ? 's' : ''}`}
+                {attendanceWeight == null
+                  ? `${defaultAttendanceWeight} (Default: ${defaultAttendanceWeight === 1 ? '1 per session' : 'per hour'})`
+                  : `${attendanceWeight} period${attendanceWeight !== 1 ? 's' : ''}`}
               </span>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {Array.from({ length: weight }, (_, i) => i + 1).map(n => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setAttendanceWeight(n === weight ? null : n)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all min-h-[36px] ${
-                    (n === weight && attendanceWeight == null) || attendanceWeight === n
-                      ? 'bg-sky-600 text-white shadow-sm'
-                      : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-sky-50 dark:hover:bg-sky-950/30'
-                  }`}
-                >
-                  {n} period{n !== 1 ? 's' : ''}
-                  {n === weight ? ' (default)' : ''}
-                </button>
-              ))}
+              {Array.from({ length: weight }, (_, i) => i + 1).map(n => {
+                const isSelected =
+                  (attendanceWeight === null && n === defaultAttendanceWeight) ||
+                  attendanceWeight === n;
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setAttendanceWeight(n === defaultAttendanceWeight ? null : n)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all min-h-[36px] ${
+                      isSelected
+                        ? 'bg-sky-600 text-white shadow-sm'
+                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-sky-50 dark:hover:bg-sky-950/30'
+                    }`}
+                  >
+                    {n} period{n !== 1 ? 's' : ''}
+                    {n === defaultAttendanceWeight ? ' (default)' : ''}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

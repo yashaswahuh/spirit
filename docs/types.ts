@@ -75,10 +75,13 @@ export type TermStatus = 'upcoming' | 'ongoing' | 'completed';
 export type CourseType =
   | 'theory'
   | 'lab'
+  | 'theory_and_lab'
   | 'tutorial'
   | 'project'
   | 'elective'
   | 'audit';
+
+export type LabAttendanceRule = 'per_hour' | 'single_session';
 
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
 
@@ -216,6 +219,7 @@ export interface Course extends BaseEntity {
   pass_marks?: number | null; // Overall pass mark for course (e.g. 40 or 50)
   grade_band_override?: GradeScaleEntry[] | null; // Optional course-specific grade bands
   faculty?: string | null; // Faculty / Professor / Teacher Name (e.g. "Dr. Sharma")
+  lab_attendance_rule?: LabAttendanceRule | null; // null uses term/app default, 'per_hour' | 'single_session'
 }
 
 // ============================================================================

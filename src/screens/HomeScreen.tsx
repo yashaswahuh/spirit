@@ -7,6 +7,8 @@ import { computeCourseAttendanceStats, countUnmarkedClasses } from '../engine/at
 import { canISkipTomorrow } from '../engine/whatif';
 import { getTodayTimetableSlots } from '../db/repositories/timetable.repo';
 import { markAttendance } from '../db/repositories/attendance.repo';
+import { resolveSlotAttendanceWeight } from '../engine/timetable';
+import { getLabAttendanceRule } from '../utils/preferences';
 import { hasDemoData, clearDemoData, seedDemoData } from '../db/repositories/setup.repo';
 import { TodayClassesSection } from '../components/home/TodayClassesSection';
 import { CanISkipTomorrowCard } from '../components/home/CanISkipTomorrowCard';
@@ -136,13 +138,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
 
   const handleMarkToday = async (courseId: string, slotId: string | null, status: any) => {
     const slot = slotId ? slots.find(s => s.id === slotId) : null;
+    const course = courseMap.get(courseId);
+    const attWeight = slot
+      ? resolveSlotAttendanceWeight(slot, course, getLabAttendanceRule())
+      : 1;
     await markAttendance({
       course_id: courseId,
       date: todayStr,
       slot_id: slotId,
       status,
-      weight: slot?.weight || 1,
-      component_type: slot?.component_type || courseMap.get(courseId)?.type,
+      weight: attWeight,
+      component_type: slot?.component_type || course?.type,
     });
   };
 

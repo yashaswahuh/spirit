@@ -101,6 +101,7 @@ export const termSchema = baseEntitySchema.extend({
     z.literal(6),
   ])).optional(),
   period_timings: z.array(periodTimingSchema).optional(),
+  lab_attendance_rule: z.enum(['per_hour', 'single_session']).optional(),
 });
 
 export const courseSchema = baseEntitySchema.extend({
@@ -122,6 +123,7 @@ export const courseSchema = baseEntitySchema.extend({
   pass_marks: z.number().min(0).nullable().optional(),
   grade_band_override: z.array(gradeScaleEntrySchema).nullable().optional(),
   faculty: z.string().nullable().optional(),
+  lab_attendance_rule: z.enum(['per_hour', 'single_session']).nullable().optional(),
 });
 
 export const timetableVersionSchema = baseEntitySchema.extend({
