@@ -79,6 +79,16 @@ export const TimetableUploadModal: React.FC<TimetableUploadModalProps> = ({
     handleTextChange(SAMPLE_CSV);
   };
 
+  const handleCourseColorChange = (index: number, newColor: string) => {
+    if (!parseResult) return;
+    const updatedCourses = [...parseResult.detectedCourses];
+    updatedCourses[index] = { ...updatedCourses[index], color: newColor };
+    setParseResult({
+      ...parseResult,
+      detectedCourses: updatedCourses,
+    });
+  };
+
   const handleImport = async () => {
     if (!parseResult || parseResult.detectedSlots.length === 0 || !activeTerm) {
       return;
@@ -285,7 +295,19 @@ export const TimetableUploadModal: React.FC<TimetableUploadModalProps> = ({
                     key={i}
                     className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs shadow-xs"
                   >
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: c.color }} />
+                    <label
+                      className="w-3.5 h-3.5 rounded-full flex-shrink-0 cursor-pointer ring-1 ring-black/10 hover:scale-125 transition-transform relative"
+                      style={{ backgroundColor: c.color }}
+                      title="Click to customize subject color"
+                    >
+                      <input
+                        type="color"
+                        value={c.color}
+                        onChange={e => handleCourseColorChange(i, e.target.value.toLowerCase())}
+                        className="sr-only"
+                        aria-label={`Change color for ${c.cleanName}`}
+                      />
+                    </label>
                     <span className="font-bold text-gray-900 dark:text-white">{c.cleanName}</span>
                     <span className="text-[10px] text-gray-400">({c.code})</span>
                     {c.isExisting ? (

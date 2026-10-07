@@ -147,6 +147,12 @@
   - **Student Profile Customization**: Created `ProfileEditModal.tsx` to customize name, degree program, branch/department, admission year, and threshold, accessible from `MoreScreen.tsx`.
   - **Daily Backup Reminder**: Added 1-day threshold setting and "Daily (1 Day)" preset option in `MoreScreen.tsx` with storage safety reassurance banner.
   - **Testing**: Added unit tests for Saturday rules, timetable parser, and verified all 131 tests passing across 14 test suites.
+- **Production Polish, Deployment & Customization Upgrades**:
+  - **GitHub Actions Deployment Pipeline**: Configured `.github/workflows/deploy.yml` for automated CI/CD with `workflow_dispatch`, push triggers for `main` and `master`, build artifact upload (`actions/upload-artifact@v4`), and deployment via GitHub Actions (`actions/deploy-pages@v4`).
+  - **Site-Wide Dynamic Accent Color System**: Remapped Tailwind's `indigo` palette to dynamic CSS variables `rgb(var(--color-accent-*) / <alpha-value>)` in `tailwind.config.js` and defined RGB color values for all 6 presets (`indigo`, `emerald`, `violet`, `rose`, `amber`, `cyan`) in `src/index.css`. Added `applyAccent` in `preferences.ts` and called it in `App.tsx` on mount, ensuring switching accent color in settings immediately changes buttons, badges, tabs, borders, and scrollbars site-wide.
+  - **Interactive Course Color Picker**: Created reusable `CourseColorPicker.tsx` with 17 curated course swatches, native OS color picker (`<input type="color">`), and monospace hex text input with live validation. Integrated into `SubjectModal.tsx` (course creation and edit), `OnboardingWizard.tsx` (setup wizard), and `TimetableUploadModal.tsx` (uploaded timetable preview).
+  - **Period Timings & Form Contrast Fixes**: Corrected styling in `TermSettingsModal.tsx` and `PeriodTimingsModal.tsx` where inputs lacked explicit backgrounds, resolving white-on-white text readability issues across both light and dark modes.
+  - **Unit Test Suite Expansion**: Added `src/utils/__tests__/preferences.test.ts` testing accent and theme application, date/time format preferences, and color palette presets. All 138 tests pass across 15 test files.
 
 ### Schema Changes & Migration History (Dexie v3 -> v4)
 - **New Columns Added**:

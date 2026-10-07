@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Course, CourseType } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
+import { CourseColorPicker } from '../common/CourseColorPicker';
 
 interface SubjectModalProps {
   isOpen: boolean;
@@ -20,17 +21,6 @@ interface SubjectModalProps {
   }) => void;
   initialCourse?: Course;
 }
-
-const COLOR_PRESETS = [
-  '#6366f1', // Indigo
-  '#3b82f6', // Blue
-  '#0ea5e9', // Sky
-  '#10b981', // Emerald
-  '#f59e0b', // Amber
-  '#ec4899', // Pink
-  '#8b5cf6', // Violet
-  '#ef4444', // Red
-];
 
 export const SubjectModal: React.FC<SubjectModalProps> = ({
   isOpen,
@@ -196,25 +186,11 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
           </div>
         </div>
 
-        <div>
-          <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-            Accent Color
-          </label>
-          <div className="flex items-center gap-2.5 flex-wrap">
-            {COLOR_PRESETS.map(c => (
-              <button
-                type="button"
-                key={c}
-                onClick={() => setColor(c)}
-                className={`w-8 h-8 rounded-full transition-transform focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none ${
-                  color === c ? 'scale-125 ring-2 ring-offset-2 ring-indigo-500' : 'hover:scale-110'
-                }`}
-                style={{ backgroundColor: c }}
-                aria-label={`Select color ${c}`}
-              />
-            ))}
-          </div>
-        </div>
+        <CourseColorPicker
+          value={color}
+          onChange={setColor}
+          label="Course Accent Color"
+        />
 
         <div className="pt-3 border-t border-gray-100 dark:border-gray-800 space-y-2.5">
           <label className="text-xs font-bold text-gray-700 dark:text-gray-300">

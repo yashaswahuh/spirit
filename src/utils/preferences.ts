@@ -59,9 +59,15 @@ export const getAccentPreference = (): AccentPreference => {
   return (localStorage.getItem('spirit_accent_pref') as AccentPreference) || 'indigo';
 };
 
+export const applyAccent = (accent: AccentPreference = getAccentPreference()): void => {
+  if (typeof document !== 'undefined') {
+    document.documentElement.dataset.accent = accent;
+  }
+};
+
 export const setAccentPreference = (accent: AccentPreference): void => {
   localStorage.setItem('spirit_accent_pref', accent);
-  document.documentElement.dataset.accent = accent;
+  applyAccent(accent);
 };
 
 export const getWeekStartDay = (): WeekStartDay => {

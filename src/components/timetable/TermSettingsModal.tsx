@@ -288,19 +288,19 @@ export const TermSettingsModal: React.FC<TermSettingsModalProps> = ({
                 placeholder="Name (e.g. Period 1, Lunch)"
                 value={newPeriodName}
                 onChange={e => setNewPeriodName(e.target.value)}
-                className="px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs text-gray-900 dark:text-white"
+                className="px-2.5 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
               <input
                 type="time"
                 value={newPeriodStart}
                 onChange={e => setNewPeriodStart(e.target.value)}
-                className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-mono text-gray-900 dark:text-white"
+                className="px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
               <input
                 type="time"
                 value={newPeriodEnd}
                 onChange={e => setNewPeriodEnd(e.target.value)}
-                className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-xs font-mono text-gray-900 dark:text-white"
+                className="px-2 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-xs font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
               <button
                 type="button"
@@ -363,7 +363,7 @@ export const TermSettingsModal: React.FC<TermSettingsModalProps> = ({
                         [c.id]: isNaN(val as number) ? null : val,
                       });
                     }}
-                    className="w-16 px-2 py-1 rounded-lg border border-gray-200 dark:border-gray-700 text-center font-bold text-xs"
+                    className="w-16 px-2 py-1 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500 text-center font-bold text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                   />
                   <span className="text-gray-500 font-bold">%</span>
                 </div>

@@ -22,6 +22,7 @@ import {
   setThemePreference,
   applyTheme,
   getEffectiveThemeIsDark,
+  applyAccent,
 } from './utils/preferences';
 import { SemesterSwitcherModal } from './components/timetable/SemesterSwitcherModal';
 
@@ -33,6 +34,10 @@ const MainApp: React.FC = () => {
   const [themePref, setThemePrefState] = useState<ThemePreference>(getThemePreference);
   const [isDark, setIsDark] = useState<boolean>(() => getEffectiveThemeIsDark());
   const [isSemesterSwitcherOpen, setIsSemesterSwitcherOpen] = useState(false);
+
+  useEffect(() => {
+    applyAccent();
+  }, []);
 
   useEffect(() => {
     const effectiveDark = applyTheme(themePref);

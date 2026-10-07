@@ -1,17 +1,28 @@
-name: Build and Deploy Spirit to GitHub Pages
+name: Build and Deploy Spirit via GitHub Actions
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - master
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - master
   workflow_dispatch:
+    inputs:
+      base_path:
+        description: 'Vite base path (leave blank to use default /spirit/)'
+        required: false
+        default: ''
 
+# Set permissions for GitHub Actions to deploy to GitHub Pages
 permissions:
   contents: read
   pages: write
   id-token: write
 
+# Allow one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 concurrency:
   group: 'pages'
   cancel-in-progress: false
@@ -39,31 +50,33 @@ jobs:
 
       - name: Build production application
         env:
-          # Configurable base path with /spirit/ default for GitHub Pages
-          VITE_BASE_PATH: ${{ vars.VITE_BASE_PATH || '/spirit/' }}
-          # Future optional Cloud Sync / Supabase integration placeholders
-          # (Commented out: Spirit is 100% local-first and reads sync configuration from secrets/vars only)
-          # VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          # VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          # Configurable base path with /spirit/ default for GitHub Actions deployment
+          VITE_BASE_PATH: ${{ inputs.base_path || vars.VITE_BASE_PATH || '/spirit/' }}
         run: npm run build
 
+      - name: Upload build artifact to GitHub Actions
+        uses: actions/upload-artifact@v4
+        with:
+          name: spirit-dist
+          path: './dist'
+          retention-days: 14
+
       - name: Upload GitHub Pages artifact
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch') && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
           path: './dist'
 
   deploy:
-    name: Deploy to GitHub Pages
+    name: Deploy via GitHub Actions
     needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch') && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-      - name: Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages via Actions
         id: deployment
         uses: actions/deploy-pages@v4
-

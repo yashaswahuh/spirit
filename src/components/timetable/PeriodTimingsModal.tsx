@@ -84,7 +84,7 @@ export const PeriodTimingsModal: React.FC<PeriodTimingsModalProps> = ({
                 value={item.name}
                 onChange={e => handleUpdate(index, 'name', e.target.value)}
                 placeholder="Period Name"
-                className="flex-1 min-w-[100px] px-2.5 py-1.5 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                className="flex-1 min-w-[100px] px-2.5 py-1.5 text-xs rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
 
               <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -92,14 +92,14 @@ export const PeriodTimingsModal: React.FC<PeriodTimingsModalProps> = ({
                   type="time"
                   value={item.startTime}
                   onChange={e => handleUpdate(index, 'startTime', e.target.value)}
-                  className="px-2 py-1 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                  className="px-2 py-1 text-xs rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 />
                 <span className="text-xs text-gray-400">-</span>
                 <input
                   type="time"
                   value={item.endTime}
                   onChange={e => handleUpdate(index, 'endTime', e.target.value)}
-                  className="px-2 py-1 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                  className="px-2 py-1 text-xs rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 />
               </div>
 

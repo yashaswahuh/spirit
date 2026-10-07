@@ -327,10 +327,23 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
                   className="bg-white dark:bg-gray-900 p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 space-y-2"
                 >
                   <div className="flex items-center gap-2">
-                    <span
-                      className="w-3 h-3 rounded-full flex-shrink-0"
+                    <label
+                      className="w-4 h-4 rounded-full flex-shrink-0 cursor-pointer ring-1 ring-black/10 hover:scale-125 transition-transform relative"
                       style={{ backgroundColor: course.color }}
-                    />
+                      title="Click to customize subject color"
+                    >
+                      <input
+                        type="color"
+                        value={course.color}
+                        onChange={e => {
+                          const updated = [...courses];
+                          updated[idx].color = e.target.value.toLowerCase();
+                          setCourses(updated);
+                        }}
+                        className="sr-only"
+                        aria-label={`Change color for ${course.name}`}
+                      />
+                    </label>
                     <input
                       type="text"
                       placeholder="Subject name"
