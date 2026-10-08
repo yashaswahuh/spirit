@@ -248,23 +248,33 @@ export async function syncCourseAttendanceWeights(
       ? timeToMinutes(slot.end_time) - timeToMinutes(slot.start_time)
       : 0;
 
-    const isTheoryLecture = record.component_type === 'theory' && course.type === 'theory_and_lab';
-    const isLab = !isTheoryLecture && (
+    const isMultiPeriodOrLab =
       record.component_type === 'lab' ||
       course.type === 'lab' ||
       diffMins >= 90 ||
       (slot && slot.weight !== undefined && slot.weight > 1) ||
       (slot && slot.attendance_weight !== undefined && slot.attendance_weight !== null && slot.attendance_weight > 1) ||
-      (course.lab_attendance_rule !== null && canonicalLabWeight > 1) ||
-      (record.weight !== undefined && record.weight > 1)
-    );
+      canonicalLabWeight > 1 ||
+      (record.weight !== undefined && record.weight > 1);
 
-    if (isLab) {
-      const slotWeight = slot
-        ? resolveSlotAttendanceWeight(slot, course, effectiveGlobal)
-        : canonicalLabWeight;
-      const targetWeight =
-        effectiveRule === 'single_session' ? 1 : Math.max(2, slotWeight);
+    if (isMultiPeriodOrLab) {
+      let targetWeight: number;
+      if (effectiveRule === 'single_session') {
+        targetWeight = 1;
+      } else {
+        if (slot) {
+          if (slot.component_type !== 'lab' && (!slot.weight || slot.weight <= 1) && diffMins < 90) {
+            targetWeight = 1;
+          } else {
+            const slotWeight = resolveSlotAttendanceWeight(slot, course, effectiveGlobal);
+            targetWeight = Math.max(slotWeight, 2);
+          }
+        } else {
+          targetWeight = (record.component_type === 'theory' && course.type === 'theory_and_lab')
+            ? 1
+            : Math.max(canonicalLabWeight, 2);
+        }
+      }
 
       if (record.weight !== targetWeight) {
         updates.push({ id: record.id, weight: targetWeight });

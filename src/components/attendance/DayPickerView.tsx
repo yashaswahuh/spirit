@@ -15,11 +15,11 @@ import {
   Sun,
   AlertCircle,
   HelpCircle,
-  FlaskConical,
+  Sliders,
 } from 'lucide-react';
 import { db } from '../../db/dexie';
 import { AttendanceStatus, Course, AttendanceRecord } from '../../types';
-import { resolveDaySchedule, DayScheduleResolution } from '../../engine/timetable';
+import { resolveDaySchedule, DayScheduleResolution, timeToMinutes } from '../../engine/timetable';
 import { markAttendance, deleteAttendanceRecord } from '../../db/repositories/attendance.repo';
 import { createCalendarEvent, revertHolidayForDate } from '../../db/repositories/calendar.repo';
 import { getLabAttendanceRule } from '../../utils/preferences';
@@ -212,11 +212,19 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
     courseId: string,
     slotId: string | null,
     defaultAttWeight: number,
-    _existingRecord?: AttendanceRecord
+    existingRecord?: AttendanceRecord
   ): number => {
     const key = slotId || courseId;
     if (slotCustomWeights[key] !== undefined) {
       return slotCustomWeights[key];
+    }
+    const course = courseMap.get(courseId);
+    const effectiveRule = course?.lab_attendance_rule || globalLabRule;
+    if (effectiveRule === 'single_session') {
+      return 1;
+    }
+    if (existingRecord?.weight && existingRecord.weight > 0) {
+      return existingRecord.weight;
     }
     return defaultAttWeight;
   };
@@ -601,9 +609,23 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
               record
             );
 
-            // Is this a lab or multi-period class?
-            const isLabOrMultiPeriod =
-              slot.weight > 1 || slot.component_type === 'lab' || course?.type === 'lab';
+            // Compute duration and potential multi-period status
+            const durationMins = (slot.start_time && slot.end_time)
+              ? timeToMinutes(slot.end_time) - timeToMinutes(slot.start_time)
+              : 0;
+            const naturalWeight = slot.weight > 1
+              ? slot.weight
+              : (durationMins >= 150 ? 3 : (durationMins >= 90 ? 2 : (course?.type === 'lab' || slot.component_type === 'lab' ? 2 : 1)));
+            const maxWeight = Math.max(slot.weight, naturalWeight, effectiveWeight);
+
+            // Is this a lab, elective, or multi-period class subject to attendance counting?
+            const isMultiPeriodOrRuleApplied =
+              slot.weight > 1 ||
+              slot.component_type === 'lab' ||
+              course?.type === 'lab' ||
+              course?.lab_attendance_rule != null ||
+              effectiveWeight > 1 ||
+              durationMins >= 90;
 
             const cardBorderCls =
               status === 'present'
@@ -671,16 +693,18 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
                   </span>
                 </div>
 
-                {/* Lab & Multi-Period Attendance Points Selector */}
-                {isLabOrMultiPeriod && (
+                {/* Attendance Points Selector for multi-period/lab/elective classes */}
+                {isMultiPeriodOrRuleApplied && (
                   <div className="p-3 rounded-xl bg-gray-50/90 dark:bg-gray-800/60 border border-gray-200/80 dark:border-gray-700/80 space-y-2">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800 dark:text-gray-200">
-                        <FlaskConical className="w-3.5 h-3.5 text-indigo-500" />
-                        <span>Lab Attendance Counting:</span>
-                        <span className="text-[11px] font-normal text-gray-500 dark:text-gray-400">
-                          (Spans {slot.weight} periods)
-                        </span>
+                        <Sliders className="w-3.5 h-3.5 text-indigo-500" />
+                        <span>Attendance Counting:</span>
+                        {maxWeight > 1 && (
+                          <span className="text-[11px] font-normal text-gray-500 dark:text-gray-400">
+                            (Spans {maxWeight} periods)
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-1.5">
                         <button
@@ -691,28 +715,30 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
                               ? 'bg-indigo-600 text-white shadow-xs font-black ring-2 ring-indigo-400'
                               : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:bg-gray-100'
                           }`}
-                          title="Count as 1 period (+1 attendance)"
+                          title="Count as 1 session (+1 attendance point)"
                         >
-                          1 Period (+1) {effectiveWeight === 1 ? '✓' : ''}
+                          1 Period (+1)
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSetSlotWeight(slot.course_id, slot.slot_id, slot.weight, record)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                            effectiveWeight === slot.weight
-                              ? 'bg-indigo-600 text-white shadow-xs font-black ring-2 ring-indigo-400'
-                              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:bg-gray-100'
-                          }`}
-                          title={`Count as ${slot.weight} periods (+${slot.weight} attendance points)`}
-                        >
-                          {slot.weight} Periods (+{slot.weight}) {effectiveWeight === slot.weight ? '✓' : ''}
-                        </button>
+                        {maxWeight > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleSetSlotWeight(slot.course_id, slot.slot_id, maxWeight, record)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              effectiveWeight === maxWeight
+                                ? 'bg-indigo-600 text-white shadow-xs font-black ring-2 ring-indigo-400'
+                                : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:bg-gray-100'
+                            }`}
+                            title={`Count as ${maxWeight} periods (+${maxWeight} attendance points)`}
+                          >
+                            {maxWeight} Periods (+{maxWeight})
+                          </button>
+                        )}
                       </div>
                     </div>
                     <p className="text-[11px] text-gray-500 dark:text-gray-400">
                       {effectiveWeight === 1
                         ? 'Counted as 1 single session: marking Present will award +1 point to your attendance.'
-                        : `Counted as 1 per hour: marking Present will award +${effectiveWeight} points to your attendance.`}
+                        : `Counted as 1 per hour / period: marking Present will award +${effectiveWeight} points to your attendance.`}
                     </p>
                   </div>
                 )}

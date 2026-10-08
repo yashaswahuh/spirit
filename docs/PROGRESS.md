@@ -298,8 +298,30 @@
     - **Capacitor Configuration (`capacitor.config.ts`)**: Configured `server: { androidScheme: 'https', cleartext: false }` to ensure a secure origin for Dexie IndexedDB and Web APIs on Android WebView.
     - **Automated GitHub Actions CI (`.github/workflows/build-android.yml`)**: Updated build step to run `npm run build:android` with `VITE_BASE_PATH: /` to guarantee proper APK packaging in GitHub Actions.
 
+  - **Universal Multi-Period & Elective Attendance Counting Rule Fix (NSS & Non-Lab Courses)**:
+    - **Root Cause**:
+      1. In `src/engine/timetable.ts` (`resolveSlotAttendanceWeight`), a hardcoded guard `const isExplicitTheory = slot.component_type === 'theory'` and `!isExplicitTheory` check previously bypassed the counting rule for theory/elective courses like NSS. Consequently, 2-hour theory sessions always returned `slot.weight` (2), ignoring both course-level overrides and global defaults.
+      2. In `DayPickerView.tsx`, the points selector was hardcoded as "Lab Attendance Counting" with a flask icon and `slot.component_type === 'lab'` check, which was hidden for theory/elective subjects like NSS.
+      3. In `AttendanceScreen.tsx` and `CourseAttendanceCard.tsx`, marking non-lab courses was hardcoded to 1 point without considering multi-period durations, or ignored `labAttendancePoints` when `course.type !== 'lab'`.
+      4. In `src/db/repositories/attendance.repo.ts` (`syncCourseAttendanceWeights`) and `attendance.ts`, historical reconciliation bypassed theory components in mixed courses.
+    - **Fix Implementation**:
+      1. **Timetable Engine (`timetable.ts`)**: Removed theory-blocking restrictions in `resolveSlotAttendanceWeight`. Any multi-period session (`weight > 1` or duration $\ge 90$ mins) or lab course now evaluates `effectiveRule === 'single_session'` and returns `1`. Under `per_hour`, returns canonical slot weight (e.g. 2).
+      2. **Attendance Calculation Engine (`attendance.ts`)**: Ensured dynamic rule calculation applies uniformly to multi-period theory/elective courses (e.g., NSS 8 conducted classes evaluate to 8 points under `single_session` instead of being inflated to 16). Single-period lectures in mixed courses are protected from unintended weight inflation.
+      3. **Repository Weight Synchronization (`attendance.repo.ts`)**: Updated `syncCourseAttendanceWeights` to reconcile historical records for all multi-period and elective subjects when switching between rules.
+      4. **Day-by-Day Log UI (`DayPickerView.tsx`)**:
+         - Renamed "Lab Attendance Counting" to "Attendance Counting" with `Sliders` icon.
+         - Activated selector for all multi-period, elective, or rule-configured subjects (`isMultiPeriodOrRuleApplied`).
+         - Removed checkmark emoji decorations on buttons; button active states use high-contrast indigo background and ring styling.
+         - Updated subtext to clearly explain 1 session (+1 point) vs 1 per hour / period (+N points).
+      5. **Course Card & Attendance Management (`AttendanceScreen.tsx` & `CourseAttendanceCard.tsx`)**:
+         - Updated `handleMarkCourse` and `CourseAttendanceCard` to dynamically calculate `subjectAttendancePoints` for all multi-period courses (including NSS).
+         - Updated `effectivePoints` in `CourseAttendanceCard` to apply `labAttendancePoints` to non-integrated multi-period subjects as well.
+      6. **Settings & Term Modals (`MoreScreen.tsx`, `TermSettingsModal.tsx`)**:
+         - Renamed "🧪 Lab Attendance Counting Rule" to "⚙️ Attendance Counting Rule" / `Sliders` icon with inclusive wording for multi-hour sessions, practicals, and electives.
+    - **Testing**: Added unit test in `src/engine/__tests__/attendance.test.ts` verifying that 8 sessions of NSS 2-hour blocks evaluate to 8 points under `single_session` and 16 points under `per_hour`. Updated `timetable.test.ts`. All 167 unit tests pass across 16 test files.
+
 ## Remaining
-- All planned phases, user features, attendance clear options, and APK build workflows fully implemented, tested, and verified.
+- All planned phases, user features, attendance clear options, APK build workflows, and multi-hour attendance counting rules fully implemented, tested, and verified.
 
 ## Known Issues
 - None.

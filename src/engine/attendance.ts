@@ -134,34 +134,46 @@ export function computeCourseAttendanceStats(
     const courseSlots = options?.slots?.filter(s => s.course_id === record.course_id);
     const hasMultiPeriodSlot = courseSlots?.some(s => (s.weight && s.weight > 1) || s.component_type === 'lab') ?? false;
 
-    // A session is considered a lab / multi-hour block if:
+    // A session is considered a multi-hour session / lab block if:
     // - explicitly marked as lab component_type
     // - course itself is a pure lab
     // - slot duration spans >= 90 mins (or has weight > 1)
-    // - or course is lab/has multi-period slots and not an explicitly marked theory lecture
-    const isTheoryLecture = compType === 'theory' && options?.courseType === 'theory_and_lab';
-    const isLab = !isTheoryLecture && (
+    // - record has weight > 1
+    // - or course has multi-period slots
+    const isMultiPeriodOrLab =
       compType === 'lab' ||
       options?.courseType === 'lab' ||
       diffMins >= 90 ||
       (slot && slot.weight !== undefined && slot.weight > 1) ||
       (record.weight !== undefined && record.weight > 1) ||
-      hasMultiPeriodSlot
-    );
+      hasMultiPeriodSlot;
 
-    // Dynamic attendance rule evaluation for seamless, consistent updates across all days
-    if (isLab || options?.labAttendanceRule !== undefined) {
+    // Dynamic attendance rule evaluation for seamless, consistent updates across all subjects
+    if (isMultiPeriodOrLab || effectiveRule !== undefined) {
       if (effectiveRule === 'single_session') {
         weight = 1;
       } else if (effectiveRule === 'per_hour') {
-        const slotW = slot?.weight || (diffMins >= 150 ? 3 : diffMins >= 90 ? 2 : 0);
+        const slotW = slot?.weight || (diffMins >= 150 ? 3 : diffMins >= 90 ? 2 : (slot ? 1 : 0));
         const maxCourseSlotW = courseSlots?.reduce((max, s) => {
           const d = (s.start_time && s.end_time)
             ? timeToMinutes(s.end_time) - timeToMinutes(s.start_time)
             : 0;
           return Math.max(max, d >= 90 ? 2 : (s.weight || 1));
         }, 1) || 2;
-        const targetW = slotW > 1 ? slotW : Math.max(2, maxCourseSlotW);
+        let targetW: number;
+        if (slot) {
+          if (slot.component_type !== 'lab' && slotW <= 1 && diffMins < 90) {
+            targetW = 1;
+          } else {
+            targetW = Math.max(slotW, 2);
+          }
+        } else {
+          if (compType === 'theory' && options?.courseType === 'theory_and_lab') {
+            targetW = 1;
+          } else {
+            targetW = isMultiPeriodOrLab ? Math.max(2, maxCourseSlotW) : (record.weight || 1);
+          }
+        }
         weight = targetW;
       }
     }

@@ -39,7 +39,7 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
   const isIntegrated = course.type === 'theory_and_lab';
   const effectivePoints = isIntegrated
     ? (selectedComponent === 'lab' ? labAttendancePoints : 1)
-    : (course.type === 'lab' ? labAttendancePoints : 1);
+    : (labAttendancePoints || 1);
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 shadow-sm relative transition-all">

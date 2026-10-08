@@ -17,6 +17,7 @@ import { createCourse, updateCourse, deleteCourse } from '../db/repositories/cou
 import { markAttendance, syncAllCoursesAttendanceWeights } from '../db/repositories/attendance.repo';
 import { PageContainer } from '../components/layout/PageContainer';
 import { getLabAttendanceRule } from '../utils/preferences';
+import { timeToMinutes } from '../engine/timetable';
 
 export const AttendanceScreen: React.FC = () => {
   const profile = useLiveQuery(() => db.profile.filter(p => p.deleted_at === null).first());
@@ -160,18 +161,34 @@ export const AttendanceScreen: React.FC = () => {
     const globalLabRule = getLabAttendanceRule();
     const effectiveLabRule = course?.lab_attendance_rule || globalLabRule;
 
-    let weight = 1;
+    const courseSlots = slots.filter(s => s.course_id === courseId);
     const isCourseLab = course?.type === 'lab';
     const targetComp = componentType || (isCourseLab ? 'lab' : 'theory');
 
-    if (targetComp === 'lab' || isCourseLab) {
-      if (effectiveLabRule === 'single_session') {
-        weight = 1;
+    // Find any multi-period slot for this course
+    const multiSlot = courseSlots.find(s => {
+      const diffMins = (s.start_time && s.end_time)
+        ? timeToMinutes(s.end_time) - timeToMinutes(s.start_time)
+        : 0;
+      return (s.weight && s.weight > 1) || s.component_type === 'lab' || diffMins >= 90;
+    });
+
+    let weight = 1;
+    if (effectiveLabRule === 'single_session') {
+      weight = 1;
+    } else {
+      if (course?.type === 'theory_and_lab') {
+        if (targetComp === 'lab') {
+          weight = multiSlot?.weight && multiSlot.weight > 1 ? multiSlot.weight : 2;
+        } else {
+          weight = 1;
+        }
+      } else if (multiSlot) {
+        weight = multiSlot.weight && multiSlot.weight > 1 ? multiSlot.weight : 2;
+      } else if (isCourseLab) {
+        weight = 2;
       } else {
-        const labSlot = slots.find(
-          s => s.course_id === courseId && (s.component_type === 'lab' || isCourseLab)
-        );
-        weight = labSlot?.weight && labSlot.weight > 1 ? labSlot.weight : 2;
+        weight = 1;
       }
     }
 
@@ -375,12 +392,17 @@ export const AttendanceScreen: React.FC = () => {
               </div>
             ) : (
               filteredItems.map(({ course, stats, projection }) => {
-                const labSlot = slots.find(
-                  s => s.course_id === course.id && (s.component_type === 'lab' || course.type === 'lab')
-                );
+                const courseSlots = slots.filter(s => s.course_id === course.id);
+                const multiSlot = courseSlots.find(s => {
+                  const diffMins = (s.start_time && s.end_time)
+                    ? timeToMinutes(s.end_time) - timeToMinutes(s.start_time)
+                    : 0;
+                  return (s.weight && s.weight > 1) || s.component_type === 'lab' || diffMins >= 90;
+                });
                 const globalLabRule = getLabAttendanceRule();
                 const effectiveLabRule = course.lab_attendance_rule || globalLabRule;
-                const labAttendancePoints = effectiveLabRule === 'single_session' ? 1 : (labSlot?.weight || 2);
+                const naturalWeight = multiSlot?.weight && multiSlot.weight > 1 ? multiSlot.weight : (course.type === 'lab' ? 2 : 1);
+                const subjectAttendancePoints = effectiveLabRule === 'single_session' ? 1 : naturalWeight;
 
                 return (
                   <CourseAttendanceCard
@@ -388,7 +410,7 @@ export const AttendanceScreen: React.FC = () => {
                     course={course}
                     stats={stats}
                     projection={projection}
-                    labAttendancePoints={labAttendancePoints}
+                    labAttendancePoints={subjectAttendancePoints}
                     onMark={(status, component) => handleMarkCourse(course.id, status, component)}
                     onEdit={() => {
                       setEditingCourse(course);

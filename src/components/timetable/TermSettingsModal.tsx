@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Calendar, Clock, Sliders, FlaskConical } from 'lucide-react';
+import { Plus, Trash2, Calendar, Clock, Sliders } from 'lucide-react';
 import { Term, Course, Weekday, PeriodTiming, SaturdayRule, LabAttendanceRule } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import {
@@ -258,19 +258,19 @@ export const TermSettingsModal: React.FC<TermSettingsModalProps> = ({
           </div>
         </div>
 
-        {/* Lab Attendance Counting Policy */}
+        {/* Attendance Counting Policy */}
         <div className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-100 dark:border-gray-700/80 space-y-2.5">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-              <FlaskConical className="w-3.5 h-3.5 text-indigo-500" />
-              Lab Attendance Counting Policy
+              <Sliders className="w-3.5 h-3.5 text-indigo-500" />
+              Attendance Counting Policy
             </h4>
             <span className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-full">
-              {labAttendanceRule === 'single_session' ? '1 per Lab Session' : '1 per Hour / Period'}
+              {labAttendanceRule === 'single_session' ? '1 per Session' : '1 per Hour / Period'}
             </span>
           </div>
           <p className="text-[11px] text-gray-500 dark:text-gray-400">
-            How does your college evaluate attendance for multi-hour laboratory practicals?
+            How does your college evaluate attendance for multi-hour sessions, laboratory practicals, or electives (e.g. 2-hour labs or NSS)?
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
             <button
@@ -284,7 +284,7 @@ export const TermSettingsModal: React.FC<TermSettingsModalProps> = ({
             >
               <span>1 attendance per hour / period</span>
               <span className={`text-[10px] font-normal mt-0.5 ${labAttendanceRule === 'per_hour' ? 'text-indigo-100' : 'text-gray-400'}`}>
-                A 2-hour lab awards +2 attendance points
+                A 2-hour session awards +2 attendance points
               </span>
             </button>
             <button
@@ -296,9 +296,9 @@ export const TermSettingsModal: React.FC<TermSettingsModalProps> = ({
                   : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50'
               }`}
             >
-              <span>1 attendance per lab session</span>
+              <span>1 attendance per session</span>
               <span className={`text-[10px] font-normal mt-0.5 ${labAttendanceRule === 'single_session' ? 'text-indigo-100' : 'text-gray-400'}`}>
-                A 2-hour lab awards only +1 attendance point
+                A 2-hour session awards +1 attendance point
               </span>
             </button>
           </div>

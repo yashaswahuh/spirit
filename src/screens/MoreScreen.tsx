@@ -521,18 +521,18 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
               </div>
             </div>
 
-            {/* Lab Attendance Counting Policy */}
+            {/* Attendance Counting Policy */}
             <div className="pt-2.5 border-t border-gray-100 dark:border-gray-800 space-y-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block">
-                  🧪 Lab Attendance Counting Rule
+                  ⚙️ Attendance Counting Rule
                 </label>
                 <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono">
-                  {labAttendanceRule === 'single_session' ? '1 per lab session' : '1 per lab hour'}
+                  {labAttendanceRule === 'single_session' ? '1 per session' : '1 per hour / period'}
                 </span>
               </div>
               <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
-                How does your college count attendance for multi-hour labs?
+                Default rule for multi-hour sessions (e.g. labs, electives like NSS, or 2-hour blocks):
               </p>
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <button
@@ -544,9 +544,9 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
                       : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
                   }`}
                 >
-                  <span className="font-bold">1 per hour</span>
+                  <span className="font-bold">1 per hour / period</span>
                   <span className={`text-[10px] font-normal ${labAttendanceRule === 'per_hour' ? 'text-indigo-100' : 'text-gray-400'}`}>
-                    2-hr lab = 2 points
+                    2-hr session = 2 points
                   </span>
                 </button>
                 <button
@@ -558,9 +558,9 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
                       : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
                   }`}
                 >
-                  <span className="font-bold">1 per lab session</span>
+                  <span className="font-bold">1 per session</span>
                   <span className={`text-[10px] font-normal ${labAttendanceRule === 'single_session' ? 'text-indigo-100' : 'text-gray-400'}`}>
-                    2-hr lab = 1 point
+                    2-hr session = 1 point
                   </span>
                 </button>
               </div>

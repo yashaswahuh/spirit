@@ -298,6 +298,46 @@ describe('Attendance Engine', () => {
       expect(statsNssSingleSession.conducted).toBe(5);
     });
 
+    it('accurately resolves NSS elective with 8 conducted classes to 8 attendance under single_session, never inflating to 16', () => {
+      // 8 conducted sessions of NSS with records historically saved as weight 2
+      const eightNssSessions: AttendanceRecord[] = Array.from({ length: 8 }, (_, i) => ({
+        id: `nss-${i}`,
+        user_id: 'u1',
+        course_id: 'c-nss',
+        slot_id: 'slot-nss',
+        date: `2026-09-${String(i + 1).padStart(2, '0')}`,
+        status: 'present',
+        weight: 2,
+        note: null,
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      }));
+
+      const slots = [
+        { id: 'slot-nss', course_id: 'c-nss', weekday: 2, start_time: '14:00', end_time: '16:00', weight: 2, component_type: 'theory', deleted_at: null } as any
+      ];
+
+      // Under single_session: 8 classes conducted = 8 attended (NEVER inflated to 16)
+      const statsSingle = computeCourseAttendanceStats(eightNssSessions, rulesStrict, 75, {
+        courseType: 'theory',
+        labAttendanceRule: 'single_session',
+        slots,
+      });
+      expect(statsSingle.attended).toBe(8);
+      expect(statsSingle.conducted).toBe(8);
+      expect(statsSingle.percentage).toBe(100.0);
+
+      // Under per_hour: 8 2-hour classes conducted = 16 points
+      const statsPerHour = computeCourseAttendanceStats(eightNssSessions, rulesStrict, 75, {
+        courseType: 'theory',
+        labAttendanceRule: 'per_hour',
+        slots,
+      });
+      expect(statsPerHour.attended).toBe(16);
+      expect(statsPerHour.conducted).toBe(16);
+    });
+
     it('ensures lab attendance applies consistently across all days even if past records had mixed weights', () => {
       // Suppose Monday's record was stored as weight 2, and Wednesday's record was stored as weight 1
       const mixedDaysRecords: AttendanceRecord[] = [

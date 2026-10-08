@@ -756,10 +756,24 @@ describe('Timetable Engine Unit Tests', () => {
       expect(resolveSlotAttendanceWeight(slot, course, 'per_hour')).toBe(2);
     });
 
-    it('does not reduce non-lab components (theory slots preserve duration weight)', () => {
-      const theorySlot = dummySlot({ component_type: 'theory', weight: 2 });
-      const course = dummyCourse('single_session');
-      expect(resolveSlotAttendanceWeight(theorySlot, course, 'single_session')).toBe(2);
+    it('applies single_session rule to multi-period non-lab/elective slots (e.g. NSS 2-hour blocks)', () => {
+      const nssSlot = dummySlot({ component_type: 'theory', weight: 2 });
+      const singleSessionCourse = dummyCourse('single_session');
+      // Under course single_session, a 2-hour session (even if theory/elective) counts as 1 point
+      expect(resolveSlotAttendanceWeight(nssSlot, singleSessionCourse, 'per_hour')).toBe(1);
+
+      // Under per_hour course, a 2-hour session counts as 2 points
+      const perHourCourse = dummyCourse('per_hour');
+      expect(resolveSlotAttendanceWeight(nssSlot, perHourCourse, 'single_session')).toBe(2);
+
+      // Under default course (null rule), follows globalLabRule
+      const defaultCourse = dummyCourse(null);
+      expect(resolveSlotAttendanceWeight(nssSlot, defaultCourse, 'single_session')).toBe(1);
+      expect(resolveSlotAttendanceWeight(nssSlot, defaultCourse, 'per_hour')).toBe(2);
+
+      // Standard 1-period slot always counts as 1
+      const singleSlot = dummySlot({ component_type: 'theory', weight: 1 });
+      expect(resolveSlotAttendanceWeight(singleSlot, singleSessionCourse, 'single_session')).toBe(1);
     });
 
     it('integrates into resolveDaySchedule providing correct attendance_weight in resolved slots', () => {

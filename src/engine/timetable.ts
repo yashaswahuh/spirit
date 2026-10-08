@@ -39,38 +39,34 @@ export function resolveSlotAttendanceWeight(
   course?: { lab_attendance_rule?: LabAttendanceRule | null; type?: CourseType } | null,
   globalLabRule: LabAttendanceRule = 'per_hour'
 ): number {
-  if (slot.attendance_weight != null && slot.attendance_weight > 0) {
-    return slot.attendance_weight;
-  }
+  const effectiveRule = course?.lab_attendance_rule || globalLabRule;
 
   const diffMins = (slot.start_time && slot.end_time)
     ? timeToMinutes(slot.end_time) - timeToMinutes(slot.start_time)
     : 0;
-  const isMultiPeriodTime = diffMins >= 90;
-  const isLabSlot = slot.component_type === 'lab';
-  const isExplicitTheory = slot.component_type === 'theory';
-  const isLab =
-    isLabSlot ||
-    (course?.type === 'lab' && !isExplicitTheory) ||
-    (!isExplicitTheory && isMultiPeriodTime) ||
-    (!isExplicitTheory && slot.weight !== undefined && slot.weight > 1);
+  const isMultiPeriod = (slot.weight !== undefined && slot.weight > 1) || diffMins >= 90;
+  const isLab = slot.component_type === 'lab' || course?.type === 'lab';
 
-  const effectiveRule = course?.lab_attendance_rule || globalLabRule;
-
-  if (isLab) {
+  // For any multi-period session (e.g. 2-hr lab, NSS elective, or multi-period lecture) or lab:
+  if (isMultiPeriod || isLab) {
     if (effectiveRule === 'single_session') {
       return 1;
     }
-    // Under per_hour: calculate duration periods (minimum 2 for a lab or multi-hour block)
+    // Under per_hour rule:
+    if (slot.attendance_weight != null && slot.attendance_weight > 0) {
+      return slot.attendance_weight;
+    }
     if (slot.weight && slot.weight > 1) {
       return slot.weight;
     }
     if (diffMins >= 150) return 3;
     if (diffMins >= 90) return 2;
-    // Default for any lab course/session under per_hour is 2 attendance points
-    if (slot.component_type === 'lab' || course?.type === 'lab') {
-      return 2;
-    }
+    return 2;
+  }
+
+  // Standard 1-period slot
+  if (slot.attendance_weight != null && slot.attendance_weight > 0) {
+    return slot.attendance_weight;
   }
 
   return slot.weight && slot.weight > 0 ? slot.weight : 1;
