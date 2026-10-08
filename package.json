@@ -11,7 +11,7 @@
     "test:watch": "vitest",
     "cap:sync": "cap sync",
     "cap:copy": "cap copy",
-    "build:android": "tsc && vite build --base=/ && cap sync android"
+    "build:android": "node scripts/generate-android-assets.js && tsc && vite build --base=/ && cap sync android"
   },
   "dependencies": {
     "dexie": "^4.4.6",

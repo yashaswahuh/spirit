@@ -325,6 +325,16 @@
     - **Version Tagging**: Upgraded app version to `0.5.5` (versionCode: `505`) across `package.json`, Gradle configuration, and UI footers (`MoreScreen.tsx`, `UserGuideModal.tsx`).
     - **Artifact Naming**: Configured Gradle `applicationVariants` output naming to `spirit-alpha.apk` and updated CI workflow (`.github/workflows/build-android.yml`) to verify and upload `spirit-alpha.apk` as artifact `spirit-alpha`.
 
+  - **Android Native Icon & Splash Screen Branding Replacement**:
+    - **Asset Generator (`scripts/generate-android-assets.js`)**: Built an automated generator using pure Node.js buffer rasterization and zlib PNG compression to render supersampled, anti-aliased Spirit brand icons across all Android screen densities.
+    - **Adaptive Launcher Icons**:
+      - Generated full launcher icons (`ic_launcher.png`), circular launcher icons (`ic_launcher_round.png`), and adaptive transparent foregrounds (`ic_launcher_foreground.png`) across all 5 mipmap densities: `mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, and `xxxhdpi`.
+      - Replaced `ic_launcher_background.xml` with Spirit Indigo `#4F46E5`.
+      - Created vector drawable `ic_launcher_foreground.xml` in `drawable/` and `drawable-v24/` rendering the crisp Spirit mortarboard cap and golden amber tassel.
+      - Updated `mipmap-anydpi-v26/ic_launcher.xml` and `ic_launcher_round.xml` to link to the brand vector drawable.
+    - **Native Splash Screens**: Generated custom Spirit splash screens across all portrait and landscape density variants (`drawable/`, `drawable-port-*/`, `drawable-land-*/`).
+    - **Automated Build Integration**: Integrated asset generation into `package.json` `"build:android"` script to automatically update Android resources prior to Capacitor sync.
+
 ## Remaining
 - All planned phases, user features, attendance clear options, APK build workflows, and multi-hour attendance counting rules fully implemented, tested, and verified.
 
