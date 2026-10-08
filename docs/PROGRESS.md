@@ -333,10 +333,12 @@
       - Created vector drawable `ic_launcher_foreground.xml` in `drawable/` and `drawable-v24/` rendering the crisp Spirit mortarboard cap and golden amber tassel.
       - Updated `mipmap-anydpi-v26/ic_launcher.xml` and `ic_launcher_round.xml` to link to the brand vector drawable.
     - **Native Splash Screens**: Generated custom Spirit splash screens across all portrait and landscape density variants (`drawable/`, `drawable-port-*/`, `drawable-land-*/`).
-  - **Android CI Automated Release Attachment & Artifact Disambiguation**:
-    - Added GitHub Releases trigger and tag triggers (`v*`, `release: [published]`) with `permissions: contents: write` to `.github/workflows/build-android.yml`.
-    - Integrated `softprops/action-gh-release@v2` step to automatically attach `spirit-alpha.apk` directly to the GitHub Release page whenever a release or tag is published.
-    - Renamed GitHub Pages web deployment artifact from `spirit-dist` to `spirit-web-pages-dist (web-only-not-apk)` in `.github/workflows/deploy.yml` to prevent confusion between the web build output and the Android APK package.
+  - **Android Native Permissions, Local Notifications, Calendar Sync & Backup Export**:
+    - **Capacitor Plugins**: Integrated `@capacitor/local-notifications`, `@capacitor/filesystem`, and `@capacitor/share` to provide full native Android device integration.
+    - **Android Permissions**: Added `POST_NOTIFICATIONS`, `SCHEDULE_EXACT_ALARM`, `USE_EXACT_ALARM`, `WAKE_LOCK`, `VIBRATE`, `RECEIVE_BOOT_COMPLETED`, `READ_EXTERNAL_STORAGE`, and `WRITE_EXTERNAL_STORAGE` into `AndroidManifest.xml` with `requestLegacyExternalStorage="true"`. Configured `FileProvider` paths for cache, documents, and external storage in `file_paths.xml`.
+    - **Native Notifications**: Replaced browser-only `Notification` checks with Capacitor `LocalNotifications` checks and permission requests. On Android 13+, tapping "Enable Alerts" prompts the native Android OS permission modal. Added native system notification dispatch for test alerts, class reminders, and backup warnings.
+    - **Timetable & Exam Calendar Export**: Replaced web `<a>` blob download fallback with native `Filesystem` caching and `Share.share()` intent. On Android, tapping "Timetable (.ics)" or "Exams (.ics)" opens Android's system share sheet directly displaying Google Calendar, Samsung Calendar, and file save options.
+    - **Backup & CSV Export**: Updated `downloadOrShareFile` in `src/utils/backup.ts` to write through `Filesystem` and present the native Android Share sheet, enabling 1-tap backup saving to Google Drive, device storage, or messaging apps.
 
 ## Remaining
 - All planned phases, user features, attendance clear options, APK build workflows, and multi-hour attendance counting rules fully implemented, tested, and verified.

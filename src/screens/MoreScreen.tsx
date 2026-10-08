@@ -63,8 +63,10 @@ import {
 } from '../utils/preferences';
 import {
   getNotificationPermission,
+  checkNotificationPermission,
   requestNotificationPermission,
   sendTestNotification,
+  isNativePlatform,
 } from '../utils/notifications';
 import {
   generateTimetableIcs,
@@ -156,6 +158,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
     const thresholds = getBackupThresholds();
     setDaysThreshold(thresholds.daysThreshold);
     setChangesThreshold(thresholds.changesThreshold);
+    checkNotificationPermission().then(setNotifPermission);
   }, []);
 
   useEffect(() => {
@@ -231,11 +234,16 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
     try {
       const sent = await sendTestNotification();
       if (!sent && notifPermission === 'denied') {
-        alert('Notifications are blocked by your browser. Please enable notifications in your browser site permissions.');
+        alert(
+          isNativePlatform()
+            ? 'Notifications are blocked in your phone settings. Please enable notifications for Spirit in Android App Info.'
+            : 'Notifications are blocked by your browser. Please enable notifications in your browser site permissions.'
+        );
       }
     } finally {
       setIsTestingNotif(false);
-      setNotifPermission(getNotificationPermission());
+      const updated = await checkNotificationPermission();
+      setNotifPermission(updated);
     }
   };
 
@@ -620,25 +628,27 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
             <div className="bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/40 rounded-2xl p-3.5 text-xs text-indigo-900 dark:text-indigo-200 space-y-1">
               <div className="flex items-center gap-1.5 font-bold">
                 <Info className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
-                <span>Honest Scope Notice</span>
+                <span>{isNativePlatform() ? 'Native Android Reminders' : 'Honest Scope Notice'}</span>
               </div>
               <p className="text-[11px] leading-relaxed text-indigo-700 dark:text-indigo-300">
-                {t.reminders.honestScopeNotice}
+                {isNativePlatform()
+                  ? 'Native alerts run locally on your phone without external servers or accounts. You can receive system notifications for classes, exams, and backup safety.'
+                  : t.reminders.honestScopeNotice}
               </p>
             </div>
 
-            {/* Browser Notifications Controls */}
+            {/* Notifications Controls */}
             <div className="space-y-2 pt-1">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <span className="text-xs font-bold text-gray-800 dark:text-gray-200 block">
-                    {t.reminders.browserNotifications}
+                    {isNativePlatform() ? 'App Notifications & Alerts' : t.reminders.browserNotifications}
                   </span>
                   <span className="text-[11px] text-gray-400">
                     {notifPermission === 'granted'
-                      ? 'Alerts active while app is open'
+                      ? (isNativePlatform() ? 'Native system alerts enabled' : 'Alerts active while app is open')
                       : notifPermission === 'denied'
-                      ? 'Blocked in browser permissions'
+                      ? (isNativePlatform() ? 'Blocked in Android settings' : 'Blocked in browser permissions')
                       : 'Permission not yet requested'}
                   </span>
                 </div>

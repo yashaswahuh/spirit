@@ -1,4 +1,7 @@
 import { Course, TimetableSlot, Term, Task } from '../types';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 
 /**
  * RFC 5545 iCalendar (.ics) generator for Spirit
@@ -189,9 +192,47 @@ export function generateTasksIcs(params: {
  * Downloads or shares the generated .ics file
  */
 export async function downloadOrShareIcs(filename: string, icsContent: string): Promise<boolean> {
+  // If running on native platform (Android / iOS)
+  if (Capacitor.isNativePlatform()) {
+    try {
+      // 1. Write .ics file to Cache directory for Android FileProvider sharing
+      const writeResult = await Filesystem.writeFile({
+        path: filename,
+        data: icsContent,
+        directory: Directory.Cache,
+        encoding: Encoding.UTF8,
+      });
+
+      // 2. Open Android system share sheet (user can pick Google Calendar, Samsung Calendar, or Save to files)
+      await Share.share({
+        title: filename,
+        text: 'Spirit Academic Calendar export',
+        url: writeResult.uri,
+        dialogTitle: 'Import into Calendar or Save .ics',
+      });
+      return true;
+    } catch (err: any) {
+      if (err?.message?.includes('canceled') || err?.message?.includes('cancelled')) {
+        return true; // User dismissed share sheet
+      }
+      console.warn('Native Share failed for .ics, attempting Documents write fallback:', err);
+      try {
+        await Filesystem.writeFile({
+          path: filename,
+          data: icsContent,
+          directory: Directory.Documents,
+          encoding: Encoding.UTF8,
+        });
+        return true;
+      } catch (writeErr) {
+        console.error('Filesystem write to Documents failed:', writeErr);
+      }
+    }
+  }
+
   const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
 
-  // On modern mobile devices, try native Web Share API
+  // On modern mobile web devices, try native Web Share API
   if (typeof navigator !== 'undefined' && 'canShare' in navigator && navigator.canShare) {
     try {
       const file = new File([blob], filename, { type: 'text/calendar' });
