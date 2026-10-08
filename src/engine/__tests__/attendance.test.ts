@@ -355,6 +355,54 @@ describe('Attendance Engine', () => {
       expect(count).toBe(2); // s2 weight is 2
     });
   });
+
+  describe('Attendance Report and Zero-Conducted Calculations', () => {
+    it('returns conducted 0 and attended 0 when no records and zero initial balances exist', () => {
+      const stats = computeCourseAttendanceStats([], { medical_counts_as_present: false, duty_leave_counts_as_present: false }, 75, {
+        initialAttended: 0,
+        initialConducted: 0,
+      });
+
+      expect(stats.conducted).toBe(0);
+      expect(stats.attended).toBe(0);
+      expect(stats.safe_bunks).toBe(0);
+      expect(stats.must_attend).toBe(0);
+      expect(stats.is_in_danger).toBe(false);
+    });
+
+    it('correctly includes opening balances from past portal history', () => {
+      const stats = computeCourseAttendanceStats([], { medical_counts_as_present: false, duty_leave_counts_as_present: false }, 75, {
+        initialAttended: 18,
+        initialConducted: 20,
+      });
+
+      expect(stats.conducted).toBe(20);
+      expect(stats.attended).toBe(18);
+      expect(stats.percentage).toBe(90.0);
+      expect(stats.is_in_danger).toBe(false);
+      expect(stats.safe_bunks).toBe(4);
+    });
+
+    it('correctly aggregates records across historical dates within date range', () => {
+      const pastRecords: AttendanceRecord[] = [
+        { id: '1', user_id: 'u1', course_id: 'c1', slot_id: null, note: null, date: '2026-08-10', status: 'present', created_at: '', updated_at: '', deleted_at: null },
+        { id: '2', user_id: 'u1', course_id: 'c1', slot_id: null, note: null, date: '2026-08-15', status: 'absent', created_at: '', updated_at: '', deleted_at: null },
+        { id: '3', user_id: 'u1', course_id: 'c1', slot_id: null, note: null, date: '2026-09-01', status: 'present', created_at: '', updated_at: '', deleted_at: null },
+      ];
+
+      const rangeStart = '2026-08-01';
+      const rangeEnd = '2026-10-08';
+      const filtered = pastRecords.filter(r => r.date >= rangeStart && r.date <= rangeEnd);
+
+      const stats = computeCourseAttendanceStats(filtered, { medical_counts_as_present: false, duty_leave_counts_as_present: false }, 75);
+      expect(stats.conducted).toBe(3);
+      expect(stats.attended).toBe(2);
+      expect(Math.round(stats.percentage)).toBe(67);
+      expect(stats.is_in_danger).toBe(true);
+      expect(stats.must_attend).toBe(1);
+    });
+  });
 });
+
 
 

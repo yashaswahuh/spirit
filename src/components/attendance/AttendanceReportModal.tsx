@@ -23,7 +23,26 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
   const slots = useLiveQuery(() => db.timetable_slot.filter(s => s.deleted_at === null).toArray()) || [];
 
   const todayStr = new Date().toISOString().slice(0, 10);
-  const [startDate, setStartDate] = useState(activeTerm?.start_date || todayStr);
+
+  // Compute earliest boundary across active term start, recorded logs, and course tracking dates
+  const earliestDataDate = useMemo(() => {
+    let earliest = activeTerm?.start_date || '';
+    for (const r of records) {
+      if (r.date && (!earliest || r.date < earliest)) {
+        earliest = r.date;
+      }
+    }
+    for (const c of courses) {
+      if (c.tracking_start_date && (!earliest || c.tracking_start_date < earliest)) {
+        earliest = c.tracking_start_date;
+      }
+    }
+    return earliest || todayStr;
+  }, [activeTerm?.start_date, records, courses, todayStr]);
+
+  const [isCustomDate, setIsCustomDate] = useState(false);
+  const [activePreset, setActivePreset] = useState<'all' | 'month' | '30days' | '7days' | 'custom'>('all');
+  const [startDate, setStartDate] = useState(earliestDataDate);
   const [endDate, setEndDate] = useState(todayStr);
   const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
 
@@ -34,11 +53,38 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
     }
   }, [courses]);
 
+  // When earliestDataDate or activeTerm resolves, keep default full range synced if user hasn't customized
   React.useEffect(() => {
-    if (activeTerm?.start_date && !startDate) {
-      setStartDate(activeTerm.start_date);
+    if (!isCustomDate && earliestDataDate) {
+      setStartDate(earliestDataDate);
+      setEndDate(todayStr);
     }
-  }, [activeTerm]);
+  }, [earliestDataDate, isCustomDate, todayStr, isOpen]);
+
+  const handleSelectPreset = (preset: 'all' | 'month' | '30days' | '7days') => {
+    setActivePreset(preset);
+    if (preset === 'all') {
+      setIsCustomDate(false);
+      setStartDate(earliestDataDate);
+      setEndDate(todayStr);
+    } else if (preset === 'month') {
+      setIsCustomDate(true);
+      setStartDate(`${todayStr.slice(0, 7)}-01`);
+      setEndDate(todayStr);
+    } else if (preset === '30days') {
+      setIsCustomDate(true);
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      setStartDate(d.toISOString().slice(0, 10));
+      setEndDate(todayStr);
+    } else if (preset === '7days') {
+      setIsCustomDate(true);
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      setStartDate(d.toISOString().slice(0, 10));
+      setEndDate(todayStr);
+    }
+  };
 
   const toggleCourse = (courseId: string) => {
     if (selectedCourseIds.includes(courseId)) {
@@ -54,13 +100,23 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
   // Filter records by date range and selected courses
   const filteredRecords = useMemo(() => {
     return records.filter(r => {
-      if (r.date < startDate || r.date > endDate) return false;
+      if (startDate && r.date < startDate) return false;
+      if (endDate && r.date > endDate) return false;
       if (!selectedCourseIds.includes(r.course_id)) return false;
       return true;
     });
   }, [records, startDate, endDate, selectedCourseIds]);
 
   const defaultThreshold = profile?.default_attendance_threshold || 75;
+
+  // Whether opening balances should be included (full range or starts on/before earliest date)
+  const shouldIncludeInitialBalance = useMemo(() => {
+    if (!isCustomDate || activePreset === 'all') return true;
+    if (!startDate) return true;
+    if (earliestDataDate && startDate <= earliestDataDate) return true;
+    if (activeTerm?.start_date && startDate <= activeTerm.start_date) return true;
+    return false;
+  }, [isCustomDate, activePreset, startDate, earliestDataDate, activeTerm?.start_date]);
 
   // Calculate stats for each selected course
   const reportData = useMemo(() => {
@@ -75,6 +131,9 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
 
     const subjectReports = selectedCourses.map(course => {
       const courseRecords = filteredRecords.filter(r => r.course_id === course.id);
+      const courseInitialIncluded = shouldIncludeInitialBalance ||
+        (Boolean(course.tracking_start_date) && startDate <= (course.tracking_start_date || ''));
+
       const stats = computeCourseAttendanceStats(
         courseRecords,
         {
@@ -83,8 +142,9 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
         },
         course.attendance_threshold_override || defaultThreshold,
         {
-          initialAttended: startDate <= (course.tracking_start_date || activeTerm?.start_date || '') ? course.initial_attended : 0,
-          initialConducted: startDate <= (course.tracking_start_date || activeTerm?.start_date || '') ? course.initial_conducted : 0,
+          initialAttended: courseInitialIncluded ? (course.initial_attended || 0) : 0,
+          initialConducted: courseInitialIncluded ? (course.initial_conducted || 0) : 0,
+          trackingStartDate: course.tracking_start_date,
           slots,
           courseType: course.type,
           labAttendanceRule: course.lab_attendance_rule,
@@ -102,7 +162,7 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
       grandAbsent += absentCount;
       grandMedical += medicalCount;
       grandDutyLeave += dutyLeaveCount;
-      if (stats.is_in_danger) inDangerCount++;
+      if (stats.conducted > 0 && stats.is_in_danger) inDangerCount++;
 
       return {
         course,
@@ -114,8 +174,8 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
       };
     });
 
-    const grandPercentage = grandConducted > 0 ? (grandAttended / grandConducted) * 100 : 100;
-    const isOverallSafe = grandConducted === 0 || grandPercentage >= defaultThreshold;
+    const grandPercentage = grandConducted > 0 ? (grandAttended / grandConducted) * 100 : 0;
+    const isOverallSafe = grandConducted > 0 ? grandPercentage >= defaultThreshold : true;
 
     return {
       subjectReports,
@@ -128,7 +188,7 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
       isOverallSafe,
       inDangerCount,
     };
-  }, [courses, selectedCourseIds, filteredRecords, defaultThreshold, startDate, activeTerm]);
+  }, [courses, selectedCourseIds, filteredRecords, defaultThreshold, shouldIncludeInitialBalance, startDate, slots]);
 
   const handlePrint = () => {
     // Generate isolated print document in hidden iframe to guarantee no viewport clipping, no scrollbars, and full table visibility
@@ -154,13 +214,19 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
       ? `<tr><td colspan="9" style="text-align:center; padding: 24px; color: #6b7280;">No subjects selected or no records found in the specified date range.</td></tr>`
       : reportData.subjectReports.map(({ course, stats, absentCount, medicalCount, dutyLeaveCount }) => {
           const reqThreshold = course.attendance_threshold_override || defaultThreshold;
-          const statusBadge = stats.is_in_danger
+          const hasClasses = stats.conducted > 0;
+          const statusBadge = !hasClasses
+            ? `<span class="badge" style="background-color: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb;">No Classes</span>`
+            : stats.is_in_danger
             ? `<span class="badge badge-risk">⚠️ At Risk</span>`
             : `<span class="badge badge-safe">✓ Safe</span>`;
-          const guidanceText = stats.is_in_danger
+          const guidanceText = !hasClasses
+            ? `<span style="color: #9ca3af;">No classes held</span>`
+            : stats.is_in_danger
             ? `<span style="color: #dc2626; font-weight: bold;">Must Attend ${stats.must_attend}</span>`
             : `<span style="color: #059669; font-weight: 600;">Can Skip ${stats.safe_bunks}</span>`;
-          const pctColor = stats.is_in_danger ? '#dc2626' : '#059669';
+          const pctColor = !hasClasses ? '#6b7280' : stats.is_in_danger ? '#dc2626' : '#059669';
+          const pctText = hasClasses ? `${stats.percentage.toFixed(1)}%` : '—';
 
           return `
             <tr>
@@ -173,7 +239,7 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
               <td style="text-align: center; color: #dc2626; font-weight: 600;">${absentCount}</td>
               <td style="text-align: center; color: #4b5563;">${medicalCount}/${dutyLeaveCount}</td>
               <td style="text-align: center; font-weight: 800; color: ${pctColor};">
-                ${stats.conducted > 0 ? `${stats.percentage.toFixed(1)}%` : '100%'}
+                ${pctText}
               </td>
               <td style="text-align: center; color: #4b5563;">${reqThreshold}%</td>
               <td style="text-align: center;">${statusBadge}</td>
@@ -348,12 +414,14 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
           <div class="card">
             <span class="card-label">Overall Attendance</span>
             <div class="card-value">
-              <span>${reportData.grandPercentage.toFixed(1)}%</span>
-              <span class="badge ${reportData.isOverallSafe ? 'badge-safe' : 'badge-risk'}">
-                ${reportData.isOverallSafe ? '✓ Safe' : '⚠️ Detention Risk'}
-              </span>
+              <span>${reportData.grandConducted > 0 ? `${reportData.grandPercentage.toFixed(1)}%` : '—'}</span>
+              ${reportData.grandConducted === 0
+                ? `<span class="badge" style="background-color: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb;">No Classes</span>`
+                : reportData.isOverallSafe
+                ? `<span class="badge badge-safe">✓ Safe</span>`
+                : `<span class="badge badge-risk">⚠️ Detention Risk</span>`}
             </div>
-            <div class="card-sub">${reportData.inDangerCount > 0 ? `${reportData.inDangerCount} subject(s) at risk` : 'All subjects safe'}</div>
+            <div class="card-sub">${reportData.grandConducted === 0 ? 'No attendance records logged yet' : reportData.inDangerCount > 0 ? `${reportData.inDangerCount} subject(s) at risk` : 'All subjects safe'}</div>
           </div>
 
           <div class="card">
@@ -446,6 +514,30 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
             </div>
           </div>
 
+          {/* Quick Date Presets */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 mr-1">Range:</span>
+            {[
+              { id: 'all', label: 'All Term' },
+              { id: 'month', label: 'This Month' },
+              { id: '30days', label: 'Last 30 Days' },
+              { id: '7days', label: 'Last 7 Days' },
+            ].map(p => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => handleSelectPreset(p.id as any)}
+                className={`px-2.5 py-1 text-xs rounded-lg font-semibold transition-colors ${
+                  activePreset === p.id
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
           {/* Date Range Inputs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -455,7 +547,11 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
               <input
                 type="date"
                 value={startDate}
-                onChange={e => setStartDate(e.target.value)}
+                onChange={e => {
+                  setStartDate(e.target.value);
+                  setIsCustomDate(true);
+                  setActivePreset('custom');
+                }}
                 className="w-full px-3 py-1.5 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
               />
             </div>
@@ -466,7 +562,11 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
               <input
                 type="date"
                 value={endDate}
-                onChange={e => setEndDate(e.target.value)}
+                onChange={e => {
+                  setEndDate(e.target.value);
+                  setIsCustomDate(true);
+                  setActivePreset('custom');
+                }}
                 className="w-full px-3 py-1.5 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
               />
             </div>
@@ -543,18 +643,31 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
               <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block truncate">Overall Attendance</span>
               <div className="flex items-center justify-between gap-1.5 flex-wrap mt-1">
                 <span className="text-2xl font-black text-gray-900 dark:text-white print:text-black">
-                  {reportData.grandPercentage.toFixed(1)}%
+                  {reportData.grandConducted > 0 ? `${reportData.grandPercentage.toFixed(1)}%` : '—'}
                 </span>
-                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                  reportData.isOverallSafe ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-                }`}>
-                  {reportData.isOverallSafe ? (
-                    <><CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" /> Safe</>
-                  ) : (
-                    <><AlertTriangle className="w-3 h-3 text-rose-600 dark:text-rose-400 shrink-0" /> At Risk</>
-                  )}
-                </span>
+                {reportData.grandConducted === 0 ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-700">
+                    No Classes
+                  </span>
+                ) : (
+                  <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                    reportData.isOverallSafe ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                  }`}>
+                    {reportData.isOverallSafe ? (
+                      <><CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" /> Safe</>
+                    ) : (
+                      <><AlertTriangle className="w-3 h-3 text-rose-600 dark:text-rose-400 shrink-0" /> At Risk</>
+                    )}
+                  </span>
+                )}
               </div>
+              <span className="text-[10px] text-gray-400 block mt-0.5 truncate">
+                {reportData.grandConducted === 0
+                  ? 'No attendance records in range'
+                  : reportData.inDangerCount > 0
+                  ? `${reportData.inDangerCount} subject(s) at risk`
+                  : 'All subjects safe'}
+              </span>
             </div>
 
             <div className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 print:border-gray-300 print:bg-gray-50 min-w-0">
@@ -608,6 +721,7 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
                 ) : (
                   reportData.subjectReports.map(({ course, stats, absentCount, medicalCount, dutyLeaveCount }) => {
                     const reqThreshold = course.attendance_threshold_override || defaultThreshold;
+                    const hasClasses = stats.conducted > 0;
                     return (
                       <tr key={course.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 print:hover:bg-transparent">
                         <td className="py-2.5 px-3">
@@ -623,27 +737,37 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
                         <td className="py-2.5 px-2 text-center text-rose-600 font-medium">{absentCount}</td>
                         <td className="py-2.5 px-2 text-center text-gray-500">{medicalCount}/{dutyLeaveCount}</td>
                         <td className="py-2.5 px-2 text-center font-black">
-                          <span className={stats.is_in_danger ? 'text-rose-600' : 'text-emerald-600'}>
-                            {stats.conducted > 0 ? `${stats.percentage.toFixed(1)}%` : '100%'}
-                          </span>
+                          {hasClasses ? (
+                            <span className={stats.is_in_danger ? 'text-rose-600' : 'text-emerald-600'}>
+                              {stats.percentage.toFixed(1)}%
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 dark:text-gray-500 font-semibold">—</span>
+                          )}
                         </td>
                         <td className="py-2.5 px-2 text-center text-gray-500 font-medium">{reqThreshold}%</td>
                         <td className="py-2.5 px-2 text-center">
-                          {stats.is_in_danger ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                          {!hasClasses ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-500 bg-gray-100 dark:bg-gray-800 dark:text-gray-400 px-2 py-0.5 rounded border border-gray-200 dark:border-gray-700">
+                              No Classes
+                            </span>
+                          ) : stats.is_in_danger ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/50">
                               <AlertTriangle className="w-3 h-3 text-rose-600" /> At Risk
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/50">
                               <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Safe
                             </span>
                           )}
                         </td>
                         <td className="py-2.5 px-3 text-right font-medium">
-                          {stats.is_in_danger ? (
+                          {!hasClasses ? (
+                            <span className="text-gray-400 dark:text-gray-500 text-xs font-normal">No classes held</span>
+                          ) : stats.is_in_danger ? (
                             <span className="text-rose-600 font-bold">Must Attend {stats.must_attend}</span>
                           ) : (
-                            <span className="text-emerald-700 font-semibold">Can Skip {stats.safe_bunks}</span>
+                            <span className="text-emerald-700 dark:text-emerald-400 font-semibold">Can Skip {stats.safe_bunks}</span>
                           )}
                         </td>
                       </tr>

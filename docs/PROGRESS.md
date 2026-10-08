@@ -274,10 +274,34 @@
       - `HomeScreen.tsx` & `AttendanceScreen.tsx` & `CatchUpModal.tsx`: Synchronized to pass accurate weights and component types.
       - `AttendanceScreen.tsx`: Automatically runs `syncAllCoursesAttendanceWeights` on mount to reconcile historical records.
     - **Testing**: Added unit test in `attendance.test.ts` verifying that lab sessions on different weekdays with mixed historical records or slot weights consistently evaluate to 4 under `per_hour` and 2 under `single_session`. All 163 tests pass.
+  - **Attendance Report Dynamic Range & 0/100% Display Bug Fix (`AttendanceReportModal.tsx`)**:
+    - **Root Cause**:
+      1. `startDate` initialized to `activeTerm?.start_date || todayStr`. On initial render, `useLiveQuery` is asynchronous and returns `undefined`, so `startDate` immediately evaluated to `todayStr`.
+      2. The subsequent sync effect checked `if (activeTerm?.start_date && !startDate)`, which evaluated to `false` because `startDate` was already truthy (`todayStr`), permanently freezing `startDate` to today.
+      3. As a result, all historical attendance records (`r.date < todayStr`) were filtered out, leaving `filteredRecords = []` (0 conducted, 0 attended).
+      4. `stats.conducted === 0` defaulted to `percentage: 100%` and `is_in_danger: false`, falsely displaying `100.0% ✓ Safe` and "Can Skip 0" when no classes were held.
+      5. Opening balance was excluded because `startDate <= (course.tracking_start_date || activeTerm?.start_date || '')` evaluated to `false` with `todayStr`.
+    - **Fix Implementation**:
+      - `earliestDataDate`: Dynamically calculates earliest boundary across `activeTerm.start_date`, all logged attendance record dates, and subject `tracking_start_date` values.
+      - Auto-synchronizes `startDate` to `earliestDataDate` whenever `activeTerm` or records resolve, unless explicitly customized by the user.
+      - Added Quick Range Presets: **All Term**, **This Month**, **Last 30 Days**, and **Last 7 Days**.
+      - Opening balances (`initial_attended`, `initial_conducted`) are properly included for "All Term" or whenever the selected date range encompasses the semester/tracking start.
+      - **Zero-Conducted Display Guard**:
+        - Subject Table: When `stats.conducted === 0`, percentage displays `—`, status badge displays `No Classes` (neutral gray), and guidance displays `No classes held` (never green "Safe" or "Can Skip 0").
+        - Overall Attendance Card: When `grandConducted === 0`, percentage displays `0.0%` / `—`, status badge displays `No Classes` (neutral gray), and subtitle displays `No attendance records in range`.
+        - Printable PDF Iframe (`handlePrint`): Synchronized identical safeguards with full-width responsive layout.
+    - **Testing**: Added unit tests in `src/engine/__tests__/attendance.test.ts` verifying zero-conducted stats and historical date range filtering. All 166 tests passing across 16 test files.
+  - **Native Android App Readiness & Capacitor Configuration**:
+    - **Base URL Fix for Android WebView**: Replaced hardcoded `/spirit/` base path with root-relative `/` for native builds. Updated `package.json` `"build:android"` script to `tsc && vite build --base=/ && cap sync android`.
+    - **Vite Asset Links (`index.html`)**: Switched favicon and icon paths from `/spirit/favicon...` to `%BASE_URL%favicon...`, enabling seamless compilation for both GitHub Pages (`/spirit/`) and Android (`/`).
+    - **Native Theme Colors (`android/app/src/main/res/values/colors.xml`)**: Added missing `colors.xml` defining `colorPrimary (#4F46E5)`, `colorPrimaryDark (#4338CA)`, and `colorAccent (#6366F1)` to prevent Android resource compilation warnings.
+    - **Capacitor Configuration (`capacitor.config.ts`)**: Configured `server: { androidScheme: 'https', cleartext: false }` to ensure a secure origin for Dexie IndexedDB and Web APIs on Android WebView.
+    - **Automated GitHub Actions CI (`.github/workflows/build-android.yml`)**: Updated build step to run `npm run build:android` with `VITE_BASE_PATH: /` to guarantee proper APK packaging in GitHub Actions.
 
 ## Remaining
 - All planned phases, user features, attendance clear options, and APK build workflows fully implemented, tested, and verified.
 
 ## Known Issues
 - None.
+
 
