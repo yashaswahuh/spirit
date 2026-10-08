@@ -112,3 +112,84 @@ export async function deleteAttendanceRecord(id: string): Promise<void> {
     recordDataChange();
   }
 }
+
+export interface ClearAttendanceOptions {
+  courseId?: string | null; // null or undefined means all courses
+  startDate?: string | null;
+  endDate?: string | null;
+  resetOpeningBalances?: boolean;
+}
+
+/**
+ * Counts how many attendance records match the given clear filters.
+ */
+export async function countAttendanceRecordsToClear(options: ClearAttendanceOptions = {}): Promise<number> {
+  const { courseId, startDate, endDate } = options;
+
+  let query = db.attendance_record.filter(r => r.deleted_at === null);
+
+  if (courseId) {
+    query = query.filter(r => r.course_id === courseId);
+  }
+  if (startDate) {
+    query = query.filter(r => r.date >= startDate);
+  }
+  if (endDate) {
+    query = query.filter(r => r.date <= endDate);
+  }
+
+  return query.count();
+}
+
+/**
+ * Clears out ONLY logged attendance records without performing a total wipe.
+ * Leaves courses, timetable slots, grading schemes, marks, tasks, and student profiles 100% intact.
+ */
+export async function clearAttendanceRecords(
+  options: ClearAttendanceOptions = {}
+): Promise<{ deletedCount: number; resetCoursesCount: number }> {
+  const { courseId, startDate, endDate, resetOpeningBalances = false } = options;
+
+  let query = db.attendance_record.filter(r => r.deleted_at === null);
+
+  if (courseId) {
+    query = query.filter(r => r.course_id === courseId);
+  }
+  if (startDate) {
+    query = query.filter(r => r.date >= startDate);
+  }
+  if (endDate) {
+    query = query.filter(r => r.date <= endDate);
+  }
+
+  const matchingRecords = await query.toArray();
+  const recordIds = matchingRecords.map(r => r.id);
+  let resetCoursesCount = 0;
+
+  await db.transaction('rw', [db.attendance_record, db.course], async () => {
+    if (recordIds.length > 0) {
+      await db.attendance_record.bulkDelete(recordIds);
+    }
+
+    if (resetOpeningBalances) {
+      let coursesQuery = db.course.filter(c => c.deleted_at === null);
+      if (courseId) {
+        coursesQuery = coursesQuery.filter(c => c.id === courseId);
+      }
+      const targetCourses = await coursesQuery.toArray();
+      resetCoursesCount = targetCourses.length;
+      const now = new Date().toISOString();
+      for (const course of targetCourses) {
+        await db.course.update(course.id, {
+          initial_attended: 0,
+          initial_conducted: 0,
+          tracking_start_date: null,
+          updated_at: now,
+        });
+      }
+    }
+  });
+
+  recordDataChange();
+  return { deletedCount: recordIds.length, resetCoursesCount };
+}

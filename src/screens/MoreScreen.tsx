@@ -24,6 +24,7 @@ import {
   Pencil,
   BookOpen,
   ArrowRight,
+  RotateCcw,
 } from 'lucide-react';
 import { db } from '../db/dexie';
 import { seedDemoData, hasDemoData, clearDemoData, resetDatabase } from '../db/repositories/setup.repo';
@@ -32,6 +33,7 @@ import { TasksTrackerModal } from '../components/tasks/TasksTrackerModal';
 import { BackupModal } from '../components/safety/BackupModal';
 import { DeviceTransferModal } from '../components/safety/DeviceTransferModal';
 import { DeleteDataModal } from '../components/safety/DeleteDataModal';
+import { ClearAttendanceModal } from '../components/attendance/ClearAttendanceModal';
 import { InstallGuidanceModal } from '../components/safety/InstallGuidanceModal';
 import { PrivacyModal } from '../components/safety/PrivacyModal';
 import { PeriodTimingsModal } from '../components/timetable/PeriodTimingsModal';
@@ -106,6 +108,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   const [isBackupOpen, setIsBackupOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isClearAttendanceOpen, setIsClearAttendanceOpen] = useState(false);
   const [isInstallOpen, setIsInstallOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isPeriodTimingsOpen, setIsPeriodTimingsOpen] = useState(false);
@@ -892,6 +895,13 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
                 </button>
               )}
               <button
+                onClick={() => setIsClearAttendanceOpen(true)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 text-rose-700 dark:text-rose-300 font-semibold text-xs sm:text-sm hover:bg-rose-100/60 dark:hover:bg-rose-900/40 transition-colors min-h-[44px]"
+              >
+                <RotateCcw className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+                Clear Logged Attendance Data (Keep Subjects & Schedule)
+              </button>
+              <button
                 onClick={() => setIsDeleteOpen(true)}
                 className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50/40 dark:bg-red-950/20 text-red-600 dark:text-red-400 font-semibold text-xs sm:text-sm hover:bg-red-100/60 transition-colors min-h-[44px]"
               >
@@ -966,6 +976,13 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
           isOpen={isDeleteOpen}
           onClose={() => setIsDeleteOpen(false)}
           onDeleted={onResetApp}
+        />
+      )}
+
+      {isClearAttendanceOpen && (
+        <ClearAttendanceModal
+          isOpen={isClearAttendanceOpen}
+          onClose={() => setIsClearAttendanceOpen(false)}
         />
       )}
 

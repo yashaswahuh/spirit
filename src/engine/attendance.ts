@@ -269,3 +269,23 @@ export function countUnmarkedClasses(params: UnmarkedCountParams): number {
   return totalUnmarked;
 }
 
+export interface AttendanceClearFilterOptions {
+  courseId?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+}
+
+/**
+ * Pure evaluation function to determine if an attendance record matches the given clear filters.
+ */
+export function shouldClearAttendanceRecord(
+  record: { course_id: string; date: string; deleted_at?: string | null },
+  options: AttendanceClearFilterOptions = {}
+): boolean {
+  if (record.deleted_at !== null && record.deleted_at !== undefined) return false;
+  if (options.courseId && record.course_id !== options.courseId) return false;
+  if (options.startDate && record.date < options.startDate) return false;
+  if (options.endDate && record.date > options.endDate) return false;
+  return true;
+}
+

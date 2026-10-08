@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Plus, Search, Filter, CalendarCheck, Sparkles, LayoutGrid, CalendarDays, FileText } from 'lucide-react';
+import { Plus, Search, Filter, CalendarCheck, Sparkles, LayoutGrid, CalendarDays, FileText, RotateCcw } from 'lucide-react';
 import { db } from '../db/dexie';
 import { Course, AttendanceStatus } from '../types';
 import { computeCourseAttendanceStats, countUnmarkedClasses } from '../engine/attendance';
@@ -12,6 +12,7 @@ import { CatchUpModal } from '../components/attendance/CatchUpModal';
 import { WhatIfModal } from '../components/attendance/WhatIfModal';
 import { CourseCalendarModal } from '../components/attendance/CourseCalendarModal';
 import { AttendanceReportModal } from '../components/attendance/AttendanceReportModal';
+import { ClearAttendanceModal } from '../components/attendance/ClearAttendanceModal';
 import { createCourse, updateCourse, deleteCourse } from '../db/repositories/course.repo';
 import { markAttendance } from '../db/repositories/attendance.repo';
 import { PageContainer } from '../components/layout/PageContainer';
@@ -37,6 +38,8 @@ export const AttendanceScreen: React.FC = () => {
   const [isCatchUpOpen, setIsCatchUpOpen] = useState(false);
   const [isWhatIfOpen, setIsWhatIfOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isClearAttendanceOpen, setIsClearAttendanceOpen] = useState(false);
+  const [clearInitialCourseId, setClearInitialCourseId] = useState<string | null>(null);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -233,6 +236,20 @@ export const AttendanceScreen: React.FC = () => {
             Report
           </button>
 
+          {/* Clear Logs */}
+          <button
+            type="button"
+            onClick={() => {
+              setClearInitialCourseId(null);
+              setIsClearAttendanceOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all min-h-[42px]"
+            title="Clear logged attendance data without deleting subjects or timetable"
+          >
+            <RotateCcw className="w-4 h-4 text-rose-500" />
+            Clear Logs
+          </button>
+
           {/* Add Subject */}
           {activeTab === 'subjects' && (
             <button
@@ -370,6 +387,10 @@ export const AttendanceScreen: React.FC = () => {
                     }}
                     onDelete={() => handleDeleteCourse(course.id)}
                     onViewCalendar={() => setCalendarCourse(course)}
+                    onClearAttendance={() => {
+                      setClearInitialCourseId(course.id);
+                      setIsClearAttendanceOpen(true);
+                    }}
                   />
                 );
               })
@@ -417,6 +438,18 @@ export const AttendanceScreen: React.FC = () => {
         <AttendanceReportModal
           isOpen={isReportOpen}
           onClose={() => setIsReportOpen(false)}
+        />
+      )}
+
+      {/* Clear Attendance Modal */}
+      {isClearAttendanceOpen && (
+        <ClearAttendanceModal
+          isOpen={isClearAttendanceOpen}
+          onClose={() => {
+            setIsClearAttendanceOpen(false);
+            setClearInitialCourseId(null);
+          }}
+          initialCourseId={clearInitialCourseId}
         />
       )}
     </PageContainer>

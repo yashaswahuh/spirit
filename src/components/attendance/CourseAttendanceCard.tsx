@@ -10,6 +10,7 @@ interface CourseAttendanceCardProps {
   onEdit?: () => void;
   onDelete?: () => void;
   onViewCalendar?: () => void;
+  onClearAttendance?: () => void;
   projection?: {
     bestCase: number;
     worstCase: number;
@@ -26,6 +27,7 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
   onEdit,
   onDelete,
   onViewCalendar,
+  onClearAttendance,
   projection,
   labAttendancePoints = 1,
 }) => {
@@ -100,6 +102,17 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
                   className="w-full text-left px-3 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 font-medium"
                 >
                   Edit Subject
+                </button>
+              )}
+              {onClearAttendance && (
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onClearAttendance();
+                  }}
+                  className="w-full text-left px-3 py-2 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 font-medium"
+                >
+                  Clear Subject Attendance
                 </button>
               )}
               {onDelete && (

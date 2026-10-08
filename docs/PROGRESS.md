@@ -213,6 +213,38 @@
       - `Dexie.version(7)` non-destructive upgrade backfilling `lab_attendance_rule: null` on existing course records.
     - **Testing & Verification**:
       - All 156 unit and accessibility tests pass across 15 test suites with 0 errors. Clean production build verified.
+- **Automated Android APK Build & Attendance Management Fixes**:
+  - **Automated GitHub Actions Android Build (`.github/workflows/build-android.yml`)**:
+    - Created CI workflow configured for `ubuntu-latest`, Java 17, and Node 22 running on pushes/PRs to `main`, `master`, `phase-6`, and manual `workflow_dispatch`.
+    - Automatically builds web production assets, syncs Capacitor native project (`npx cap sync android`), marks `gradlew` executable, and runs `./gradlew assembleDebug`.
+    - Uploads `app-debug.apk` directly as a downloadable GitHub Actions artifact (`spirit-android-debug-apk`) with 30-day retention.
+  - **Attendance Record Schema & Button Interaction Bug Fix (`src/db/schemas.ts`)**:
+    - Fixed root cause where `component_type` in `attendanceRecordSchema` was declared without `.nullable()`, triggering Zod validation errors on `null` and silently dropping attendance marking promises.
+    - Updated `attendance.repo.ts` to match records by `component_type` when `slot_id` is null, enabling independent Theory (+1 pt) and Lab (+N pts) marking on the same calendar day.
+  - **Attendance PDF Report Overhaul (`AttendanceReportModal.tsx`)**:
+    - Replaced in-modal `window.print()` with an isolated iframe document generator featuring standard A4 styling (`@page { size: portrait; margin: 12mm 10mm; }`), 100% full table width, and zero scrollbars or column cutoffs in generated PDFs.
+    - Resolved summary card layout overflow: Safe / At Risk badge now wraps smoothly inside the "Overall Attendance" card without spilling outside card boundaries.
+    - Expanded dialog width with `4xl` responsive modal support.
+  - **Button Visual Indicator Refinement**:
+    - Replaced checkmark `✓` badge and radio dots across today's classes and day-by-day logs with solid designated color fills (Emerald for Present, Rose for Absent, Amber for Cancelled) from plain neutral defaults.
+- **Dedicated Non-Destructive Attendance Data Clearing (`ClearAttendanceModal.tsx`)**:
+  - **Granular Attendance Clear Engine (`attendance.repo.ts` & `attendance.ts`)**:
+    - Implemented `clearAttendanceRecords` and `countAttendanceRecordsToClear` in `attendance.repo.ts` running inside an atomic Dexie transaction.
+    - Clears out **ONLY logged attendance entries** without performing a total wipe. Leaves courses, timetable slots, teacher names, grading schemes, marks, exams/tasks, and student profile completely untouched.
+    - Added pure filter predicate `shouldClearAttendanceRecord` in `src/engine/attendance.ts`.
+  - **Dedicated UI Modal (`ClearAttendanceModal.tsx`)**:
+    - Multi-scope selector: Clear attendance across **All Subjects** or select a **Specific Subject**.
+    - Optional date range filter: Restrict clearing to a specific timeframe (`startDate` to `endDate`).
+    - Optional opening balance reset: Checkbox to reset initial attended/conducted counts to 0 without deleting courses.
+    - Live reactive preview banner displaying exact count of matching attendance records to be deleted.
+    - Reassuring safety guarantee callout clearly distinguishing this action from total data wipes.
+  - **Tri-Point UI Integration**:
+    - **Settings Screen (`MoreScreen.tsx`)**: Added `Clear Logged Attendance Data` button in the Local Storage & Database Management section right alongside the total wipe button.
+    - **Attendance Screen Header (`AttendanceScreen.tsx`)**: Added `Clear Logs` button in the action bar next to Report and Catch Up.
+    - **Subject Attendance Card (`CourseAttendanceCard.tsx`)**: Added `Clear Subject Attendance` directly in each course card's 3-dots dropdown menu with pre-selected subject scope.
+  - **Comprehensive Unit Tests (`clear-attendance.test.ts`)**:
+    - Added 5 unit tests verifying scope filtering, soft-deleted record exclusion, date range bounds, and preservation of course metadata.
+    - All 161 unit and accessibility tests pass across 16 test suites. Clean production build verified.
 
 ### Schema Changes & Migration History (Dexie v3 -> v4 -> v5 -> v6 -> v7)
 - **New Columns Added**:
@@ -228,7 +260,7 @@
   - `Dexie.version(7)`: Non-destructive in-place upgrade backfilling `lab_attendance_rule: null` on `Course`.
 
 ## Remaining
-- All planned phases, user features, and configurable lab attendance policies fully implemented, tested, and verified.
+- All planned phases, user features, attendance clear options, and APK build workflows fully implemented, tested, and verified.
 
 ## Known Issues
 - None.
