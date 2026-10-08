@@ -938,7 +938,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
 
           {/* About / Version Footer */}
           <div className="text-center text-[11px] text-gray-400 dark:text-gray-500 space-y-1">
-            <p className="font-semibold text-gray-600 dark:text-gray-400">Spirit v0.1.0 • Offline-First Academic Tracker</p>
+            <p className="font-semibold text-gray-600 dark:text-gray-400">Spirit v0.5.5-alpha • Offline-First Academic Tracker</p>
             <p>Built with Vite, React, TypeScript, Tailwind CSS, vitest & Dexie</p>
           </div>
         </div>

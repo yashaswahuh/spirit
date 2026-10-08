@@ -54,10 +54,17 @@ jobs:
           cd android
           ./gradlew assembleDebug --no-daemon --stacktrace
 
+      - name: Verify and ensure spirit-alpha.apk
+        run: |
+          ls -la android/app/build/outputs/apk/debug/
+          if [ ! -f android/app/build/outputs/apk/debug/spirit-alpha.apk ]; then
+            cp android/app/build/outputs/apk/debug/*.apk android/app/build/outputs/apk/debug/spirit-alpha.apk
+          fi
+
       - name: Upload Android Debug APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: spirit-android-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: spirit-alpha
+          path: android/app/build/outputs/apk/debug/spirit-alpha.apk
           retention-days: 30
 

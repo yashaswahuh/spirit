@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.spirit.academic',
+  appId: 'com.yashaswahuh.spirit',
   appName: 'Spirit',
   webDir: 'dist',
   server: {

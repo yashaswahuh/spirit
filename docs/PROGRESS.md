@@ -320,6 +320,11 @@
          - Renamed "🧪 Lab Attendance Counting Rule" to "⚙️ Attendance Counting Rule" / `Sliders` icon with inclusive wording for multi-hour sessions, practicals, and electives.
     - **Testing**: Added unit test in `src/engine/__tests__/attendance.test.ts` verifying that 8 sessions of NSS 2-hour blocks evaluate to 8 points under `single_session` and 16 points under `per_hour`. Updated `timetable.test.ts`. All 167 unit tests pass across 16 test files.
 
+  - **Android App Identification & Release Packaging Configuration**:
+    - **Package Identifier**: Configured package name to `com.yashaswahuh.spirit` across `capacitor.config.ts`, `android/app/build.gradle` (`namespace`, `applicationId`), `strings.xml`, and migrated `MainActivity.java` into package directory `android/app/src/main/java/com/yashaswahuh/spirit/`.
+    - **Version Tagging**: Upgraded app version to `0.5.5` (versionCode: `505`) across `package.json`, Gradle configuration, and UI footers (`MoreScreen.tsx`, `UserGuideModal.tsx`).
+    - **Artifact Naming**: Configured Gradle `applicationVariants` output naming to `spirit-alpha.apk` and updated CI workflow (`.github/workflows/build-android.yml`) to verify and upload `spirit-alpha.apk` as artifact `spirit-alpha`.
+
 ## Remaining
 - All planned phases, user features, attendance clear options, APK build workflows, and multi-hour attendance counting rules fully implemented, tested, and verified.
 
