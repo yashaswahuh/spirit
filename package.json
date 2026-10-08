@@ -14,6 +14,9 @@
     "build:android": "node scripts/generate-android-assets.js && tsc && vite build --base=/ && cap sync android"
   },
   "dependencies": {
+    "@capacitor/filesystem": "^8.1.4",
+    "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/share": "^8.0.3",
     "dexie": "^4.4.6",
     "dexie-react-hooks": "^4.4.0",
     "lucide-react": "^1.52.0",
