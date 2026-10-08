@@ -6,7 +6,7 @@ import type { TimetableSlot, Course } from '../types';
 import { computeCourseAttendanceStats, countUnmarkedClasses } from '../engine/attendance';
 import { canISkipTomorrow } from '../engine/whatif';
 import { getTodayTimetableSlots } from '../db/repositories/timetable.repo';
-import { markAttendance } from '../db/repositories/attendance.repo';
+import { markAttendance, deleteAttendanceRecord } from '../db/repositories/attendance.repo';
 import { resolveSlotAttendanceWeight } from '../engine/timetable';
 import { getLabAttendanceRule } from '../utils/preferences';
 import { hasDemoData, clearDemoData, seedDemoData } from '../db/repositories/setup.repo';
@@ -142,6 +142,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
     const attWeight = slot
       ? resolveSlotAttendanceWeight(slot, course, getLabAttendanceRule())
       : 1;
+
+    // Check if a record already exists with this status -> tapping again unmarks!
+    const existing = recordsToday.find(
+      r => r.course_id === courseId && (slotId ? r.slot_id === slotId : true)
+    );
+
+    if (existing && existing.status === status) {
+      await deleteAttendanceRecord(existing.id);
+      return;
+    }
+
     await markAttendance({
       course_id: courseId,
       date: todayStr,

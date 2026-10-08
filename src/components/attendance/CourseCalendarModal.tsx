@@ -16,6 +16,7 @@ import { db } from '../../db/dexie';
 import { Course, AttendanceRecord, AttendanceStatus } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import { markAttendance, deleteAttendanceRecord } from '../../db/repositories/attendance.repo';
+import { getLabAttendanceRule } from '../../utils/preferences';
 
 interface CourseCalendarModalProps {
   isOpen: boolean;
@@ -116,15 +117,19 @@ export const CourseCalendarModal: React.FC<CourseCalendarModalProps> = ({
     if (!selectedRecordDate) return;
 
     const existing = recordMap.get(selectedRecordDate);
-    if (status === 'clear') {
+    if (status === 'clear' || (existing && existing.status === status)) {
       if (existing) {
         await deleteAttendanceRecord(existing.id);
       }
     } else {
+      const globalLabRule = getLabAttendanceRule();
+      const rule = course.lab_attendance_rule || globalLabRule;
+      const weight = (course.type === 'lab' && rule === 'per_hour') ? 2 : 1;
       await markAttendance({
         course_id: course.id,
         date: selectedRecordDate,
         status,
+        weight,
       });
     }
     setSelectedRecordDate(null);
@@ -275,68 +280,69 @@ export const CourseCalendarModal: React.FC<CourseCalendarModalProps> = ({
         </div>
 
         {/* Quick Edit Sheet / Popover for Selected Date */}
-        {selectedRecordDate && (
-          <div className="p-3.5 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 space-y-2.5 animate-fade-in">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                <CheckCircle2 className="w-4 h-4 text-indigo-500" />
-                Edit Attendance for {selectedRecordDate}
-              </h4>
-              <button
-                type="button"
-                onClick={() => setSelectedRecordDate(null)}
-                className="text-xs text-gray-400 hover:text-gray-600"
-              >
-                Close
-              </button>
-            </div>
+        {selectedRecordDate && (() => {
+          const currentRec = recordMap.get(selectedRecordDate);
+          const currentStatus = currentRec?.status;
 
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-              <button
-                type="button"
-                onClick={() => handleSetStatus('present')}
-                className="py-2 px-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors min-h-[40px]"
-              >
-                Present
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSetStatus('absent')}
-                className="py-2 px-1.5 rounded-xl bg-rose-600 text-white text-xs font-bold hover:bg-rose-700 transition-colors min-h-[40px]"
-              >
-                Absent
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSetStatus('cancelled')}
-                className="py-2 px-1.5 rounded-xl bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 transition-colors min-h-[40px]"
-              >
-                Cancelled
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSetStatus('medical')}
-                className="py-2 px-1.5 rounded-xl bg-cyan-600 text-white text-xs font-bold hover:bg-cyan-700 transition-colors min-h-[40px]"
-              >
-                Medical
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSetStatus('duty_leave')}
-                className="py-2 px-1.5 rounded-xl bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 transition-colors min-h-[40px]"
-              >
-                Duty
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSetStatus('clear')}
-                className="py-2 px-1.5 rounded-xl bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-bold hover:bg-gray-300 transition-colors min-h-[40px]"
-              >
-                Clear Log
-              </button>
+          return (
+            <div className="p-3.5 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 space-y-2.5 animate-fade-in">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-indigo-500" />
+                  <span>Edit Attendance for {selectedRecordDate}</span>
+                  {currentStatus && (
+                    <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded-md">
+                      Currently: {currentStatus}
+                    </span>
+                  )}
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setSelectedRecordDate(null)}
+                  className="text-xs text-gray-400 hover:text-gray-600 cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                {[
+                  { status: 'present' as AttendanceStatus, label: 'Present', activeBg: 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-gray-900' },
+                  { status: 'absent' as AttendanceStatus, label: 'Absent', activeBg: 'bg-rose-600 text-white shadow-md ring-2 ring-rose-500 ring-offset-2 dark:ring-offset-gray-900' },
+                  { status: 'cancelled' as AttendanceStatus, label: 'Cancelled', activeBg: 'bg-amber-600 text-white shadow-md ring-2 ring-amber-500 ring-offset-2 dark:ring-offset-gray-900' },
+                  { status: 'medical' as AttendanceStatus, label: 'Medical', activeBg: 'bg-cyan-600 text-white shadow-md ring-2 ring-cyan-500 ring-offset-2 dark:ring-offset-gray-900' },
+                  { status: 'duty_leave' as AttendanceStatus, label: 'Duty', activeBg: 'bg-violet-600 text-white shadow-md ring-2 ring-violet-500 ring-offset-2 dark:ring-offset-gray-900' },
+                ].map(btn => {
+                  const isSelected = currentStatus === btn.status;
+                  return (
+                    <button
+                      key={btn.status}
+                      type="button"
+                      onClick={() => handleSetStatus(btn.status)}
+                      className={`py-2 px-1.5 rounded-xl text-xs font-bold transition-all min-h-[40px] flex items-center justify-center gap-1 cursor-pointer ${
+                        isSelected
+                          ? `${btn.activeBg} font-black scale-[1.02]`
+                          : 'bg-white dark:bg-gray-700/80 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
+                      }`}
+                      title={isSelected ? `${btn.label} (Tap to unmark)` : `Mark ${btn.label}`}
+                    >
+                      <span>{btn.label}</span>
+                      {isSelected && <span className="text-[10px] font-black">✓</span>}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => handleSetStatus('clear')}
+                  className="py-2 px-1.5 rounded-xl bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors min-h-[40px] cursor-pointer"
+                  title="Clear attendance mark for this date"
+                >
+                  Clear Log
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Term Heatmap Section */}
         <div className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-100 dark:border-gray-700 space-y-2">

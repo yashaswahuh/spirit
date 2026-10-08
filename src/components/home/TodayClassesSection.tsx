@@ -71,10 +71,19 @@ export const TodayClassesSection: React.FC<TodayClassesSectionProps> = ({
             );
             const currentStatus = currentRecord?.status;
 
+            const cardBorder =
+              currentStatus === 'present'
+                ? 'border-emerald-300 dark:border-emerald-700/80 bg-emerald-50/20 dark:bg-emerald-950/10 shadow-emerald-500/5'
+                : currentStatus === 'absent'
+                ? 'border-rose-300 dark:border-rose-700/80 bg-rose-50/20 dark:bg-rose-950/10 shadow-rose-500/5'
+                : currentStatus === 'cancelled'
+                ? 'border-amber-300 dark:border-amber-700/80 bg-amber-50/20 dark:bg-amber-950/10 shadow-amber-500/5'
+                : 'border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900';
+
             return (
               <div
                 key={slot.id}
-                className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 transition-all hover:border-gray-200 dark:hover:border-gray-700"
+                className={`rounded-2xl p-4 border shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 transition-all ${cardBorder}`}
               >
                 {/* Left: Course details, color stripe, single-line time */}
                 <div className="flex items-start gap-3 min-w-0">
@@ -133,40 +142,58 @@ export const TodayClassesSection: React.FC<TodayClassesSectionProps> = ({
                 {/* Right: Buttons below class info on narrow widths (<640px) and beside it on wider screens (>=640px) */}
                 <div className="w-full sm:w-auto grid grid-cols-3 sm:flex sm:items-center gap-2 pt-2.5 sm:pt-0 border-t sm:border-t-0 border-gray-100 dark:border-gray-800/80 flex-shrink-0">
                   <button
+                    type="button"
                     onClick={() => onMarkAttendance(course.id, slot.id, 'present')}
-                    className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold min-h-[42px] sm:min-h-[38px] transition-all focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none ${
+                    className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs min-h-[42px] sm:min-h-[38px] transition-all focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none cursor-pointer ${
                       currentStatus === 'present'
-                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200 dark:shadow-none font-bold'
-                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50'
+                        ? 'bg-emerald-600 text-white shadow-md font-black ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-gray-900 scale-[1.02]'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 font-semibold'
                     }`}
-                    title="Mark Present"
+                    title={currentStatus === 'present' ? 'Present (Tap again to clear)' : 'Mark Present'}
                   >
                     <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                    Present
+                    <span>Present</span>
+                    {currentStatus === 'present' && (
+                      <span className="ml-0.5 px-1.5 py-0.5 rounded text-[9px] bg-white/25 font-black uppercase">
+                        ✓
+                      </span>
+                    )}
                   </button>
                   <button
+                    type="button"
                     onClick={() => onMarkAttendance(course.id, slot.id, 'absent')}
-                    className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold min-h-[42px] sm:min-h-[38px] transition-all focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none ${
+                    className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs min-h-[42px] sm:min-h-[38px] transition-all focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none cursor-pointer ${
                       currentStatus === 'absent'
-                        ? 'bg-rose-600 text-white shadow-md shadow-rose-200 dark:shadow-none font-bold'
-                        : 'bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-900/50'
+                        ? 'bg-rose-600 text-white shadow-md font-black ring-2 ring-rose-500 ring-offset-2 dark:ring-offset-gray-900 scale-[1.02]'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 font-semibold'
                     }`}
-                    title="Mark Absent"
+                    title={currentStatus === 'absent' ? 'Absent (Tap again to clear)' : 'Mark Absent'}
                   >
                     <X className="w-3.5 h-3.5 stroke-[2.5]" />
-                    Absent
+                    <span>Absent</span>
+                    {currentStatus === 'absent' && (
+                      <span className="ml-0.5 px-1.5 py-0.5 rounded text-[9px] bg-white/25 font-black uppercase">
+                        ✓
+                      </span>
+                    )}
                   </button>
                   <button
+                    type="button"
                     onClick={() => onMarkAttendance(course.id, slot.id, 'cancelled')}
-                    className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-medium min-h-[42px] sm:min-h-[38px] transition-all focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:outline-none ${
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs min-h-[42px] sm:min-h-[38px] transition-all focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none cursor-pointer ${
                       currentStatus === 'cancelled'
-                        ? 'bg-gray-700 text-white shadow-sm font-bold'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'
+                        ? 'bg-amber-600 text-white shadow-md font-black ring-2 ring-amber-500 ring-offset-2 dark:ring-offset-gray-900 scale-[1.02]'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 font-semibold'
                     }`}
-                    title="Mark Class Cancelled"
+                    title={currentStatus === 'cancelled' ? 'Cancelled (Tap again to clear)' : 'Mark Class Cancelled'}
                   >
                     <Ban className="w-3.5 h-3.5" />
-                    Cancelled
+                    <span>Cancelled</span>
+                    {currentStatus === 'cancelled' && (
+                      <span className="ml-0.5 px-1.5 py-0.5 rounded text-[9px] bg-white/25 font-black uppercase">
+                        ✓
+                      </span>
+                    )}
                   </button>
                 </div>
               </div>

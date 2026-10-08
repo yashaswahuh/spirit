@@ -12,6 +12,7 @@ import {
   Course,
   CourseType,
   TimetableSlot,
+  LabAttendanceRule,
 } from '../../types';
 import {
   profileSchema,
@@ -24,6 +25,7 @@ import {
 } from '../schemas';
 import { generateUUID } from '../../utils/uuid';
 import { UGC_10_POINT_SCHEME } from '../../presets/grading-schemes';
+import { setLabAttendanceRule } from '../../utils/preferences';
 
 export interface OnboardingData {
   userName: string;
@@ -36,6 +38,7 @@ export interface OnboardingData {
   startDate: string;
   endDate: string;
   attendanceThreshold: number;
+  labAttendanceRule?: LabAttendanceRule;
   courses: Array<{
     name: string;
     code: string;
@@ -146,11 +149,16 @@ export async function saveOnboardingSetup(data: OnboardingData, isDemo = false):
     attendance_threshold: data.attendanceThreshold,
     working_days: [1, 2, 3, 4, 5, 6], // Monday to Saturday
     period_timings: defaultPeriodTimings,
+    lab_attendance_rule: data.labAttendanceRule || 'single_session',
     created_at: now,
     updated_at: now,
     deleted_at: null,
   };
   validateEntity(termSchema, term);
+
+  if (data.labAttendanceRule) {
+    setLabAttendanceRule(data.labAttendanceRule);
+  }
 
   // 4b. Initial Timetable Version
   const initialVersionId = generateUUID();

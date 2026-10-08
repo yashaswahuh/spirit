@@ -48,16 +48,27 @@ export async function markAttendance(params: MarkAttendanceParams): Promise<Atte
   const records = await db.attendance_record
     .where('course_id')
     .equals(course_id)
-    .filter(r => r.deleted_at === null && r.date === date && (slot_id ? r.slot_id === slot_id : true))
+    .filter(r => r.deleted_at === null && r.date === date)
     .toArray();
 
-  if (records.length > 0) {
-    const existing = records[0];
+  // Find matching record: exact slot_id match first, or adopt existing unslotted record
+  let existing: AttendanceRecord | undefined;
+  if (slot_id) {
+    existing = records.find(r => r.slot_id === slot_id);
+    if (!existing) {
+      existing = records.find(r => !r.slot_id);
+    }
+  } else {
+    existing = records[0];
+  }
+
+  if (existing) {
     const updated: AttendanceRecord = {
       ...existing,
       status,
-      note: note ?? existing.note,
-      weight: weight ?? existing.weight,
+      slot_id: slot_id ?? existing.slot_id,
+      note: note !== undefined ? note : existing.note,
+      weight: weight !== undefined ? weight : existing.weight,
       component_type: component_type ?? existing.component_type,
       updated_at: now,
     };
@@ -75,7 +86,7 @@ export async function markAttendance(params: MarkAttendanceParams): Promise<Atte
     slot_id,
     status,
     weight,
-    component_type,
+    component_type: component_type || null,
     note,
     created_at: now,
     updated_at: now,

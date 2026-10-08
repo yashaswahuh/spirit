@@ -197,16 +197,21 @@
         2. **Per-Subject Override** (`SubjectModal.tsx`): Dedicated lab rule dropdown on lab and integrated (theory + lab) subjects allowing individual course overrides (Default, 1 per hour, or 1 per lab session).
         3. **Slot-Level Override** (`SlotModal.tsx`): Multi-period slots automatically compute dynamic default attendance weight based on effective course/app rule while allowing manual period weight overrides.
       - **Engine Resolution (`resolveSlotAttendanceWeight`)**: Evaluates `slot.attendance_weight` > `course.lab_attendance_rule` > `globalLabRule` to determine exact attendance points awarded.
-      - Synchronized across HomeScreen quick marks, CatchUpModal bulk actions, DayPickerView logs, and timetable resolution.
-    - **Day-by-Day Log Button Selection Visibility (`DayPickerView.tsx`)**:
-      - Replaced ambiguous all-tinted button styling with high-contrast, accessible controls: unselected buttons are clean neutral gray with dark text, while the selected button features vibrant solid color, bold typography, 2px ring with offset, subtle drop shadow, and a prominent `Selected` badge pill.
-      - Added a dedicated Status Indicator Banner on every slot card displaying the current attendance mark and awarded periods with a 1-tap "Clear" button.
-      - Dynamic card border tinting (emerald, rose, amber, cyan, violet) providing instant visual feedback on marked slots.
-      - Robust fallback record matching ensuring attendance logged with or without explicit slot IDs is accurately displayed and toggleable.
+      - Synchronized across HomeScreen quick marks, CatchUpModal bulk actions, DayPickerView logs, CourseCalendarModal, and timetable resolution.
+    - **Day-by-Day Log Button Selection Visibility & Stats (`DayPickerView.tsx`)**:
+      - Fixed `useLiveQuery` dependency array by passing `[selectedDate]`, ensuring switching dates re-queries and renders attendance records reactively without stale closure locks.
+      - Added Day Attendance Summary Stats Bar at the top of the date view displaying Scheduled periods, Present points (+pts), Absent, Cancelled, and Unmarked class counts.
+      - Interactive per-slot Lab Attendance Points Selector allowing users to toggle between 1 single session (+1 attendance) and N periods (+N attendance) directly on any multi-period or lab class card.
+      - High-contrast Status Indicator Banner on marked slot cards with explicit details and 1-tap "Clear mark" button.
+      - Replaced ambiguous button styling with high-contrast, accessible controls: unselected buttons have neutral styling with an empty radio dot, while selected buttons feature vibrant solid backgrounds, active colored rings with offset, scale effect, and an active `✓` badge.
+      - Tapping the active status button unmarks/clears the class.
+    - **Course Calendar Modal (`CourseCalendarModal.tsx`)**:
+      - Updated quick edit popover buttons with active selection states, checkmarks, 1-tap unmark toggling, and lab counting rule awareness.
+    - **Onboarding Setup Wizard (`OnboardingWizard.tsx`)**:
+      - Added Lab Attendance Policy configuration in Step 5 (Attendance Setup), allowing students to set their institution's policy (`1 per lab session` vs `1 per hour / period`) upon initial app setup.
     - **Database Migration (Dexie v7)**:
       - `Dexie.version(7)` non-destructive upgrade backfilling `lab_attendance_rule: null` on existing course records.
     - **Testing & Verification**:
-      - Added unit tests for `resolveSlotAttendanceWeight` and lab counting rules in `timetable.test.ts`.
       - All 156 unit and accessibility tests pass across 15 test suites with 0 errors. Clean production build verified.
 
 ### Schema Changes & Migration History (Dexie v3 -> v4 -> v5 -> v6 -> v7)
@@ -227,6 +232,3 @@
 
 ## Known Issues
 - None.
-
-
-
