@@ -101,6 +101,7 @@ export const termSchema = baseEntitySchema.extend({
     z.literal(6),
   ])).optional(),
   period_timings: z.array(periodTimingSchema).optional(),
+  lab_attendance_rule: z.enum(['per_hour', 'single_session']).optional(),
 });
 
 export const courseSchema = baseEntitySchema.extend({
@@ -122,6 +123,7 @@ export const courseSchema = baseEntitySchema.extend({
   pass_marks: z.number().min(0).nullable().optional(),
   grade_band_override: z.array(gradeScaleEntrySchema).nullable().optional(),
   faculty: z.string().nullable().optional(),
+  lab_attendance_rule: z.enum(['per_hour', 'single_session']).nullable().optional(),
 });
 
 export const timetableVersionSchema = baseEntitySchema.extend({
@@ -185,14 +187,14 @@ export const calendarEventSchema = baseEntitySchema.extend({
 });
 
 export const attendanceRecordSchema = baseEntitySchema.extend({
-  course_id: z.string().uuid(),
+  course_id: z.string(),
   date: z.string(),
-  slot_id: z.string().uuid().nullable().optional(),
+  slot_id: z.string().nullable().optional(),
   status: z.enum(['present', 'absent', 'cancelled', 'medical', 'duty_leave', 'holiday']),
   weight: z.number().int().min(1).default(1).optional(),
-  override_id: z.string().uuid().nullable().optional(),
+  override_id: z.string().nullable().optional(),
   note: z.string().nullable().optional(),
-  component_type: z.enum(['theory', 'lab', 'theory_and_lab', 'tutorial', 'project', 'elective', 'audit']).optional(),
+  component_type: z.enum(['theory', 'lab', 'theory_and_lab', 'tutorial', 'project', 'elective', 'audit']).nullable().optional(),
 });
 
 export const assessmentComponentSchema = baseEntitySchema.extend({

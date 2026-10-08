@@ -154,16 +154,77 @@ p, span, h1, h2, h3, h4, h5, h6, button, a, label {
 /* Print CSS: Clean layout for Attendance and Academic reports */
 @media print {
   @page {
-    margin: 12mm;
-    size: auto;
+    margin: 10mm;
+    size: portrait;
   }
 
+  html,
   body {
     background-color: #ffffff !important;
     color: #000000 !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
   }
 
+  /* Unconstrain dialogs, bottom sheets, and scrollable wrappers */
+  [role="dialog"],
+  [role="dialog"] > div,
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .overflow-auto {
+    position: static !important;
+    overflow: visible !important;
+    max-height: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    height: auto !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Hide modal backdrop in print */
+  [role="dialog"] > div:first-child {
+    display: none !important;
+  }
+
+  /* Hide app navigation and interactive controls */
+  nav,
+  header,
+  footer,
+  button,
   .print\:hidden {
+    display: none !important;
+  }
+
+  /* Force tables to render cleanly across pages */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  /* Hide all scrollbars in print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    scrollbar-width: none !important;
+  }
+
+  ::-webkit-scrollbar {
     display: none !important;
   }
 }

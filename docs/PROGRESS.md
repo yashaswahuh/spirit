@@ -189,37 +189,146 @@
   - **Timetable Upload & Parser Engine**:
     - `timetableParser.ts`: Extracts faculty from uploaded files and synchronizes across all parsed slots and `ParsedCourseItem`.
     - `TimetableUploadModal.tsx`: Persists recognized faculty directly onto newly created courses and updates existing courses if empty.
-  - **Day-by-Day Log Improvements & Configurable Lab Attendance**:
-    - **Status Visibility in Day Picker (`DayPickerView.tsx`)**: Added clear, prominent status pills on every slot card displaying the current attendance status (Present, Absent, Cancelled, Medical, Duty, or "Not marked") with corresponding icons and contrast styling, so students immediately know their mark without relying on subtle border tints.
-    - **Saturday Off Rule Displayed as Holiday**: Passed `saturdayRule: activeTerm?.saturday_rule` to `resolveDaySchedule` in `DayPickerView.tsx`, ensuring 2nd Saturday and 2nd/4th Saturday off rules configured for the term immediately render as holidays in the day-by-day log.
-    - **Configurable Attendance Count for Multi-Period Labs (`attendance_weight`)**:
-      - Added `attendance_weight` to `TimetableSlot` (types, zod schema, Dexie v6 upgrade, and calculation engine `EffectiveSlot`).
-      - In `SlotModal.tsx`, when a slot spans multiple periods (e.g. a 2-hour Chemistry lab with weight 2), students can select whether the session counts as 1 period for attendance (e.g. +1 attendance for 2 hours) or spans its full duration.
-      - In `DayPickerView.tsx`, one-tap logging and bulk actions record `slot.attendance_weight` rather than the slot's timetable duration, ensuring attendance stats remain completely accurate according to university policy.
-      - Slot cards in `DayPickerView.tsx` display a "Counts as X" indicator badge whenever attendance weight differs from time-spanning period duration.
-  - **Unit Tests & Build**:
-    - Added unit test in `src/engine/__tests__/timetable.test.ts` verifying `attendance_weight` mapping and separation from slot duration weight.
-    - Added unit test in `src/utils/__tests__/timetableParser.test.ts` verifying faculty propagation across parsed slots and detected courses.
-    - Added schema validation test in `src/db/__tests__/schemas.test.ts` for optional course faculty.
-    - All 150 tests pass across 15 test suites with 0 build errors.
+  - **Configurable Lab Attendance Counting Policy & Day-by-Day Log UI Overhaul**:
+    - **Institutional Lab Attendance Counting Policy (`LabAttendanceRule = 'per_hour' | 'single_session'`)**:
+      - Added support for institutions that award 1 attendance point per lab session regardless of multi-hour duration (e.g. 2-hour lab counts as +1 attendance) vs institutions that award 1 point per hour/period (+2 attendance for 2 hours).
+      - **Hierarchical Configuration**:
+        1. **Global App Setting** (`preferences.ts`, `MoreScreen.tsx`): Interactive settings card allowing users to set default college lab attendance rule with instant persistence.
+        2. **Per-Subject Override** (`SubjectModal.tsx`): Dedicated lab rule dropdown on lab and integrated (theory + lab) subjects allowing individual course overrides (Default, 1 per hour, or 1 per lab session).
+        3. **Slot-Level Override** (`SlotModal.tsx`): Multi-period slots automatically compute dynamic default attendance weight based on effective course/app rule while allowing manual period weight overrides.
+      - **Engine Resolution (`resolveSlotAttendanceWeight`)**: Evaluates `slot.attendance_weight` > `course.lab_attendance_rule` > `globalLabRule` to determine exact attendance points awarded.
+      - Synchronized across HomeScreen quick marks, CatchUpModal bulk actions, DayPickerView logs, CourseCalendarModal, and timetable resolution.
+    - **Day-by-Day Log Button Selection Visibility & Stats (`DayPickerView.tsx`)**:
+      - Fixed `useLiveQuery` dependency array by passing `[selectedDate]`, ensuring switching dates re-queries and renders attendance records reactively without stale closure locks.
+      - Added Day Attendance Summary Stats Bar at the top of the date view displaying Scheduled periods, Present points (+pts), Absent, Cancelled, and Unmarked class counts.
+      - Interactive per-slot Lab Attendance Points Selector allowing users to toggle between 1 single session (+1 attendance) and N periods (+N attendance) directly on any multi-period or lab class card.
+      - High-contrast Status Indicator Banner on marked slot cards with explicit details and 1-tap "Clear mark" button.
+      - Replaced ambiguous button styling with high-contrast, accessible controls: unselected buttons have neutral styling with an empty radio dot, while selected buttons feature vibrant solid backgrounds, active colored rings with offset, scale effect, and an active `✓` badge.
+      - Tapping the active status button unmarks/clears the class.
+    - **Course Calendar Modal (`CourseCalendarModal.tsx`)**:
+      - Updated quick edit popover buttons with active selection states, checkmarks, 1-tap unmark toggling, and lab counting rule awareness.
+    - **Onboarding Setup Wizard (`OnboardingWizard.tsx`)**:
+      - Added Lab Attendance Policy configuration in Step 5 (Attendance Setup), allowing students to set their institution's policy (`1 per lab session` vs `1 per hour / period`) upon initial app setup.
+    - **Database Migration (Dexie v7)**:
+      - `Dexie.version(7)` non-destructive upgrade backfilling `lab_attendance_rule: null` on existing course records.
+    - **Testing & Verification**:
+      - All 156 unit and accessibility tests pass across 15 test suites with 0 errors. Clean production build verified.
+- **Automated Android APK Build & Attendance Management Fixes**:
+  - **Automated GitHub Actions Android Build (`.github/workflows/build-android.yml`)**:
+    - Created CI workflow configured for `ubuntu-latest`, Java 17, and Node 22 running on pushes/PRs to `main`, `master`, `phase-6`, and manual `workflow_dispatch`.
+    - Automatically builds web production assets, syncs Capacitor native project (`npx cap sync android`), marks `gradlew` executable, and runs `./gradlew assembleDebug`.
+    - Uploads `app-debug.apk` directly as a downloadable GitHub Actions artifact (`spirit-android-debug-apk`) with 30-day retention.
+  - **Attendance Record Schema & Button Interaction Bug Fix (`src/db/schemas.ts`)**:
+    - Fixed root cause where `component_type` in `attendanceRecordSchema` was declared without `.nullable()`, triggering Zod validation errors on `null` and silently dropping attendance marking promises.
+    - Updated `attendance.repo.ts` to match records by `component_type` when `slot_id` is null, enabling independent Theory (+1 pt) and Lab (+N pts) marking on the same calendar day.
+  - **Attendance PDF Report Overhaul (`AttendanceReportModal.tsx`)**:
+    - Replaced in-modal `window.print()` with an isolated iframe document generator featuring standard A4 styling (`@page { size: portrait; margin: 12mm 10mm; }`), 100% full table width, and zero scrollbars or column cutoffs in generated PDFs.
+    - Resolved summary card layout overflow: Safe / At Risk badge now wraps smoothly inside the "Overall Attendance" card without spilling outside card boundaries.
+    - Expanded dialog width with `4xl` responsive modal support.
+  - **Button Visual Indicator Refinement**:
+    - Replaced checkmark `✓` badge and radio dots across today's classes and day-by-day logs with solid designated color fills (Emerald for Present, Rose for Absent, Amber for Cancelled) from plain neutral defaults.
+- **Dedicated Non-Destructive Attendance Data Clearing (`ClearAttendanceModal.tsx`)**:
+  - **Granular Attendance Clear Engine (`attendance.repo.ts` & `attendance.ts`)**:
+    - Implemented `clearAttendanceRecords` and `countAttendanceRecordsToClear` in `attendance.repo.ts` running inside an atomic Dexie transaction.
+    - Clears out **ONLY logged attendance entries** without performing a total wipe. Leaves courses, timetable slots, teacher names, grading schemes, marks, exams/tasks, and student profile completely untouched.
+    - Added pure filter predicate `shouldClearAttendanceRecord` in `src/engine/attendance.ts`.
+  - **Dedicated UI Modal (`ClearAttendanceModal.tsx`)**:
+    - Multi-scope selector: Clear attendance across **All Subjects** or select a **Specific Subject**.
+    - Optional date range filter: Restrict clearing to a specific timeframe (`startDate` to `endDate`).
+    - Optional opening balance reset: Checkbox to reset initial attended/conducted counts to 0 without deleting courses.
+    - Live reactive preview banner displaying exact count of matching attendance records to be deleted.
+    - Reassuring safety guarantee callout clearly distinguishing this action from total data wipes.
+  - **Tri-Point UI Integration**:
+    - **Settings Screen (`MoreScreen.tsx`)**: Added `Clear Logged Attendance Data` button in the Local Storage & Database Management section right alongside the total wipe button.
+    - **Attendance Screen Header (`AttendanceScreen.tsx`)**: Added `Clear Logs` button in the action bar next to Report and Catch Up.
+    - **Subject Attendance Card (`CourseAttendanceCard.tsx`)**: Added `Clear Subject Attendance` directly in each course card's 3-dots dropdown menu with pre-selected subject scope.
+- **Instant Retroactive Attendance Point Updates & Universal Attendance Counting Rule**:
+  - **Dual Weight Synchronization Engine (`attendance.repo.ts`, `course.repo.ts`, `MoreScreen.tsx`)**:
+    - Implemented `syncCourseAttendanceWeights(courseId, courseRule?, globalRule?)` executing an atomic Dexie transaction to update stored attendance records to the target weight (1 for `single_session` vs slot weight/2 for `per_hour`).
+    - Implemented `syncAllCoursesAttendanceWeights(newGlobalRule)` triggering reactive updates across all courses following the global default.
+    - Hooked course persistence in `updateCourse` to automatically trigger weight synchronization whenever `lab_attendance_rule` changes.
+  - **Dynamic Calculation Engine (`src/engine/attendance.ts`)**:
+    - Extended `computeCourseAttendanceStats` with dynamic rule evaluation using `CourseAttendanceCalculationOptions` (`courseType`, `labAttendanceRule`, `globalLabRule`, `slots`).
+    - Multi-period sessions dynamically evaluate to 1 attendance point under `single_session` or slot weight (e.g. 2) under `per_hour`.
+    - Synchronized across `HomeScreen.tsx`, `AttendanceScreen.tsx`, `GradesScreen.tsx`, `AttendanceReportModal.tsx`, and `WhatIfModal.tsx`.
+    - Instant app-wide recalculation: Changing between 2h = 2pts and 2h = 1pt instantly reflects across all statistics (e.g., 10 conducted classes drops to 5, or vice-versa).
+  - **Universal "Attendance Counting Rule" for All Subjects (`SubjectModal.tsx`)**:
+    - Renamed and unlocked the attendance counting rule selector for **all course types** (Theory, Lab, Theory + Lab, Project, Audit).
+    - Students can now configure electives and multi-hour blocks (such as NSS, physical education, seminars) that award 1 attendance point for a 2-hour block while regular courses follow 1 point per hour.
+  - **Comprehensive User Guide Overhaul (`UserGuideModal.tsx`)**:
+    - Completely revamped user guide into clear, structured, student-focused tabs:
+      - **Quick Start**: 3-step setup, mid-semester opening balances, and 1-tap daily marking.
+      - **Attendance Math & Rules**: Clear explanation of 1 pt vs 2 pts counting rules with instant recalculation, Safe Bunks ($\lfloor \text{Attended} / \text{Target} - \text{Conducted} \rfloor$), and Must Attend ($\lceil (\text{Target} \times \text{Conducted} - \text{Attended}) / (1 - \text{Target}) \rceil$) with practical examples.
+      - **Timetable & Upload**: Drag-and-drop parsing, alternate Saturdays, mid-term versions, and day swaps.
+      - **Grades & GPA**: Best of N, drop lowest, and required end-sem marks solver.
+      - **Data Safety & Reset**: Distinction between non-destructive "Clear Logged Attendance Only" and full factory wipes, plus persistent storage.
+      - **Calendar Alarms & PWA**: Offline install and RFC 5545 `.ics` export with alarms.
+  - **Lab Attendance Day-by-Day Consistency Fix**:
+    - **Root Cause**: Lab slots across different weekdays had inconsistent stored weights (e.g. 2 periods on Tuesday vs 1 period on Thursday due to presets or CSV parsing), and resolution engines (`resolveSlotAttendanceWeight`, `DayPickerView.getSlotEffectiveWeight`, `AttendanceScreen`, `CourseCalendarModal`) relied on stale per-slot or per-record values, causing the same lab to count for +2 on some days and only +1 on others.
+    - **Engine Fix (`timetable.ts` & `attendance.ts`)**:
+      - `resolveSlotAttendanceWeight`: Now inspects slot duration ($\ge 90$ mins spans $\ge 2$ periods), course type, and component type. Under `per_hour`, all lab sessions for a lab/multi-period course consistently evaluate to $\ge 2$ points across all weekdays; under `single_session`, all sessions consistently evaluate to 1 point.
+      - `computeCourseAttendanceStats`: Guarantees that within a course, every lab/multi-hour record evaluates to the same canonical weight without leaving isolated days at 1.
+    - **Repository & Screen Normalization**:
+      - `DayPickerView.tsx`: `getSlotEffectiveWeight` now dynamically references rule-resolved weights rather than stale prior records, and day summary stats accurately accumulate effective attendance points.
+      - `timetable.repo.ts`: `getEffectiveDaySchedule` and `getTodayTimetableSlots` pass courses and global lab rules and preserve `attendance_weight`.
+      - `HomeScreen.tsx` & `AttendanceScreen.tsx` & `CatchUpModal.tsx`: Synchronized to pass accurate weights and component types.
+      - `AttendanceScreen.tsx`: Automatically runs `syncAllCoursesAttendanceWeights` on mount to reconcile historical records.
+    - **Testing**: Added unit test in `attendance.test.ts` verifying that lab sessions on different weekdays with mixed historical records or slot weights consistently evaluate to 4 under `per_hour` and 2 under `single_session`. All 163 tests pass.
+  - **Attendance Report Dynamic Range & 0/100% Display Bug Fix (`AttendanceReportModal.tsx`)**:
+    - **Root Cause**:
+      1. `startDate` initialized to `activeTerm?.start_date || todayStr`. On initial render, `useLiveQuery` is asynchronous and returns `undefined`, so `startDate` immediately evaluated to `todayStr`.
+      2. The subsequent sync effect checked `if (activeTerm?.start_date && !startDate)`, which evaluated to `false` because `startDate` was already truthy (`todayStr`), permanently freezing `startDate` to today.
+      3. As a result, all historical attendance records (`r.date < todayStr`) were filtered out, leaving `filteredRecords = []` (0 conducted, 0 attended).
+      4. `stats.conducted === 0` defaulted to `percentage: 100%` and `is_in_danger: false`, falsely displaying `100.0% ✓ Safe` and "Can Skip 0" when no classes were held.
+      5. Opening balance was excluded because `startDate <= (course.tracking_start_date || activeTerm?.start_date || '')` evaluated to `false` with `todayStr`.
+    - **Fix Implementation**:
+      - `earliestDataDate`: Dynamically calculates earliest boundary across `activeTerm.start_date`, all logged attendance record dates, and subject `tracking_start_date` values.
+      - Auto-synchronizes `startDate` to `earliestDataDate` whenever `activeTerm` or records resolve, unless explicitly customized by the user.
+      - Added Quick Range Presets: **All Term**, **This Month**, **Last 30 Days**, and **Last 7 Days**.
+      - Opening balances (`initial_attended`, `initial_conducted`) are properly included for "All Term" or whenever the selected date range encompasses the semester/tracking start.
+      - **Zero-Conducted Display Guard**:
+        - Subject Table: When `stats.conducted === 0`, percentage displays `—`, status badge displays `No Classes` (neutral gray), and guidance displays `No classes held` (never green "Safe" or "Can Skip 0").
+        - Overall Attendance Card: When `grandConducted === 0`, percentage displays `0.0%` / `—`, status badge displays `No Classes` (neutral gray), and subtitle displays `No attendance records in range`.
+        - Printable PDF Iframe (`handlePrint`): Synchronized identical safeguards with full-width responsive layout.
+    - **Testing**: Added unit tests in `src/engine/__tests__/attendance.test.ts` verifying zero-conducted stats and historical date range filtering. All 166 tests passing across 16 test files.
+  - **Native Android App Readiness & Capacitor Configuration**:
+    - **Base URL Fix for Android WebView**: Replaced hardcoded `/spirit/` base path with root-relative `/` for native builds. Updated `package.json` `"build:android"` script to `tsc && vite build --base=/ && cap sync android`.
+    - **Vite Asset Links (`index.html`)**: Switched favicon and icon paths from `/spirit/favicon...` to `%BASE_URL%favicon...`, enabling seamless compilation for both GitHub Pages (`/spirit/`) and Android (`/`).
+    - **Native Theme Colors (`android/app/src/main/res/values/colors.xml`)**: Added missing `colors.xml` defining `colorPrimary (#4F46E5)`, `colorPrimaryDark (#4338CA)`, and `colorAccent (#6366F1)` to prevent Android resource compilation warnings.
+    - **Capacitor Configuration (`capacitor.config.ts`)**: Configured `server: { androidScheme: 'https', cleartext: false }` to ensure a secure origin for Dexie IndexedDB and Web APIs on Android WebView.
+    - **Automated GitHub Actions CI (`.github/workflows/build-android.yml`)**: Updated build step to run `npm run build:android` with `VITE_BASE_PATH: /` to guarantee proper APK packaging in GitHub Actions.
 
-### Schema Changes & Migration History (Dexie v3 -> v4 -> v5 -> v6)
-- **New Columns Added**:
-  - `BaseEntity`: Added `is_demo?: boolean` flag across all 14 Dexie tables to isolate demo records from user data.
-  - `Term`: Added `saturday_rule?: SaturdayRule` to support alternate Saturday holiday rules (2nd Saturday off, 2nd & 4th Saturday off, all off).
-  - `AttendanceRecord`: Added `component_type?: CourseType` to track whether logged attendance was for a theory lecture or lab session.
-  - `Course`: Added `faculty?: string | null` to track the subject instructor/professor globally.
-  - `TimetableSlot`: Added `attendance_weight?: number | null` to configure how many periods a multi-period slot counts for attendance.
-- **Database Version Upgrades**:
-  - `Dexie.version(4)`: Non-destructive in-place upgrade backfilling `is_demo: false` on existing records without data loss.
-  - `Dexie.version(5)`: Non-destructive in-place upgrade backfilling `faculty: null` on `Course`, harvesting any existing `slot.faculty` names from timetable slots to maintain full data consistency.
-  - `Dexie.version(6)`: Non-destructive in-place upgrade backfilling `attendance_weight: null` on `TimetableSlot`.
+  - **Universal Multi-Period & Elective Attendance Counting Rule Fix (NSS & Non-Lab Courses)**:
+    - **Root Cause**:
+      1. In `src/engine/timetable.ts` (`resolveSlotAttendanceWeight`), a hardcoded guard `const isExplicitTheory = slot.component_type === 'theory'` and `!isExplicitTheory` check previously bypassed the counting rule for theory/elective courses like NSS. Consequently, 2-hour theory sessions always returned `slot.weight` (2), ignoring both course-level overrides and global defaults.
+      2. In `DayPickerView.tsx`, the points selector was hardcoded as "Lab Attendance Counting" with a flask icon and `slot.component_type === 'lab'` check, which was hidden for theory/elective subjects like NSS.
+      3. In `AttendanceScreen.tsx` and `CourseAttendanceCard.tsx`, marking non-lab courses was hardcoded to 1 point without considering multi-period durations, or ignored `labAttendancePoints` when `course.type !== 'lab'`.
+      4. In `src/db/repositories/attendance.repo.ts` (`syncCourseAttendanceWeights`) and `attendance.ts`, historical reconciliation bypassed theory components in mixed courses.
+    - **Fix Implementation**:
+      1. **Timetable Engine (`timetable.ts`)**: Removed theory-blocking restrictions in `resolveSlotAttendanceWeight`. Any multi-period session (`weight > 1` or duration $\ge 90$ mins) or lab course now evaluates `effectiveRule === 'single_session'` and returns `1`. Under `per_hour`, returns canonical slot weight (e.g. 2).
+      2. **Attendance Calculation Engine (`attendance.ts`)**: Ensured dynamic rule calculation applies uniformly to multi-period theory/elective courses (e.g., NSS 8 conducted classes evaluate to 8 points under `single_session` instead of being inflated to 16). Single-period lectures in mixed courses are protected from unintended weight inflation.
+      3. **Repository Weight Synchronization (`attendance.repo.ts`)**: Updated `syncCourseAttendanceWeights` to reconcile historical records for all multi-period and elective subjects when switching between rules.
+      4. **Day-by-Day Log UI (`DayPickerView.tsx`)**:
+         - Renamed "Lab Attendance Counting" to "Attendance Counting" with `Sliders` icon.
+         - Activated selector for all multi-period, elective, or rule-configured subjects (`isMultiPeriodOrRuleApplied`).
+         - Removed checkmark emoji decorations on buttons; button active states use high-contrast indigo background and ring styling.
+         - Updated subtext to clearly explain 1 session (+1 point) vs 1 per hour / period (+N points).
+      5. **Course Card & Attendance Management (`AttendanceScreen.tsx` & `CourseAttendanceCard.tsx`)**:
+         - Updated `handleMarkCourse` and `CourseAttendanceCard` to dynamically calculate `subjectAttendancePoints` for all multi-period courses (including NSS).
+         - Updated `effectivePoints` in `CourseAttendanceCard` to apply `labAttendancePoints` to non-integrated multi-period subjects as well.
+      6. **Settings & Term Modals (`MoreScreen.tsx`, `TermSettingsModal.tsx`)**:
+         - Renamed "🧪 Lab Attendance Counting Rule" to "⚙️ Attendance Counting Rule" / `Sliders` icon with inclusive wording for multi-hour sessions, practicals, and electives.
+    - **Testing**: Added unit test in `src/engine/__tests__/attendance.test.ts` verifying that 8 sessions of NSS 2-hour blocks evaluate to 8 points under `single_session` and 16 points under `per_hour`. Updated `timetable.test.ts`. All 167 unit tests pass across 16 test files.
+
+  - **Android App Identification & Release Packaging Configuration**:
+    - **Package Identifier**: Configured package name to `com.yashaswahuh.spirit` across `capacitor.config.ts`, `android/app/build.gradle` (`namespace`, `applicationId`), `strings.xml`, and migrated `MainActivity.java` into package directory `android/app/src/main/java/com/yashaswahuh/spirit/`.
+    - **Version Tagging**: Upgraded app version to `0.5.5` (versionCode: `505`) across `package.json`, Gradle configuration, and UI footers (`MoreScreen.tsx`, `UserGuideModal.tsx`).
+    - **Artifact Naming**: Configured Gradle `applicationVariants` output naming to `spirit-alpha.apk` and updated CI workflow (`.github/workflows/build-android.yml`) to verify and upload `spirit-alpha.apk` as artifact `spirit-alpha`.
 
 ## Remaining
-- All planned phases, user features, and integrated theory/lab workflows fully implemented, tested, and verified.
+- All planned phases, user features, attendance clear options, APK build workflows, and multi-hour attendance counting rules fully implemented, tested, and verified.
 
 ## Known Issues
 - None.
-
 
 

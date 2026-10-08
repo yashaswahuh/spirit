@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Course, CourseType } from '../../types';
+import { Course, CourseType, LabAttendanceRule } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import { CourseColorPicker } from '../common/CourseColorPicker';
 
@@ -19,6 +19,7 @@ interface SubjectModalProps {
     initial_conducted?: number;
     tracking_start_date?: string | null;
     faculty?: string | null;
+    lab_attendance_rule?: LabAttendanceRule | null;
   }) => void;
   initialCourse?: Course;
 }
@@ -34,6 +35,9 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
   const [faculty, setFaculty] = useState(initialCourse?.faculty || '');
   const [credits, setCredits] = useState(initialCourse?.credits ?? 4);
   const [type, setType] = useState<CourseType>(initialCourse?.type || 'theory');
+  const [labAttendanceRule, setLabAttendanceRule] = useState<LabAttendanceRule | null>(
+    initialCourse?.lab_attendance_rule ?? null
+  );
   const [color, setColor] = useState(initialCourse?.color || '#6366f1');
   const [thresholdOverride, setThresholdOverride] = useState<string>(
     initialCourse?.attendance_threshold_override?.toString() || ''
@@ -61,6 +65,7 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
       setFaculty(initialCourse.faculty || '');
       setCredits(initialCourse.credits);
       setType(initialCourse.type);
+      setLabAttendanceRule(initialCourse.lab_attendance_rule ?? null);
       setColor(initialCourse.color);
       setThresholdOverride(initialCourse.attendance_threshold_override?.toString() || '');
       setMedicalCounts(initialCourse.medical_counts_as_present);
@@ -74,6 +79,7 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
       setFaculty('');
       setCredits(4);
       setType('theory');
+      setLabAttendanceRule(null);
       setColor('#6366f1');
       setThresholdOverride('');
       setMedicalCounts(false);
@@ -101,6 +107,7 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
       initial_attended: Math.max(0, Number(initialAttended) || 0),
       initial_conducted: Math.max(0, Number(initialConducted) || 0),
       tracking_start_date: trackingStartDate ? trackingStartDate : null,
+      lab_attendance_rule: labAttendanceRule,
     });
     onClose();
   };
@@ -212,6 +219,33 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
               className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[44px]"
             />
           </div>
+        </div>
+
+        {/* Attendance Counting Rule (Available for all subjects e.g. labs, electives like NSS, multi-period classes) */}
+        <div className="p-3.5 rounded-2xl bg-sky-50/70 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/50 space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-sky-900 dark:text-sky-200">
+              Attendance Counting Rule
+            </label>
+            <span className="text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-sky-100 dark:bg-sky-900/60 px-2 py-0.5 rounded-full">
+              {labAttendanceRule === null ? 'Default from Settings' : labAttendanceRule === 'single_session' ? '1 per Session' : '1 per Hour / Period'}
+            </span>
+          </div>
+          <p className="text-[11px] text-sky-700 dark:text-sky-400">
+            Configure how multi-hour periods, practicals, or electives (e.g. 2-hour labs or NSS) count toward attendance in this subject.
+          </p>
+          <select
+            value={labAttendanceRule ?? ''}
+            onChange={e => {
+              const val = e.target.value;
+              setLabAttendanceRule(val === 'per_hour' || val === 'single_session' ? val : null);
+            }}
+            className="w-full px-3 py-2 text-xs rounded-xl border border-sky-200 dark:border-sky-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-sky-500 min-h-[40px]"
+          >
+            <option value="">⚙️ Default (Follow App Settings)</option>
+            <option value="per_hour">⏱️ 1 attendance per hour / period (e.g. 2hr session = 2 attendance points)</option>
+            <option value="single_session">🎯 1 attendance per session (e.g. 2hr session = 1 attendance point)</option>
+          </select>
         </div>
 
         <CourseColorPicker

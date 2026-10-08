@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
 import { Plus, Trash2, Calendar, Clock, Sliders } from 'lucide-react';
-import { Term, Course, Weekday, PeriodTiming, SaturdayRule } from '../../types';
+import { Term, Course, Weekday, PeriodTiming, SaturdayRule, LabAttendanceRule } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
-import { setPeriodTimings as setGlobalPeriodTimings, PeriodTimingConfig } from '../../utils/preferences';
+import {
+  setPeriodTimings as setGlobalPeriodTimings,
+  PeriodTimingConfig,
+  getLabAttendanceRule,
+  setLabAttendanceRule as setGlobalLabRule,
+} from '../../utils/preferences';
 
 interface TermSettingsModalProps {
   isOpen: boolean;
@@ -16,6 +21,7 @@ interface TermSettingsModalProps {
     working_days: Weekday[];
     period_timings: PeriodTiming[];
     saturday_rule?: SaturdayRule;
+    lab_attendance_rule?: LabAttendanceRule;
   }) => Promise<void>;
   onUpdateCourseThreshold: (courseId: string, threshold: number | null) => Promise<void>;
 }
@@ -50,6 +56,9 @@ export const TermSettingsModal: React.FC<TermSettingsModalProps> = ({
   const [attendanceThreshold, setAttendanceThreshold] = useState(term.attendance_threshold || 75);
   const [workingDays, setWorkingDays] = useState<Weekday[]>(term.working_days || [1, 2, 3, 4, 5, 6]);
   const [saturdayRule, setSaturdayRule] = useState<SaturdayRule>(term.saturday_rule || 'second_saturday_off');
+  const [labAttendanceRule, setLabAttendanceRule] = useState<LabAttendanceRule>(
+    term.lab_attendance_rule || getLabAttendanceRule()
+  );
   const [periodTimings, setPeriodTimings] = useState<PeriodTiming[]>(term.period_timings || []);
   const [courseThresholds, setCourseThresholds] = useState<Record<string, number | null>>(
     Object.fromEntries(courses.map(c => [c.id, c.attendance_threshold_override]))
@@ -99,7 +108,11 @@ export const TermSettingsModal: React.FC<TermSettingsModalProps> = ({
         working_days: workingDays,
         period_timings: periodTimings,
         saturday_rule: saturdayRule,
+        lab_attendance_rule: labAttendanceRule,
       });
+
+      // Synchronize lab rule to global preferences
+      setGlobalLabRule(labAttendanceRule);
 
       // Sync non-break teaching periods to preferences
       const configTimings: PeriodTimingConfig[] = periodTimings
@@ -242,6 +255,52 @@ export const TermSettingsModal: React.FC<TermSettingsModalProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+
+        {/* Attendance Counting Policy */}
+        <div className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-100 dark:border-gray-700/80 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+              <Sliders className="w-3.5 h-3.5 text-indigo-500" />
+              Attendance Counting Policy
+            </h4>
+            <span className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-full">
+              {labAttendanceRule === 'single_session' ? '1 per Session' : '1 per Hour / Period'}
+            </span>
+          </div>
+          <p className="text-[11px] text-gray-500 dark:text-gray-400">
+            How does your college evaluate attendance for multi-hour sessions, laboratory practicals, or electives (e.g. 2-hour labs or NSS)?
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+            <button
+              type="button"
+              onClick={() => setLabAttendanceRule('per_hour')}
+              className={`p-3 rounded-xl border text-xs font-bold text-left transition-all flex flex-col justify-between min-h-[52px] ${
+                labAttendanceRule === 'per_hour'
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              <span>1 attendance per hour / period</span>
+              <span className={`text-[10px] font-normal mt-0.5 ${labAttendanceRule === 'per_hour' ? 'text-indigo-100' : 'text-gray-400'}`}>
+                A 2-hour session awards +2 attendance points
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setLabAttendanceRule('single_session')}
+              className={`p-3 rounded-xl border text-xs font-bold text-left transition-all flex flex-col justify-between min-h-[52px] ${
+                labAttendanceRule === 'single_session'
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                  : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              <span>1 attendance per session</span>
+              <span className={`text-[10px] font-normal mt-0.5 ${labAttendanceRule === 'single_session' ? 'text-indigo-100' : 'text-gray-400'}`}>
+                A 2-hour session awards +1 attendance point
+              </span>
+            </button>
           </div>
         </div>
 

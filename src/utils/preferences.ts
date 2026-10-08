@@ -3,6 +3,7 @@ export type AccentPreference = 'indigo' | 'emerald' | 'violet' | 'rose' | 'amber
 export type WeekStartDay = 1 | 0; // 1 = Monday, 0 = Sunday
 export type TimeFormat = '12h' | '24h';
 export type DateFormatPattern = 'DD/MM/YYYY' | 'YYYY-MM-DD' | 'MM/DD/YYYY';
+export type LabAttendanceRule = 'per_hour' | 'single_session';
 
 export interface PeriodTimingConfig {
   period: number;
@@ -107,5 +108,13 @@ export const getPeriodTimings = (): PeriodTimingConfig[] => {
 
 export const setPeriodTimings = (timings: PeriodTimingConfig[]): void => {
   localStorage.setItem('spirit_period_timings', JSON.stringify(timings));
+};
+
+export const getLabAttendanceRule = (): LabAttendanceRule => {
+  return (localStorage.getItem('spirit_lab_attendance_rule') as LabAttendanceRule) || 'per_hour';
+};
+
+export const setLabAttendanceRule = (rule: LabAttendanceRule): void => {
+  localStorage.setItem('spirit_lab_attendance_rule', rule);
 };
 

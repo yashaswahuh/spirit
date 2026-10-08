@@ -255,6 +255,120 @@ describe('Attendance Engine', () => {
       expect(stats.lab?.conducted).toBe(2);
       expect(stats.lab?.percentage).toBe(100.0);
     });
+
+    it('instantly and retroactively recalculates 2-hour sessions between 1 pt per session (single_session) and 2 pts per session (per_hour)', () => {
+      // 5 sessions of a 2-hour lab or elective (like NSS)
+      // Stored records have weight 2 (from a 2-hour slot with weight: 2)
+      const fiveLabSessions: AttendanceRecord[] = [
+        { id: 'l1', user_id: 'u1', course_id: 'c1', slot_id: 'slot1', date: '2026-10-01', status: 'present', weight: 2, note: null, created_at: '', updated_at: '', deleted_at: null },
+        { id: 'l2', user_id: 'u1', course_id: 'c1', slot_id: 'slot1', date: '2026-10-08', status: 'present', weight: 2, note: null, created_at: '', updated_at: '', deleted_at: null },
+        { id: 'l3', user_id: 'u1', course_id: 'c1', slot_id: 'slot1', date: '2026-10-15', status: 'present', weight: 2, note: null, created_at: '', updated_at: '', deleted_at: null },
+        { id: 'l4', user_id: 'u1', course_id: 'c1', slot_id: 'slot1', date: '2026-10-22', status: 'present', weight: 2, note: null, created_at: '', updated_at: '', deleted_at: null },
+        { id: 'l5', user_id: 'u1', course_id: 'c1', slot_id: 'slot1', date: '2026-10-29', status: 'present', weight: 2, note: null, created_at: '', updated_at: '', deleted_at: null },
+      ];
+
+      // Under per_hour: each 2hr session = 2 pts. 5 sessions = 10 attended / 10 conducted
+      const statsPerHour = computeCourseAttendanceStats(fiveLabSessions, rulesStrict, 75, {
+        courseType: 'lab',
+        labAttendanceRule: 'per_hour',
+      });
+      expect(statsPerHour.attended).toBe(10);
+      expect(statsPerHour.conducted).toBe(10);
+      expect(statsPerHour.percentage).toBe(100.0);
+
+      // Under single_session: each 2hr session = 1 pt. 5 sessions = 5 attended / 5 conducted
+      const statsSingleSession = computeCourseAttendanceStats(fiveLabSessions, rulesStrict, 75, {
+        courseType: 'lab',
+        labAttendanceRule: 'single_session',
+      });
+      expect(statsSingleSession.attended).toBe(5);
+      expect(statsSingleSession.conducted).toBe(5);
+      expect(statsSingleSession.percentage).toBe(100.0);
+
+      // Also works for an elective course (like NSS, courseType: 'theory' or 'audit') with slot info
+      const slots = [
+        { id: 'slot1', course_id: 'c1', weekday: 4, start_time: '14:00', end_time: '16:00', weight: 2, deleted_at: null } as any
+      ];
+      const statsNssSingleSession = computeCourseAttendanceStats(fiveLabSessions, rulesStrict, 75, {
+        courseType: 'theory',
+        labAttendanceRule: 'single_session',
+        slots,
+      });
+      expect(statsNssSingleSession.attended).toBe(5);
+      expect(statsNssSingleSession.conducted).toBe(5);
+    });
+
+    it('accurately resolves NSS elective with 8 conducted classes to 8 attendance under single_session, never inflating to 16', () => {
+      // 8 conducted sessions of NSS with records historically saved as weight 2
+      const eightNssSessions: AttendanceRecord[] = Array.from({ length: 8 }, (_, i) => ({
+        id: `nss-${i}`,
+        user_id: 'u1',
+        course_id: 'c-nss',
+        slot_id: 'slot-nss',
+        date: `2026-09-${String(i + 1).padStart(2, '0')}`,
+        status: 'present',
+        weight: 2,
+        note: null,
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      }));
+
+      const slots = [
+        { id: 'slot-nss', course_id: 'c-nss', weekday: 2, start_time: '14:00', end_time: '16:00', weight: 2, component_type: 'theory', deleted_at: null } as any
+      ];
+
+      // Under single_session: 8 classes conducted = 8 attended (NEVER inflated to 16)
+      const statsSingle = computeCourseAttendanceStats(eightNssSessions, rulesStrict, 75, {
+        courseType: 'theory',
+        labAttendanceRule: 'single_session',
+        slots,
+      });
+      expect(statsSingle.attended).toBe(8);
+      expect(statsSingle.conducted).toBe(8);
+      expect(statsSingle.percentage).toBe(100.0);
+
+      // Under per_hour: 8 2-hour classes conducted = 16 points
+      const statsPerHour = computeCourseAttendanceStats(eightNssSessions, rulesStrict, 75, {
+        courseType: 'theory',
+        labAttendanceRule: 'per_hour',
+        slots,
+      });
+      expect(statsPerHour.attended).toBe(16);
+      expect(statsPerHour.conducted).toBe(16);
+    });
+
+    it('ensures lab attendance applies consistently across all days even if past records had mixed weights', () => {
+      // Suppose Monday's record was stored as weight 2, and Wednesday's record was stored as weight 1
+      const mixedDaysRecords: AttendanceRecord[] = [
+        { id: 'mon', user_id: 'u1', course_id: 'c-lab', slot_id: 's-mon', date: '2026-10-05', status: 'present', weight: 2, note: null, created_at: '', updated_at: '', deleted_at: null },
+        { id: 'wed', user_id: 'u1', course_id: 'c-lab', slot_id: 's-wed', date: '2026-10-07', status: 'present', weight: 1, note: null, created_at: '', updated_at: '', deleted_at: null },
+      ];
+
+      const slots = [
+        { id: 's-mon', course_id: 'c-lab', weekday: 1, start_time: '14:00', end_time: '16:00', weight: 2, component_type: 'lab', deleted_at: null } as any,
+        // Wednesday slot was accidentally saved with weight 1, but spans 2 hours (14:00 to 16:00)
+        { id: 's-wed', course_id: 'c-lab', weekday: 3, start_time: '14:00', end_time: '16:00', weight: 1, component_type: 'lab', deleted_at: null } as any,
+      ];
+
+      // Under per_hour: both Monday and Wednesday MUST consistently award 2 points each -> total 4
+      const statsPerHour = computeCourseAttendanceStats(mixedDaysRecords, rulesStrict, 75, {
+        courseType: 'lab',
+        labAttendanceRule: 'per_hour',
+        slots,
+      });
+      expect(statsPerHour.attended).toBe(4);
+      expect(statsPerHour.conducted).toBe(4);
+
+      // Under single_session: both Monday and Wednesday MUST consistently award 1 point each -> total 2
+      const statsSingle = computeCourseAttendanceStats(mixedDaysRecords, rulesStrict, 75, {
+        courseType: 'lab',
+        labAttendanceRule: 'single_session',
+        slots,
+      });
+      expect(statsSingle.attended).toBe(2);
+      expect(statsSingle.conducted).toBe(2);
+    });
   });
 
   describe('countUnmarkedClasses', () => {
@@ -281,6 +395,54 @@ describe('Attendance Engine', () => {
       expect(count).toBe(2); // s2 weight is 2
     });
   });
+
+  describe('Attendance Report and Zero-Conducted Calculations', () => {
+    it('returns conducted 0 and attended 0 when no records and zero initial balances exist', () => {
+      const stats = computeCourseAttendanceStats([], { medical_counts_as_present: false, duty_leave_counts_as_present: false }, 75, {
+        initialAttended: 0,
+        initialConducted: 0,
+      });
+
+      expect(stats.conducted).toBe(0);
+      expect(stats.attended).toBe(0);
+      expect(stats.safe_bunks).toBe(0);
+      expect(stats.must_attend).toBe(0);
+      expect(stats.is_in_danger).toBe(false);
+    });
+
+    it('correctly includes opening balances from past portal history', () => {
+      const stats = computeCourseAttendanceStats([], { medical_counts_as_present: false, duty_leave_counts_as_present: false }, 75, {
+        initialAttended: 18,
+        initialConducted: 20,
+      });
+
+      expect(stats.conducted).toBe(20);
+      expect(stats.attended).toBe(18);
+      expect(stats.percentage).toBe(90.0);
+      expect(stats.is_in_danger).toBe(false);
+      expect(stats.safe_bunks).toBe(4);
+    });
+
+    it('correctly aggregates records across historical dates within date range', () => {
+      const pastRecords: AttendanceRecord[] = [
+        { id: '1', user_id: 'u1', course_id: 'c1', slot_id: null, note: null, date: '2026-08-10', status: 'present', created_at: '', updated_at: '', deleted_at: null },
+        { id: '2', user_id: 'u1', course_id: 'c1', slot_id: null, note: null, date: '2026-08-15', status: 'absent', created_at: '', updated_at: '', deleted_at: null },
+        { id: '3', user_id: 'u1', course_id: 'c1', slot_id: null, note: null, date: '2026-09-01', status: 'present', created_at: '', updated_at: '', deleted_at: null },
+      ];
+
+      const rangeStart = '2026-08-01';
+      const rangeEnd = '2026-10-08';
+      const filtered = pastRecords.filter(r => r.date >= rangeStart && r.date <= rangeEnd);
+
+      const stats = computeCourseAttendanceStats(filtered, { medical_counts_as_present: false, duty_leave_counts_as_present: false }, 75);
+      expect(stats.conducted).toBe(3);
+      expect(stats.attended).toBe(2);
+      expect(Math.round(stats.percentage)).toBe(67);
+      expect(stats.is_in_danger).toBe(true);
+      expect(stats.must_attend).toBe(1);
+    });
+  });
 });
+
 
 

@@ -4,6 +4,7 @@ import { Printer, CheckCircle2, AlertTriangle, Filter } from 'lucide-react';
 import { db } from '../../db/dexie';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import { computeCourseAttendanceStats } from '../../engine/attendance';
+import { getLabAttendanceRule } from '../../utils/preferences';
 
 interface AttendanceReportModalProps {
   isOpen: boolean;
@@ -19,9 +20,29 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
   const activeTerm = useLiveQuery(() => db.term.filter(t => t.deleted_at === null && t.status === 'ongoing').first());
   const courses = useLiveQuery(() => db.course.filter(c => c.deleted_at === null).toArray()) || [];
   const records = useLiveQuery(() => db.attendance_record.filter(r => r.deleted_at === null).toArray()) || [];
+  const slots = useLiveQuery(() => db.timetable_slot.filter(s => s.deleted_at === null).toArray()) || [];
 
   const todayStr = new Date().toISOString().slice(0, 10);
-  const [startDate, setStartDate] = useState(activeTerm?.start_date || todayStr);
+
+  // Compute earliest boundary across active term start, recorded logs, and course tracking dates
+  const earliestDataDate = useMemo(() => {
+    let earliest = activeTerm?.start_date || '';
+    for (const r of records) {
+      if (r.date && (!earliest || r.date < earliest)) {
+        earliest = r.date;
+      }
+    }
+    for (const c of courses) {
+      if (c.tracking_start_date && (!earliest || c.tracking_start_date < earliest)) {
+        earliest = c.tracking_start_date;
+      }
+    }
+    return earliest || todayStr;
+  }, [activeTerm?.start_date, records, courses, todayStr]);
+
+  const [isCustomDate, setIsCustomDate] = useState(false);
+  const [activePreset, setActivePreset] = useState<'all' | 'month' | '30days' | '7days' | 'custom'>('all');
+  const [startDate, setStartDate] = useState(earliestDataDate);
   const [endDate, setEndDate] = useState(todayStr);
   const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
 
@@ -32,11 +53,38 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
     }
   }, [courses]);
 
+  // When earliestDataDate or activeTerm resolves, keep default full range synced if user hasn't customized
   React.useEffect(() => {
-    if (activeTerm?.start_date && !startDate) {
-      setStartDate(activeTerm.start_date);
+    if (!isCustomDate && earliestDataDate) {
+      setStartDate(earliestDataDate);
+      setEndDate(todayStr);
     }
-  }, [activeTerm]);
+  }, [earliestDataDate, isCustomDate, todayStr, isOpen]);
+
+  const handleSelectPreset = (preset: 'all' | 'month' | '30days' | '7days') => {
+    setActivePreset(preset);
+    if (preset === 'all') {
+      setIsCustomDate(false);
+      setStartDate(earliestDataDate);
+      setEndDate(todayStr);
+    } else if (preset === 'month') {
+      setIsCustomDate(true);
+      setStartDate(`${todayStr.slice(0, 7)}-01`);
+      setEndDate(todayStr);
+    } else if (preset === '30days') {
+      setIsCustomDate(true);
+      const d = new Date();
+      d.setDate(d.getDate() - 30);
+      setStartDate(d.toISOString().slice(0, 10));
+      setEndDate(todayStr);
+    } else if (preset === '7days') {
+      setIsCustomDate(true);
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      setStartDate(d.toISOString().slice(0, 10));
+      setEndDate(todayStr);
+    }
+  };
 
   const toggleCourse = (courseId: string) => {
     if (selectedCourseIds.includes(courseId)) {
@@ -52,13 +100,23 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
   // Filter records by date range and selected courses
   const filteredRecords = useMemo(() => {
     return records.filter(r => {
-      if (r.date < startDate || r.date > endDate) return false;
+      if (startDate && r.date < startDate) return false;
+      if (endDate && r.date > endDate) return false;
       if (!selectedCourseIds.includes(r.course_id)) return false;
       return true;
     });
   }, [records, startDate, endDate, selectedCourseIds]);
 
   const defaultThreshold = profile?.default_attendance_threshold || 75;
+
+  // Whether opening balances should be included (full range or starts on/before earliest date)
+  const shouldIncludeInitialBalance = useMemo(() => {
+    if (!isCustomDate || activePreset === 'all') return true;
+    if (!startDate) return true;
+    if (earliestDataDate && startDate <= earliestDataDate) return true;
+    if (activeTerm?.start_date && startDate <= activeTerm.start_date) return true;
+    return false;
+  }, [isCustomDate, activePreset, startDate, earliestDataDate, activeTerm?.start_date]);
 
   // Calculate stats for each selected course
   const reportData = useMemo(() => {
@@ -73,6 +131,9 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
 
     const subjectReports = selectedCourses.map(course => {
       const courseRecords = filteredRecords.filter(r => r.course_id === course.id);
+      const courseInitialIncluded = shouldIncludeInitialBalance ||
+        (Boolean(course.tracking_start_date) && startDate <= (course.tracking_start_date || ''));
+
       const stats = computeCourseAttendanceStats(
         courseRecords,
         {
@@ -81,8 +142,13 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
         },
         course.attendance_threshold_override || defaultThreshold,
         {
-          initialAttended: startDate <= (course.tracking_start_date || activeTerm?.start_date || '') ? course.initial_attended : 0,
-          initialConducted: startDate <= (course.tracking_start_date || activeTerm?.start_date || '') ? course.initial_conducted : 0,
+          initialAttended: courseInitialIncluded ? (course.initial_attended || 0) : 0,
+          initialConducted: courseInitialIncluded ? (course.initial_conducted || 0) : 0,
+          trackingStartDate: course.tracking_start_date,
+          slots,
+          courseType: course.type,
+          labAttendanceRule: course.lab_attendance_rule,
+          globalLabRule: getLabAttendanceRule(),
         }
       );
 
@@ -96,7 +162,7 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
       grandAbsent += absentCount;
       grandMedical += medicalCount;
       grandDutyLeave += dutyLeaveCount;
-      if (stats.is_in_danger) inDangerCount++;
+      if (stats.conducted > 0 && stats.is_in_danger) inDangerCount++;
 
       return {
         course,
@@ -108,8 +174,8 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
       };
     });
 
-    const grandPercentage = grandConducted > 0 ? (grandAttended / grandConducted) * 100 : 100;
-    const isOverallSafe = grandConducted === 0 || grandPercentage >= defaultThreshold;
+    const grandPercentage = grandConducted > 0 ? (grandAttended / grandConducted) * 100 : 0;
+    const isOverallSafe = grandConducted > 0 ? grandPercentage >= defaultThreshold : true;
 
     return {
       subjectReports,
@@ -122,10 +188,305 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
       isOverallSafe,
       inDangerCount,
     };
-  }, [courses, selectedCourseIds, filteredRecords, defaultThreshold, startDate, activeTerm]);
+  }, [courses, selectedCourseIds, filteredRecords, defaultThreshold, shouldIncludeInitialBalance, startDate, slots]);
 
   const handlePrint = () => {
-    window.print();
+    // Generate isolated print document in hidden iframe to guarantee no viewport clipping, no scrollbars, and full table visibility
+    const printFrame = document.createElement('iframe');
+    printFrame.setAttribute('aria-hidden', 'true');
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
+
+    const doc = printFrame.contentWindow?.document;
+    if (!doc) return;
+
+    const studentName = profile?.name || 'Student';
+    const programStr = `${program?.degree_type || 'Degree'} (${program?.branch_department || 'Branch'})`;
+    const termStr = `${activeTerm?.name || 'Current Term'} | ${startDate} to ${endDate}`;
+    const generatedDate = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    const rowsHtml = reportData.subjectReports.length === 0
+      ? `<tr><td colspan="9" style="text-align:center; padding: 24px; color: #6b7280;">No subjects selected or no records found in the specified date range.</td></tr>`
+      : reportData.subjectReports.map(({ course, stats, absentCount, medicalCount, dutyLeaveCount }) => {
+          const reqThreshold = course.attendance_threshold_override || defaultThreshold;
+          const hasClasses = stats.conducted > 0;
+          const statusBadge = !hasClasses
+            ? `<span class="badge" style="background-color: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb;">No Classes</span>`
+            : stats.is_in_danger
+            ? `<span class="badge badge-risk">⚠️ At Risk</span>`
+            : `<span class="badge badge-safe">✓ Safe</span>`;
+          const guidanceText = !hasClasses
+            ? `<span style="color: #9ca3af;">No classes held</span>`
+            : stats.is_in_danger
+            ? `<span style="color: #dc2626; font-weight: bold;">Must Attend ${stats.must_attend}</span>`
+            : `<span style="color: #059669; font-weight: 600;">Can Skip ${stats.safe_bunks}</span>`;
+          const pctColor = !hasClasses ? '#6b7280' : stats.is_in_danger ? '#dc2626' : '#059669';
+          const pctText = hasClasses ? `${stats.percentage.toFixed(1)}%` : '—';
+
+          return `
+            <tr>
+              <td style="text-align: left;">
+                <div style="font-weight: 700; color: #111827;">${course.name}</div>
+                <div style="font-size: 10px; color: #6b7280;">${course.code || 'Course'} • ${course.credits} Credits • ${course.type}</div>
+              </td>
+              <td style="text-align: center;">${stats.conducted}</td>
+              <td style="text-align: center; font-weight: 600; color: #111827;">${stats.attended}</td>
+              <td style="text-align: center; color: #dc2626; font-weight: 600;">${absentCount}</td>
+              <td style="text-align: center; color: #4b5563;">${medicalCount}/${dutyLeaveCount}</td>
+              <td style="text-align: center; font-weight: 800; color: ${pctColor};">
+                ${pctText}
+              </td>
+              <td style="text-align: center; color: #4b5563;">${reqThreshold}%</td>
+              <td style="text-align: center;">${statusBadge}</td>
+              <td style="text-align: right;">${guidanceText}</td>
+            </tr>
+          `;
+        }).join('');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Spirit Attendance Report - ${studentName}</title>
+        <style>
+          @page {
+            size: portrait;
+            margin: 12mm 10mm;
+          }
+          * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #111827;
+            background: #ffffff;
+            margin: 0;
+            padding: 10px;
+            font-size: 12px;
+            line-height: 1.4;
+          }
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            border-bottom: 2px solid #111827;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+          }
+          .title {
+            font-size: 22px;
+            font-weight: 900;
+            letter-spacing: -0.5px;
+            margin: 0;
+            color: #111827;
+          }
+          .subtitle {
+            font-size: 11px;
+            color: #6b7280;
+            margin-top: 2px;
+          }
+          .meta-info {
+            text-align: right;
+            font-size: 11px;
+            color: #374151;
+            line-height: 1.4;
+          }
+          .meta-info strong {
+            color: #111827;
+          }
+          .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 18px;
+          }
+          .card {
+            border: 1px solid #e5e7eb;
+            background-color: #f9fafb;
+            border-radius: 8px;
+            padding: 10px 12px;
+          }
+          .card-label {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #6b7280;
+            margin-bottom: 4px;
+            display: block;
+          }
+          .card-value {
+            font-size: 18px;
+            font-weight: 800;
+            color: #111827;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 4px;
+          }
+          .card-sub {
+            font-size: 9px;
+            color: #9ca3af;
+            margin-top: 2px;
+          }
+          .badge {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 9999px;
+            white-space: nowrap;
+          }
+          .badge-safe {
+            background-color: #ecfdf5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+          }
+          .badge-risk {
+            background-color: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            margin-bottom: 18px;
+          }
+          thead {
+            display: table-header-group;
+          }
+          tr {
+            page-break-inside: avoid;
+          }
+          th {
+            background-color: #f3f4f6;
+            color: #374151;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 9px;
+            letter-spacing: 0.05em;
+            padding: 8px 6px;
+            border: 1px solid #d1d5db;
+          }
+          td {
+            padding: 7px 6px;
+            border: 1px solid #e5e7eb;
+            vertical-align: middle;
+          }
+          tbody tr:nth-child(even) td {
+            background-color: #f9fafb;
+          }
+          .footer {
+            border-top: 1px solid #e5e7eb;
+            padding-top: 10px;
+            font-size: 10px;
+            color: #6b7280;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <h1 class="title">Official Attendance Report</h1>
+            <div class="subtitle">Generated via Spirit • Local-First Academic Management</div>
+          </div>
+          <div class="meta-info">
+            <div><strong>Student:</strong> ${studentName}</div>
+            <div><strong>Program:</strong> ${programStr}</div>
+            <div><strong>Term:</strong> ${termStr}</div>
+          </div>
+        </div>
+
+        <div class="cards-grid">
+          <div class="card">
+            <span class="card-label">Overall Attendance</span>
+            <div class="card-value">
+              <span>${reportData.grandConducted > 0 ? `${reportData.grandPercentage.toFixed(1)}%` : '—'}</span>
+              ${reportData.grandConducted === 0
+                ? `<span class="badge" style="background-color: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb;">No Classes</span>`
+                : reportData.isOverallSafe
+                ? `<span class="badge badge-safe">✓ Safe</span>`
+                : `<span class="badge badge-risk">⚠️ Detention Risk</span>`}
+            </div>
+            <div class="card-sub">${reportData.grandConducted === 0 ? 'No attendance records logged yet' : reportData.inDangerCount > 0 ? `${reportData.inDangerCount} subject(s) at risk` : 'All subjects safe'}</div>
+          </div>
+
+          <div class="card">
+            <span class="card-label">Conducted vs Attended</span>
+            <div class="card-value">${reportData.grandAttended} / ${reportData.grandConducted}</div>
+            <div class="card-sub">Total Period Units</div>
+          </div>
+
+          <div class="card">
+            <span class="card-label">Absences Logged</span>
+            <div class="card-value" style="color: #dc2626;">${reportData.grandAbsent}</div>
+            <div class="card-sub">Total Unexcused Misses</div>
+          </div>
+
+          <div class="card">
+            <span class="card-label">Approved Leaves</span>
+            <div class="card-value">${reportData.grandMedical + reportData.grandDutyLeave}</div>
+            <div class="card-sub">Medical: ${reportData.grandMedical} | OD: ${reportData.grandDutyLeave}</div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align: left; width: 26%;">Subject / Code</th>
+              <th style="text-align: center; width: 9%;">Conducted</th>
+              <th style="text-align: center; width: 9%;">Attended</th>
+              <th style="text-align: center; width: 8%;">Absent</th>
+              <th style="text-align: center; width: 10%;">Leave (Med/OD)</th>
+              <th style="text-align: center; width: 10%;">Percentage</th>
+              <th style="text-align: center; width: 8%;">Target</th>
+              <th style="text-align: center; width: 10%;">Status</th>
+              <th style="text-align: right; width: 10%;">Guidance</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          <span>Calculated using university-compliant attendance formulas (Opening Balances + Weight-adjusted Periods).</span>
+          <span>Generated on ${generatedDate}</span>
+        </div>
+      </body>
+      </html>
+    `;
+
+    doc.open();
+    doc.write(htmlContent);
+    doc.close();
+
+    // Trigger print
+    setTimeout(() => {
+      printFrame.contentWindow?.focus();
+      printFrame.contentWindow?.print();
+      // Cleanup iframe after print dialog interaction
+      setTimeout(() => {
+        try {
+          document.body.removeChild(printFrame);
+        } catch {
+          // ignore if already removed
+        }
+      }, 2000);
+    }, 250);
   };
 
   return (
@@ -133,7 +494,7 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Attendance Report"
-      maxWidth="xl"
+      maxWidth="4xl"
     >
       <div className="space-y-6">
         {/* Controls - Hidden on print */}
@@ -153,6 +514,30 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
             </div>
           </div>
 
+          {/* Quick Date Presets */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 mr-1">Range:</span>
+            {[
+              { id: 'all', label: 'All Term' },
+              { id: 'month', label: 'This Month' },
+              { id: '30days', label: 'Last 30 Days' },
+              { id: '7days', label: 'Last 7 Days' },
+            ].map(p => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => handleSelectPreset(p.id as any)}
+                className={`px-2.5 py-1 text-xs rounded-lg font-semibold transition-colors ${
+                  activePreset === p.id
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
           {/* Date Range Inputs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -162,7 +547,11 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
               <input
                 type="date"
                 value={startDate}
-                onChange={e => setStartDate(e.target.value)}
+                onChange={e => {
+                  setStartDate(e.target.value);
+                  setIsCustomDate(true);
+                  setActivePreset('custom');
+                }}
                 className="w-full px-3 py-1.5 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
               />
             </div>
@@ -173,7 +562,11 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
               <input
                 type="date"
                 value={endDate}
-                onChange={e => setEndDate(e.target.value)}
+                onChange={e => {
+                  setEndDate(e.target.value);
+                  setIsCustomDate(true);
+                  setActivePreset('custom');
+                }}
                 className="w-full px-3 py-1.5 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
               />
             </div>
@@ -246,48 +639,65 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
 
           {/* Overall Summary Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 print:border-gray-300 print:bg-gray-50">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Overall Attendance</span>
-              <div className="flex items-baseline gap-2 mt-1">
+            <div className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 print:border-gray-300 print:bg-gray-50 min-w-0">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block truncate">Overall Attendance</span>
+              <div className="flex items-center justify-between gap-1.5 flex-wrap mt-1">
                 <span className="text-2xl font-black text-gray-900 dark:text-white print:text-black">
-                  {reportData.grandPercentage.toFixed(1)}%
+                  {reportData.grandConducted > 0 ? `${reportData.grandPercentage.toFixed(1)}%` : '—'}
                 </span>
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                  reportData.isOverallSafe ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                }`}>
-                  {reportData.isOverallSafe ? 'Safe' : 'Detention Risk'}
-                </span>
+                {reportData.grandConducted === 0 ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400 border border-gray-200 dark:border-gray-700">
+                    No Classes
+                  </span>
+                ) : (
+                  <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                    reportData.isOverallSafe ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                  }`}>
+                    {reportData.isOverallSafe ? (
+                      <><CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" /> Safe</>
+                    ) : (
+                      <><AlertTriangle className="w-3 h-3 text-rose-600 dark:text-rose-400 shrink-0" /> At Risk</>
+                    )}
+                  </span>
+                )}
               </div>
+              <span className="text-[10px] text-gray-400 block mt-0.5 truncate">
+                {reportData.grandConducted === 0
+                  ? 'No attendance records in range'
+                  : reportData.inDangerCount > 0
+                  ? `${reportData.inDangerCount} subject(s) at risk`
+                  : 'All subjects safe'}
+              </span>
             </div>
 
-            <div className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 print:border-gray-300 print:bg-gray-50">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Conducted vs Attended</span>
+            <div className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 print:border-gray-300 print:bg-gray-50 min-w-0">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block truncate">Conducted vs Attended</span>
               <div className="text-xl font-bold text-gray-900 dark:text-white print:text-black mt-1">
                 {reportData.grandAttended} / {reportData.grandConducted}
               </div>
               <span className="text-[10px] text-gray-400">Total Period Units</span>
             </div>
 
-            <div className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 print:border-gray-300 print:bg-gray-50">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Absences Logged</span>
+            <div className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 print:border-gray-300 print:bg-gray-50 min-w-0">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block truncate">Absences Logged</span>
               <div className="text-xl font-bold text-gray-900 dark:text-white print:text-black mt-1">
                 {reportData.grandAbsent}
               </div>
               <span className="text-[10px] text-gray-400">Total Unexcused Misses</span>
             </div>
 
-            <div className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 print:border-gray-300 print:bg-gray-50">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Approved Leaves</span>
+            <div className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 print:border-gray-300 print:bg-gray-50 min-w-0">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block truncate">Approved Leaves</span>
               <div className="text-xl font-bold text-gray-900 dark:text-white print:text-black mt-1">
                 {reportData.grandMedical + reportData.grandDutyLeave}
               </div>
-              <span className="text-[10px] text-gray-400">Medical: {reportData.grandMedical} | OD: {reportData.grandDutyLeave}</span>
+              <span className="text-[10px] text-gray-400 truncate block">Med: {reportData.grandMedical} | OD: {reportData.grandDutyLeave}</span>
             </div>
           </div>
 
           {/* Detailed Per-Subject Table */}
-          <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800 print:border-gray-400">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800 print:border-gray-400 print:overflow-visible">
+            <table className="w-full text-left text-xs border-collapse min-w-[620px] print:min-w-0">
               <thead>
                 <tr className="bg-gray-100 dark:bg-gray-800/80 print:bg-gray-100 text-gray-700 dark:text-gray-300 print:text-black font-bold uppercase text-[10px] tracking-wider border-b border-gray-200 dark:border-gray-700 print:border-gray-400">
                   <th className="py-2.5 px-3">Subject / Code</th>
@@ -311,6 +721,7 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
                 ) : (
                   reportData.subjectReports.map(({ course, stats, absentCount, medicalCount, dutyLeaveCount }) => {
                     const reqThreshold = course.attendance_threshold_override || defaultThreshold;
+                    const hasClasses = stats.conducted > 0;
                     return (
                       <tr key={course.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30 print:hover:bg-transparent">
                         <td className="py-2.5 px-3">
@@ -326,27 +737,37 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
                         <td className="py-2.5 px-2 text-center text-rose-600 font-medium">{absentCount}</td>
                         <td className="py-2.5 px-2 text-center text-gray-500">{medicalCount}/{dutyLeaveCount}</td>
                         <td className="py-2.5 px-2 text-center font-black">
-                          <span className={stats.is_in_danger ? 'text-rose-600' : 'text-emerald-600'}>
-                            {stats.conducted > 0 ? `${stats.percentage.toFixed(1)}%` : '100%'}
-                          </span>
+                          {hasClasses ? (
+                            <span className={stats.is_in_danger ? 'text-rose-600' : 'text-emerald-600'}>
+                              {stats.percentage.toFixed(1)}%
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 dark:text-gray-500 font-semibold">—</span>
+                          )}
                         </td>
                         <td className="py-2.5 px-2 text-center text-gray-500 font-medium">{reqThreshold}%</td>
                         <td className="py-2.5 px-2 text-center">
-                          {stats.is_in_danger ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                          {!hasClasses ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-500 bg-gray-100 dark:bg-gray-800 dark:text-gray-400 px-2 py-0.5 rounded border border-gray-200 dark:border-gray-700">
+                              No Classes
+                            </span>
+                          ) : stats.is_in_danger ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/50">
                               <AlertTriangle className="w-3 h-3 text-rose-600" /> At Risk
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/50">
                               <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Safe
                             </span>
                           )}
                         </td>
                         <td className="py-2.5 px-3 text-right font-medium">
-                          {stats.is_in_danger ? (
+                          {!hasClasses ? (
+                            <span className="text-gray-400 dark:text-gray-500 text-xs font-normal">No classes held</span>
+                          ) : stats.is_in_danger ? (
                             <span className="text-rose-600 font-bold">Must Attend {stats.must_attend}</span>
                           ) : (
-                            <span className="text-emerald-700 font-semibold">Can Skip {stats.safe_bunks}</span>
+                            <span className="text-emerald-700 dark:text-emerald-400 font-semibold">Can Skip {stats.safe_bunks}</span>
                           )}
                         </td>
                       </tr>

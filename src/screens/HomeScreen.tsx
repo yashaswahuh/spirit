@@ -6,7 +6,9 @@ import type { TimetableSlot, Course } from '../types';
 import { computeCourseAttendanceStats, countUnmarkedClasses } from '../engine/attendance';
 import { canISkipTomorrow } from '../engine/whatif';
 import { getTodayTimetableSlots } from '../db/repositories/timetable.repo';
-import { markAttendance } from '../db/repositories/attendance.repo';
+import { markAttendance, deleteAttendanceRecord } from '../db/repositories/attendance.repo';
+import { resolveSlotAttendanceWeight } from '../engine/timetable';
+import { getLabAttendanceRule } from '../utils/preferences';
 import { hasDemoData, clearDemoData, seedDemoData } from '../db/repositories/setup.repo';
 import { TodayClassesSection } from '../components/home/TodayClassesSection';
 import { CanISkipTomorrowCard } from '../components/home/CanISkipTomorrowCard';
@@ -79,6 +81,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
         initialConducted: c.initial_conducted,
         trackingStartDate: c.tracking_start_date,
         slots,
+        courseType: c.type,
+        labAttendanceRule: c.lab_attendance_rule,
+        globalLabRule: getLabAttendanceRule(),
       }
     );
 
@@ -136,13 +141,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
 
   const handleMarkToday = async (courseId: string, slotId: string | null, status: any) => {
     const slot = slotId ? slots.find(s => s.id === slotId) : null;
+    const todaySlot = slotId ? todaySlots.find(s => s.id === slotId) : null;
+    const effectiveSlot = slot || todaySlot;
+    const course = courseMap.get(courseId);
+    const globalLabRule = getLabAttendanceRule();
+    const attWeight = effectiveSlot
+      ? resolveSlotAttendanceWeight(effectiveSlot, course, globalLabRule)
+      : (course?.type === 'lab' ? (globalLabRule === 'single_session' ? 1 : 2) : 1);
+
+    // Check if a record already exists with this status -> tapping again unmarks!
+    const existing = recordsToday.find(
+      r => r.course_id === courseId && (slotId ? r.slot_id === slotId : true)
+    );
+
+    if (existing && existing.status === status) {
+      await deleteAttendanceRecord(existing.id);
+      return;
+    }
+
     await markAttendance({
       course_id: courseId,
       date: todayStr,
       slot_id: slotId,
       status,
-      weight: slot?.weight || 1,
-      component_type: slot?.component_type || courseMap.get(courseId)?.type,
+      weight: attWeight,
+      component_type: effectiveSlot?.component_type || (course?.type === 'lab' ? 'lab' : 'theory'),
     });
   };
 

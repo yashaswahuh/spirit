@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Plus, Search, Filter, CalendarCheck, Sparkles, LayoutGrid, CalendarDays, FileText } from 'lucide-react';
+import { Plus, Search, Filter, CalendarCheck, Sparkles, LayoutGrid, CalendarDays, FileText, RotateCcw } from 'lucide-react';
 import { db } from '../db/dexie';
 import { Course, AttendanceStatus } from '../types';
 import { computeCourseAttendanceStats, countUnmarkedClasses } from '../engine/attendance';
@@ -12,9 +12,12 @@ import { CatchUpModal } from '../components/attendance/CatchUpModal';
 import { WhatIfModal } from '../components/attendance/WhatIfModal';
 import { CourseCalendarModal } from '../components/attendance/CourseCalendarModal';
 import { AttendanceReportModal } from '../components/attendance/AttendanceReportModal';
+import { ClearAttendanceModal } from '../components/attendance/ClearAttendanceModal';
 import { createCourse, updateCourse, deleteCourse } from '../db/repositories/course.repo';
-import { markAttendance } from '../db/repositories/attendance.repo';
+import { markAttendance, syncAllCoursesAttendanceWeights } from '../db/repositories/attendance.repo';
 import { PageContainer } from '../components/layout/PageContainer';
+import { getLabAttendanceRule } from '../utils/preferences';
+import { timeToMinutes } from '../engine/timetable';
 
 export const AttendanceScreen: React.FC = () => {
   const profile = useLiveQuery(() => db.profile.filter(p => p.deleted_at === null).first());
@@ -36,6 +39,8 @@ export const AttendanceScreen: React.FC = () => {
   const [isCatchUpOpen, setIsCatchUpOpen] = useState(false);
   const [isWhatIfOpen, setIsWhatIfOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isClearAttendanceOpen, setIsClearAttendanceOpen] = useState(false);
+  const [clearInitialCourseId, setClearInitialCourseId] = useState<string | null>(null);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,6 +80,9 @@ export const AttendanceScreen: React.FC = () => {
         initialConducted: course.initial_conducted,
         trackingStartDate: course.tracking_start_date,
         slots,
+        courseType: course.type,
+        labAttendanceRule: course.lab_attendance_rule,
+        globalLabRule: getLabAttendanceRule(),
       }
     );
 
@@ -139,12 +147,58 @@ export const AttendanceScreen: React.FC = () => {
     setEditingCourse(undefined);
   };
 
-  const handleMarkCourse = async (courseId: string, status: AttendanceStatus) => {
+  // Sync existing attendance weights across all courses on mount to fix any past inconsistent records
+  useEffect(() => {
+    syncAllCoursesAttendanceWeights().catch(() => {});
+  }, []);
+
+  const handleMarkCourse = async (
+    courseId: string,
+    status: AttendanceStatus,
+    componentType?: 'theory' | 'lab'
+  ) => {
+    const course = courses.find(c => c.id === courseId);
+    const globalLabRule = getLabAttendanceRule();
+    const effectiveLabRule = course?.lab_attendance_rule || globalLabRule;
+
+    const courseSlots = slots.filter(s => s.course_id === courseId);
+    const isCourseLab = course?.type === 'lab';
+    const targetComp = componentType || (isCourseLab ? 'lab' : 'theory');
+
+    // Find any multi-period slot for this course
+    const multiSlot = courseSlots.find(s => {
+      const diffMins = (s.start_time && s.end_time)
+        ? timeToMinutes(s.end_time) - timeToMinutes(s.start_time)
+        : 0;
+      return (s.weight && s.weight > 1) || s.component_type === 'lab' || diffMins >= 90;
+    });
+
+    let weight = 1;
+    if (effectiveLabRule === 'single_session') {
+      weight = 1;
+    } else {
+      if (course?.type === 'theory_and_lab') {
+        if (targetComp === 'lab') {
+          weight = multiSlot?.weight && multiSlot.weight > 1 ? multiSlot.weight : 2;
+        } else {
+          weight = 1;
+        }
+      } else if (multiSlot) {
+        weight = multiSlot.weight && multiSlot.weight > 1 ? multiSlot.weight : 2;
+      } else if (isCourseLab) {
+        weight = 2;
+      } else {
+        weight = 1;
+      }
+    }
+
     await markAttendance({
       course_id: courseId,
       date: todayStr,
       status,
       slot_id: null,
+      weight,
+      component_type: targetComp,
     });
   };
 
@@ -206,6 +260,20 @@ export const AttendanceScreen: React.FC = () => {
           >
             <FileText className="w-4 h-4 text-emerald-500" />
             Report
+          </button>
+
+          {/* Clear Logs */}
+          <button
+            type="button"
+            onClick={() => {
+              setClearInitialCourseId(null);
+              setIsClearAttendanceOpen(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all min-h-[42px]"
+            title="Clear logged attendance data without deleting subjects or timetable"
+          >
+            <RotateCcw className="w-4 h-4 text-rose-500" />
+            Clear Logs
           </button>
 
           {/* Add Subject */}
@@ -323,21 +391,40 @@ export const AttendanceScreen: React.FC = () => {
                 </button>
               </div>
             ) : (
-              filteredItems.map(({ course, stats, projection }) => (
-                <CourseAttendanceCard
-                  key={course.id}
-                  course={course}
-                  stats={stats}
-                  projection={projection}
-                  onMark={status => handleMarkCourse(course.id, status)}
-                  onEdit={() => {
-                    setEditingCourse(course);
-                    setIsModalOpen(true);
-                  }}
-                  onDelete={() => handleDeleteCourse(course.id)}
-                  onViewCalendar={() => setCalendarCourse(course)}
-                />
-              ))
+              filteredItems.map(({ course, stats, projection }) => {
+                const courseSlots = slots.filter(s => s.course_id === course.id);
+                const multiSlot = courseSlots.find(s => {
+                  const diffMins = (s.start_time && s.end_time)
+                    ? timeToMinutes(s.end_time) - timeToMinutes(s.start_time)
+                    : 0;
+                  return (s.weight && s.weight > 1) || s.component_type === 'lab' || diffMins >= 90;
+                });
+                const globalLabRule = getLabAttendanceRule();
+                const effectiveLabRule = course.lab_attendance_rule || globalLabRule;
+                const naturalWeight = multiSlot?.weight && multiSlot.weight > 1 ? multiSlot.weight : (course.type === 'lab' ? 2 : 1);
+                const subjectAttendancePoints = effectiveLabRule === 'single_session' ? 1 : naturalWeight;
+
+                return (
+                  <CourseAttendanceCard
+                    key={course.id}
+                    course={course}
+                    stats={stats}
+                    projection={projection}
+                    labAttendancePoints={subjectAttendancePoints}
+                    onMark={(status, component) => handleMarkCourse(course.id, status, component)}
+                    onEdit={() => {
+                      setEditingCourse(course);
+                      setIsModalOpen(true);
+                    }}
+                    onDelete={() => handleDeleteCourse(course.id)}
+                    onViewCalendar={() => setCalendarCourse(course)}
+                    onClearAttendance={() => {
+                      setClearInitialCourseId(course.id);
+                      setIsClearAttendanceOpen(true);
+                    }}
+                  />
+                );
+              })
             )}
           </div>
         </>
@@ -382,6 +469,18 @@ export const AttendanceScreen: React.FC = () => {
         <AttendanceReportModal
           isOpen={isReportOpen}
           onClose={() => setIsReportOpen(false)}
+        />
+      )}
+
+      {/* Clear Attendance Modal */}
+      {isClearAttendanceOpen && (
+        <ClearAttendanceModal
+          isOpen={isClearAttendanceOpen}
+          onClose={() => {
+            setIsClearAttendanceOpen(false);
+            setClearInitialCourseId(null);
+          }}
+          initialCourseId={clearInitialCourseId}
         />
       )}
     </PageContainer>

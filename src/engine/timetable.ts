@@ -12,9 +12,65 @@ import {
   CalendarEvent,
   Weekday,
   CourseType,
+  Course,
   SaturdayRule,
   PeriodTiming,
+  LabAttendanceRule,
 } from '../types';
+
+/**
+ * Resolves the attendance weight for a slot, taking into account:
+ * 1. An explicit slot-level attendance_weight override
+ * 2. Course-level lab_attendance_rule ('single_session' vs 'per_hour')
+ * 3. Global lab_attendance_rule setting
+ * 4. Slot duration / time difference (>= 90 mins spans at least 2 periods)
+ * 5. Course type (lab or theory_and_lab) and slot component type
+ *
+ * Ensures labs consistently count for the exact same points (+1 or +2) across all days of the week.
+ */
+export function resolveSlotAttendanceWeight(
+  slot: {
+    weight?: number;
+    attendance_weight?: number | null;
+    component_type?: CourseType;
+    start_time?: string;
+    end_time?: string;
+  },
+  course?: { lab_attendance_rule?: LabAttendanceRule | null; type?: CourseType } | null,
+  globalLabRule: LabAttendanceRule = 'per_hour'
+): number {
+  const effectiveRule = course?.lab_attendance_rule || globalLabRule;
+
+  const diffMins = (slot.start_time && slot.end_time)
+    ? timeToMinutes(slot.end_time) - timeToMinutes(slot.start_time)
+    : 0;
+  const isMultiPeriod = (slot.weight !== undefined && slot.weight > 1) || diffMins >= 90;
+  const isLab = slot.component_type === 'lab' || course?.type === 'lab';
+
+  // For any multi-period session (e.g. 2-hr lab, NSS elective, or multi-period lecture) or lab:
+  if (isMultiPeriod || isLab) {
+    if (effectiveRule === 'single_session') {
+      return 1;
+    }
+    // Under per_hour rule:
+    if (slot.attendance_weight != null && slot.attendance_weight > 0) {
+      return slot.attendance_weight;
+    }
+    if (slot.weight && slot.weight > 1) {
+      return slot.weight;
+    }
+    if (diffMins >= 150) return 3;
+    if (diffMins >= 90) return 2;
+    return 2;
+  }
+
+  // Standard 1-period slot
+  if (slot.attendance_weight != null && slot.attendance_weight > 0) {
+    return slot.attendance_weight;
+  }
+
+  return slot.weight && slot.weight > 0 ? slot.weight : 1;
+}
 
 /**
  * Evaluates whether a given date is an off Saturday based on the specified Saturday rule.
@@ -241,6 +297,8 @@ export interface ResolveDayScheduleParams {
   overrides?: TimetableOverride[];
   workingDays?: Weekday[]; // default [1, 2, 3, 4, 5, 6] (Mon-Sat)
   saturdayRule?: SaturdayRule;
+  courses?: Course[];
+  labAttendanceRule?: LabAttendanceRule;
 }
 
 /**
@@ -251,7 +309,7 @@ export interface ResolveDayScheduleParams {
  * 3. Working days of the term
  * 4. Saturday working rules (e.g. 2nd Saturday off, 2nd & 4th Saturday off)
  * 5. One-off date overrides (cancel, substitute, extra, reschedule)
- * 6. Slot weights
+ * 6. Slot weights & Lab attendance counting rules (per-hour vs single session)
  */
 export function resolveDaySchedule(params: ResolveDayScheduleParams): DayScheduleResolution {
   const {
@@ -262,6 +320,8 @@ export function resolveDaySchedule(params: ResolveDayScheduleParams): DaySchedul
     overrides = [],
     workingDays = [1, 2, 3, 4, 5, 6],
     saturdayRule,
+    courses = [],
+    labAttendanceRule = 'per_hour',
   } = params;
 
   const dateObj = new Date(date + 'T00:00:00Z');
@@ -348,9 +408,13 @@ export function resolveDaySchedule(params: ResolveDayScheduleParams): DaySchedul
     });
   }
 
+  const courseMap = new Map(courses.map(c => [c.id, c]));
+
   // Map to EffectiveSlot
   let effectiveSlots: EffectiveSlot[] = baseDaySlots.map(s => {
     const w = s.weight && s.weight > 0 ? s.weight : 1;
+    const course = courseMap.get(s.course_id);
+    const attWeight = resolveSlotAttendanceWeight(s, course, labAttendanceRule);
     return {
       slot_id: s.id,
       course_id: s.course_id,
@@ -360,7 +424,7 @@ export function resolveDaySchedule(params: ResolveDayScheduleParams): DaySchedul
       faculty: s.faculty || null,
       component_type: s.component_type,
       weight: w,
-      attendance_weight: s.attendance_weight != null ? s.attendance_weight : w,
+      attendance_weight: attWeight,
       period_name: s.period_name || null,
       is_override: false,
     };

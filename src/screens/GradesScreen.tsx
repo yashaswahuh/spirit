@@ -18,6 +18,7 @@ import { db } from '../db/dexie';
 import { Course, GradeResult } from '../types';
 import { PageContainer } from '../components/layout/PageContainer';
 import { computeCourseAttendanceStats } from '../engine/attendance';
+import { getLabAttendanceRule } from '../utils/preferences';
 import { calculateCourseMarks, checkCourseEligibility } from '../engine/marks';
 import { calculateSgpa, calculateCgpa, CourseAttemptRecord } from '../engine/gpa';
 import { CourseMarksModal } from '../components/grades/CourseMarksModal';
@@ -87,6 +88,9 @@ export const GradesScreen: React.FC = () => {
         initialAttended: c.initial_attended,
         initialConducted: c.initial_conducted,
         trackingStartDate: c.tracking_start_date,
+        courseType: c.type,
+        labAttendanceRule: c.lab_attendance_rule,
+        globalLabRule: getLabAttendanceRule(),
       }
     );
     courseAttendanceMap.set(c.id, stats.percentage);

@@ -6,16 +6,18 @@ import { AttendanceStats } from '../../types';
 interface CourseAttendanceCardProps {
   course: Course;
   stats: AttendanceStats;
-  onMark: (status: AttendanceStatus) => void;
+  onMark: (status: AttendanceStatus, componentType?: 'theory' | 'lab') => void;
   onEdit?: () => void;
   onDelete?: () => void;
   onViewCalendar?: () => void;
+  onClearAttendance?: () => void;
   projection?: {
     bestCase: number;
     worstCase: number;
     remainingClasses: number;
     classesNeeded: number;
   };
+  labAttendancePoints?: number;
 }
 
 export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
@@ -25,11 +27,19 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
   onEdit,
   onDelete,
   onViewCalendar,
+  onClearAttendance,
   projection,
+  labAttendancePoints = 1,
 }) => {
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [selectedComponent, setSelectedComponent] = React.useState<'theory' | 'lab'>('theory');
   const isSafe = !stats.is_in_danger;
   const pctDisplay = stats.conducted > 0 ? `${stats.percentage.toFixed(1)}%` : 'No Classes';
+
+  const isIntegrated = course.type === 'theory_and_lab';
+  const effectivePoints = isIntegrated
+    ? (selectedComponent === 'lab' ? labAttendancePoints : 1)
+    : (labAttendancePoints || 1);
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 shadow-sm relative transition-all">
@@ -92,6 +102,17 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
                   className="w-full text-left px-3 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 font-medium"
                 >
                   Edit Subject
+                </button>
+              )}
+              {onClearAttendance && (
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onClearAttendance();
+                  }}
+                  className="w-full text-left px-3 py-2 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 font-medium"
+                >
+                  Clear Subject Attendance
                 </button>
               )}
               {onDelete && (
@@ -207,31 +228,79 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
         </div>
       )}
 
+      {/* Component selector for integrated Theory + Lab courses */}
+      {isIntegrated && (
+        <div className="mt-3 flex items-center bg-gray-100 dark:bg-gray-800/80 p-1 rounded-xl text-xs">
+          <button
+            type="button"
+            onClick={() => setSelectedComponent('theory')}
+            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              selectedComponent === 'theory'
+                ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+            }`}
+          >
+            📘 Theory (+1 pt)
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedComponent('lab')}
+            className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              selectedComponent === 'lab'
+                ? 'bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
+            }`}
+          >
+            🧪 Lab (+{labAttendancePoints} {labAttendancePoints === 1 ? 'pt' : 'pts'})
+          </button>
+        </div>
+      )}
+
       {/* Quick Attendance Marking Row */}
-      <div className="mt-3 grid grid-cols-3 gap-2">
+      <div className={`${isIntegrated ? 'mt-2' : 'mt-3'} grid grid-cols-3 gap-2`}>
         <button
-          onClick={() => onMark('present')}
-          className="flex items-center justify-center gap-1 py-2 px-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-semibold rounded-xl text-xs transition-colors min-h-[40px] focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none"
-          title="Mark Present (+1 Attended, +1 Conducted)"
+          type="button"
+          onClick={() =>
+            onMark(
+              'present',
+              isIntegrated ? selectedComponent : (course.type === 'lab' ? 'lab' : 'theory')
+            )
+          }
+          className="flex items-center justify-center gap-1 py-2 px-2 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-semibold rounded-xl text-xs transition-colors min-h-[40px] focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none cursor-pointer"
+          title={`Mark Present (+${effectivePoints} Attended, +${effectivePoints} Conducted)`}
         >
           <Plus className="w-3.5 h-3.5" />
-          Present
+          <span>Present</span>
+          {effectivePoints > 1 && <span className="text-[10px] font-bold opacity-80">(+{effectivePoints})</span>}
         </button>
         <button
-          onClick={() => onMark('absent')}
-          className="flex items-center justify-center gap-1 py-2 px-2 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 font-semibold rounded-xl text-xs transition-colors min-h-[40px] focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none"
-          title="Mark Absent (+0 Attended, +1 Conducted)"
+          type="button"
+          onClick={() =>
+            onMark(
+              'absent',
+              isIntegrated ? selectedComponent : (course.type === 'lab' ? 'lab' : 'theory')
+            )
+          }
+          className="flex items-center justify-center gap-1 py-2 px-2 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 font-semibold rounded-xl text-xs transition-colors min-h-[40px] focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none cursor-pointer"
+          title={`Mark Absent (+0 Attended, +${effectivePoints} Conducted)`}
         >
           <Minus className="w-3.5 h-3.5" />
-          Absent
+          <span>Absent</span>
+          {effectivePoints > 1 && <span className="text-[10px] font-bold opacity-80">(-{effectivePoints})</span>}
         </button>
         <button
-          onClick={() => onMark('cancelled')}
-          className="flex items-center justify-center gap-1 py-2 px-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl text-xs transition-colors min-h-[40px] focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:outline-none"
+          type="button"
+          onClick={() =>
+            onMark(
+              'cancelled',
+              isIntegrated ? selectedComponent : (course.type === 'lab' ? 'lab' : 'theory')
+            )
+          }
+          className="flex items-center justify-center gap-1 py-2 px-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-xl text-xs transition-colors min-h-[40px] focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:outline-none cursor-pointer"
           title="Mark Cancelled (Excluded from totals)"
         >
           <X className="w-3.5 h-3.5" />
-          Cancelled
+          <span>Cancelled</span>
         </button>
       </div>
     </div>

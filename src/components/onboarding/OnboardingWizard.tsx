@@ -11,10 +11,12 @@ import {
   Plus,
   Trash2,
   AlertCircle,
+  FlaskConical,
 } from 'lucide-react';
 import { ALL_PROGRAM_PRESETS, ProgramPreset } from '../../presets/programs';
 import { OnboardingData, saveOnboardingSetup, seedDemoData } from '../../db/repositories/setup.repo';
-import { CourseType } from '../../types';
+import { CourseType, LabAttendanceRule } from '../../types';
+import { getLabAttendanceRule } from '../../utils/preferences';
 
 interface OnboardingWizardProps {
   onComplete: () => void;
@@ -34,6 +36,9 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
   const [startDate, setStartDate] = useState(`${new Date().getFullYear()}-08-01`);
   const [endDate, setEndDate] = useState(`${new Date().getFullYear()}-12-15`);
   const [threshold, setThreshold] = useState(75);
+  const [labAttendanceRule, setLabAttendanceRule] = useState<LabAttendanceRule>(
+    getLabAttendanceRule() || 'single_session'
+  );
 
   const [courses, setCourses] = useState<Array<{
     name: string;
@@ -116,6 +121,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
         startDate,
         endDate,
         attendanceThreshold: threshold,
+        labAttendanceRule,
         courses,
         slots,
       };
@@ -504,6 +510,54 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
                     {t}% {t === 75 ? '(Standard)' : ''}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Lab Attendance Policy */}
+            <div className="bg-white dark:bg-gray-900 p-5 rounded-2xl border border-gray-100 dark:border-gray-800 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FlaskConical className="w-5 h-5 text-indigo-600" />
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                    Lab Attendance Policy
+                  </h3>
+                </div>
+                <span className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-2 py-0.5 rounded-full">
+                  {labAttendanceRule === 'single_session' ? '1 per Lab Session' : '1 per Hour / Period'}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                How does your college evaluate attendance for 2 or 3-hour practical laboratory sessions?
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setLabAttendanceRule('single_session')}
+                  className={`p-3.5 rounded-xl border text-xs font-bold text-left transition-all flex flex-col justify-between min-h-[58px] cursor-pointer ${
+                    labAttendanceRule === 'single_session'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750'
+                  }`}
+                >
+                  <span className="font-extrabold">1 attendance per lab session</span>
+                  <span className={`text-[10px] font-normal mt-1 ${labAttendanceRule === 'single_session' ? 'text-indigo-100' : 'text-gray-400'}`}>
+                    A 2-hour lab awards +1 attendance point
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLabAttendanceRule('per_hour')}
+                  className={`p-3.5 rounded-xl border text-xs font-bold text-left transition-all flex flex-col justify-between min-h-[58px] cursor-pointer ${
+                    labAttendanceRule === 'per_hour'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-750'
+                  }`}
+                >
+                  <span className="font-extrabold">1 attendance per hour / period</span>
+                  <span className={`text-[10px] font-normal mt-1 ${labAttendanceRule === 'per_hour' ? 'text-indigo-100' : 'text-gray-400'}`}>
+                    A 2-hour lab awards +2 attendance points
+                  </span>
+                </button>
               </div>
             </div>
           </div>

@@ -19,6 +19,7 @@ import {
 import { generateUUID } from '../../utils/uuid';
 import { resolveDaySchedule, DayScheduleResolution } from '../../engine/timetable';
 import { updateCourseFaculty } from './course.repo';
+import { getLabAttendanceRule } from '../../utils/preferences';
 
 // ============================================================================
 // TIMETABLE SLOTS
@@ -263,12 +264,13 @@ export async function deleteTimetableOverride(id: string): Promise<void> {
 export async function getEffectiveDaySchedule(dateStr?: string): Promise<DayScheduleResolution> {
   const date = dateStr || new Date().toISOString().slice(0, 10);
 
-  const [versions, slots, calendarEvents, overrides, terms] = await Promise.all([
+  const [versions, slots, calendarEvents, overrides, terms, courses] = await Promise.all([
     db.timetable_version.filter(v => v.deleted_at === null).toArray(),
     db.timetable_slot.filter(s => s.deleted_at === null).toArray(),
     db.calendar_event.filter(e => e.deleted_at === null).toArray(),
     db.timetable_override.where('date').equals(date).filter(o => o.deleted_at === null).toArray(),
     db.term.filter(t => t.deleted_at === null).toArray(),
+    db.course.filter(c => c.deleted_at === null).toArray(),
   ]);
 
   const activeTerm = terms.find(t => t.status === 'ongoing') || terms[0];
@@ -282,6 +284,8 @@ export async function getEffectiveDaySchedule(dateStr?: string): Promise<DaySche
     overrides,
     workingDays,
     saturdayRule: activeTerm?.saturday_rule,
+    courses,
+    labAttendanceRule: getLabAttendanceRule(),
   });
 }
 
@@ -305,6 +309,7 @@ export async function getTodayTimetableSlots(): Promise<{
     faculty: s.faculty,
     component_type: s.component_type,
     weight: s.weight,
+    attendance_weight: s.attendance_weight,
     period_name: s.period_name,
     created_at: '',
     updated_at: '',

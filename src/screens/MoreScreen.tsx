@@ -24,14 +24,17 @@ import {
   Pencil,
   BookOpen,
   ArrowRight,
+  RotateCcw,
 } from 'lucide-react';
 import { db } from '../db/dexie';
 import { seedDemoData, hasDemoData, clearDemoData, resetDatabase } from '../db/repositories/setup.repo';
+import { syncAllCoursesAttendanceWeights } from '../db/repositories/attendance.repo';
 import { PageContainer } from '../components/layout/PageContainer';
 import { TasksTrackerModal } from '../components/tasks/TasksTrackerModal';
 import { BackupModal } from '../components/safety/BackupModal';
 import { DeviceTransferModal } from '../components/safety/DeviceTransferModal';
 import { DeleteDataModal } from '../components/safety/DeleteDataModal';
+import { ClearAttendanceModal } from '../components/attendance/ClearAttendanceModal';
 import { InstallGuidanceModal } from '../components/safety/InstallGuidanceModal';
 import { PrivacyModal } from '../components/safety/PrivacyModal';
 import { PeriodTimingsModal } from '../components/timetable/PeriodTimingsModal';
@@ -54,6 +57,9 @@ import {
   DateFormatPattern,
   getDateFormat,
   setDateFormat,
+  LabAttendanceRule,
+  getLabAttendanceRule,
+  setLabAttendanceRule,
 } from '../utils/preferences';
 import {
   getNotificationPermission,
@@ -103,6 +109,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   const [isBackupOpen, setIsBackupOpen] = useState(false);
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isClearAttendanceOpen, setIsClearAttendanceOpen] = useState(false);
   const [isInstallOpen, setIsInstallOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isPeriodTimingsOpen, setIsPeriodTimingsOpen] = useState(false);
@@ -122,10 +129,17 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   const [weekStart, setWeekStartState] = useState<WeekStartDay>(getWeekStartDay);
   const [timeFormat, setTimeFormatState] = useState<TimeFormat>(getTimeFormat);
   const [dateFormat, setDateFormatState] = useState<DateFormatPattern>(getDateFormat);
+  const [labAttendanceRule, setLabAttendanceRuleState] = useState<LabAttendanceRule>(getLabAttendanceRule);
 
   // Default target threshold state
   const [defaultThreshold, setDefaultThreshold] = useState<number>(profile?.default_attendance_threshold || 75);
   const [thresholdGoalSaved, setThresholdGoalSaved] = useState(false);
+
+  const handleLabAttendanceRuleChange = async (rule: LabAttendanceRule) => {
+    setLabAttendanceRule(rule);
+    setLabAttendanceRuleState(rule);
+    await syncAllCoursesAttendanceWeights(rule);
+  };
 
   // Notification status
   const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>(getNotificationPermission);
@@ -507,6 +521,51 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
               </div>
             </div>
 
+            {/* Attendance Counting Policy */}
+            <div className="pt-2.5 border-t border-gray-100 dark:border-gray-800 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block">
+                  ⚙️ Attendance Counting Rule
+                </label>
+                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono">
+                  {labAttendanceRule === 'single_session' ? '1 per session' : '1 per hour / period'}
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
+                Default rule for multi-hour sessions (e.g. labs, electives like NSS, or 2-hour blocks):
+              </p>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleLabAttendanceRuleChange('per_hour')}
+                  className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left flex flex-col justify-between min-h-[52px] ${
+                    labAttendanceRule === 'per_hour'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  }`}
+                >
+                  <span className="font-bold">1 per hour / period</span>
+                  <span className={`text-[10px] font-normal ${labAttendanceRule === 'per_hour' ? 'text-indigo-100' : 'text-gray-400'}`}>
+                    2-hr session = 2 points
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLabAttendanceRuleChange('single_session')}
+                  className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left flex flex-col justify-between min-h-[52px] ${
+                    labAttendanceRule === 'single_session'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  }`}
+                >
+                  <span className="font-bold">1 per session</span>
+                  <span className={`text-[10px] font-normal ${labAttendanceRule === 'single_session' ? 'text-indigo-100' : 'text-gray-400'}`}>
+                    2-hr session = 1 point
+                  </span>
+                </button>
+              </div>
+            </div>
+
             {/* Default Grading Scheme */}
             {gradingSchemes.length > 0 && (
               <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
@@ -838,6 +897,13 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
                 </button>
               )}
               <button
+                onClick={() => setIsClearAttendanceOpen(true)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/40 dark:bg-rose-950/20 text-rose-700 dark:text-rose-300 font-semibold text-xs sm:text-sm hover:bg-rose-100/60 dark:hover:bg-rose-900/40 transition-colors min-h-[44px]"
+              >
+                <RotateCcw className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+                Clear Logged Attendance Data (Keep Subjects & Schedule)
+              </button>
+              <button
                 onClick={() => setIsDeleteOpen(true)}
                 className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50/40 dark:bg-red-950/20 text-red-600 dark:text-red-400 font-semibold text-xs sm:text-sm hover:bg-red-100/60 transition-colors min-h-[44px]"
               >
@@ -872,7 +938,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
 
           {/* About / Version Footer */}
           <div className="text-center text-[11px] text-gray-400 dark:text-gray-500 space-y-1">
-            <p className="font-semibold text-gray-600 dark:text-gray-400">Spirit v0.1.0 • Offline-First Academic Tracker</p>
+            <p className="font-semibold text-gray-600 dark:text-gray-400">Spirit v0.5.5-alpha • Offline-First Academic Tracker</p>
             <p>Built with Vite, React, TypeScript, Tailwind CSS, vitest & Dexie</p>
           </div>
         </div>
@@ -912,6 +978,13 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
           isOpen={isDeleteOpen}
           onClose={() => setIsDeleteOpen(false)}
           onDeleted={onResetApp}
+        />
+      )}
+
+      {isClearAttendanceOpen && (
+        <ClearAttendanceModal
+          isOpen={isClearAttendanceOpen}
+          onClose={() => setIsClearAttendanceOpen(false)}
         />
       )}
 

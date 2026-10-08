@@ -7,7 +7,7 @@ export interface ResponsiveDialogProps {
   title: string;
   description?: string;
   children: React.ReactNode;
-  maxWidth?: 'sm' | 'md' | 'lg' | 'xl';
+  maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl';
 }
 
 export const ResponsiveDialog: React.FC<ResponsiveDialogProps> = ({
@@ -42,6 +42,10 @@ export const ResponsiveDialog: React.FC<ResponsiveDialogProps> = ({
     md: 'sm:max-w-md',
     lg: 'sm:max-w-lg',
     xl: 'sm:max-w-xl',
+    '2xl': 'sm:max-w-2xl',
+    '3xl': 'sm:max-w-3xl',
+    '4xl': 'sm:max-w-4xl',
+    '5xl': 'sm:max-w-5xl',
   }[maxWidth];
 
   return (
