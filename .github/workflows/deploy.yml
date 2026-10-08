@@ -61,7 +61,7 @@ jobs:
       - name: Upload build artifact to GitHub Actions
         uses: actions/upload-artifact@v4
         with:
-          name: spirit-dist
+          name: spirit-web-pages-dist (web-only-not-apk)
           path: './dist'
           retention-days: 14
 

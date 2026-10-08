@@ -333,7 +333,10 @@
       - Created vector drawable `ic_launcher_foreground.xml` in `drawable/` and `drawable-v24/` rendering the crisp Spirit mortarboard cap and golden amber tassel.
       - Updated `mipmap-anydpi-v26/ic_launcher.xml` and `ic_launcher_round.xml` to link to the brand vector drawable.
     - **Native Splash Screens**: Generated custom Spirit splash screens across all portrait and landscape density variants (`drawable/`, `drawable-port-*/`, `drawable-land-*/`).
-    - **Automated Build Integration**: Integrated asset generation into `package.json` `"build:android"` script to automatically update Android resources prior to Capacitor sync.
+  - **Android CI Automated Release Attachment & Artifact Disambiguation**:
+    - Added GitHub Releases trigger and tag triggers (`v*`, `release: [published]`) with `permissions: contents: write` to `.github/workflows/build-android.yml`.
+    - Integrated `softprops/action-gh-release@v2` step to automatically attach `spirit-alpha.apk` directly to the GitHub Release page whenever a release or tag is published.
+    - Renamed GitHub Pages web deployment artifact from `spirit-dist` to `spirit-web-pages-dist (web-only-not-apk)` in `.github/workflows/deploy.yml` to prevent confusion between the web build output and the Android APK package.
 
 ## Remaining
 - All planned phases, user features, attendance clear options, APK build workflows, and multi-hour attendance counting rules fully implemented, tested, and verified.

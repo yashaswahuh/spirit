@@ -6,6 +6,10 @@ on:
       - main
       - master
       - phase-6
+    tags:
+      - 'v*'
+  release:
+    types: [published]
   pull_request:
     branches:
       - main
@@ -14,7 +18,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-apk:
@@ -67,4 +71,12 @@ jobs:
           name: spirit-alpha
           path: android/app/build/outputs/apk/debug/spirit-alpha.apk
           retention-days: 30
+
+      - name: Attach APK to GitHub Release
+        if: (startsWith(github.ref, 'refs/tags/') || github.event_name == 'release') && !cancelled()
+        uses: softprops/action-gh-release@v2
+        with:
+          files: android/app/build/outputs/apk/debug/spirit-alpha.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
