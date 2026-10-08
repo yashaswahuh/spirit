@@ -3,7 +3,7 @@
  * Zero React dependencies.
  */
 
-import { AttendanceRecord, CourseAttendanceRules, AttendanceStats } from '../types';
+import { AttendanceRecord, CourseAttendanceRules, AttendanceStats, CourseType, LabAttendanceRule, TimetableSlot } from '../types';
 
 /**
  * Normalizes threshold input to a decimal fraction in (0, 1].
@@ -77,6 +77,9 @@ export interface CourseAttendanceCalculationOptions {
   trackingStartDate?: string | null;
   slots?: TimetableSlot[];
   slotsMap?: Map<string, TimetableSlot>;
+  courseType?: CourseType;
+  labAttendanceRule?: LabAttendanceRule | null;
+  globalLabRule?: LabAttendanceRule;
 }
 
 /**
@@ -84,7 +87,9 @@ export interface CourseAttendanceCalculationOptions {
  * Follows rules:
  * - Opening balance (initialAttended, initialConducted) included in totals.
  * - Records prior to trackingStartDate (if set) are skipped to prevent double counting.
- * - Each record counts for record.weight periods (default 1).
+ * - Dynamic Attendance Counting Rule awareness:
+ *   If rule is 'single_session', multi-period sessions (labs, NSS) count as 1 point.
+ *   If rule is 'per_hour', multi-period sessions count as slot.weight (e.g. 2 points).
  * - 'cancelled' and 'holiday' are excluded from conducted count.
  * - 'medical' counts as present if rules.medical_counts_as_present is true.
  * - 'duty_leave' counts as present if rules.duty_leave_counts_as_present is true.
@@ -107,16 +112,37 @@ export function computeCourseAttendanceStats(
 
   // Build slot lookup if slots array is provided
   const slotLookup = options?.slotsMap || (options?.slots ? new Map(options.slots.map(s => [s.id, s])) : undefined);
+  const effectiveRule = options?.labAttendanceRule || options?.globalLabRule;
 
   for (const record of records) {
     if (record.deleted_at) continue;
     if (trackingStart && record.date < trackingStart) continue;
 
-    const weight = record.weight && record.weight > 0 ? record.weight : 1;
+    let weight = record.weight && record.weight > 0 ? record.weight : 1;
 
     let compType = record.component_type;
     if (!compType && record.slot_id && slotLookup) {
       compType = slotLookup.get(record.slot_id)?.component_type;
+    }
+    const isLab = compType === 'lab' || options?.courseType === 'lab';
+
+    // Dynamic attendance rule evaluation for seamless retroactive updates
+    if (effectiveRule === 'single_session') {
+      if (isLab || options?.labAttendanceRule === 'single_session') {
+        weight = 1;
+      }
+    } else if (effectiveRule === 'per_hour') {
+      if (isLab && weight === 1) {
+        const slot = record.slot_id && slotLookup ? slotLookup.get(record.slot_id) : undefined;
+        if (slot?.weight && slot.weight > 1) {
+          weight = slot.weight;
+        } else {
+          const multiSlot = options?.slots?.find(s => s.weight && s.weight > 1);
+          if (multiSlot?.weight) {
+            weight = multiSlot.weight;
+          }
+        }
+      }
     }
 
     let isConducted = false;
@@ -192,7 +218,7 @@ export function computeCourseAttendanceStats(
   };
 }
 
-import { TimetableSlot, CalendarEvent, TimetableVersion, TimetableOverride, Weekday, SaturdayRule } from '../types';
+import { CalendarEvent, TimetableVersion, TimetableOverride, Weekday, SaturdayRule } from '../types';
 import { resolveDaySchedule } from './timetable';
 
 export interface UnmarkedCountParams {

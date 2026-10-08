@@ -255,6 +255,48 @@ describe('Attendance Engine', () => {
       expect(stats.lab?.conducted).toBe(2);
       expect(stats.lab?.percentage).toBe(100.0);
     });
+
+    it('instantly and retroactively recalculates 2-hour sessions between 1 pt per session (single_session) and 2 pts per session (per_hour)', () => {
+      // 5 sessions of a 2-hour lab or elective (like NSS)
+      // Stored records have weight 2 (from a 2-hour slot with weight: 2)
+      const fiveLabSessions: AttendanceRecord[] = [
+        { id: 'l1', user_id: 'u1', course_id: 'c1', slot_id: 'slot1', date: '2026-10-01', status: 'present', weight: 2, note: null, created_at: '', updated_at: '', deleted_at: null },
+        { id: 'l2', user_id: 'u1', course_id: 'c1', slot_id: 'slot1', date: '2026-10-08', status: 'present', weight: 2, note: null, created_at: '', updated_at: '', deleted_at: null },
+        { id: 'l3', user_id: 'u1', course_id: 'c1', slot_id: 'slot1', date: '2026-10-15', status: 'present', weight: 2, note: null, created_at: '', updated_at: '', deleted_at: null },
+        { id: 'l4', user_id: 'u1', course_id: 'c1', slot_id: 'slot1', date: '2026-10-22', status: 'present', weight: 2, note: null, created_at: '', updated_at: '', deleted_at: null },
+        { id: 'l5', user_id: 'u1', course_id: 'c1', slot_id: 'slot1', date: '2026-10-29', status: 'present', weight: 2, note: null, created_at: '', updated_at: '', deleted_at: null },
+      ];
+
+      // Under per_hour: each 2hr session = 2 pts. 5 sessions = 10 attended / 10 conducted
+      const statsPerHour = computeCourseAttendanceStats(fiveLabSessions, rulesStrict, 75, {
+        courseType: 'lab',
+        labAttendanceRule: 'per_hour',
+      });
+      expect(statsPerHour.attended).toBe(10);
+      expect(statsPerHour.conducted).toBe(10);
+      expect(statsPerHour.percentage).toBe(100.0);
+
+      // Under single_session: each 2hr session = 1 pt. 5 sessions = 5 attended / 5 conducted
+      const statsSingleSession = computeCourseAttendanceStats(fiveLabSessions, rulesStrict, 75, {
+        courseType: 'lab',
+        labAttendanceRule: 'single_session',
+      });
+      expect(statsSingleSession.attended).toBe(5);
+      expect(statsSingleSession.conducted).toBe(5);
+      expect(statsSingleSession.percentage).toBe(100.0);
+
+      // Also works for an elective course (like NSS, courseType: 'theory' or 'audit') with slot info
+      const slots = [
+        { id: 'slot1', course_id: 'c1', weekday: 4, start_time: '14:00', end_time: '16:00', weight: 2, deleted_at: null } as any
+      ];
+      const statsNssSingleSession = computeCourseAttendanceStats(fiveLabSessions, rulesStrict, 75, {
+        courseType: 'theory',
+        labAttendanceRule: 'single_session',
+        slots,
+      });
+      expect(statsNssSingleSession.attended).toBe(5);
+      expect(statsNssSingleSession.conducted).toBe(5);
+    });
   });
 
   describe('countUnmarkedClasses', () => {

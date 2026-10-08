@@ -4,10 +4,11 @@
  */
 
 import { db, LOCAL_USER_ID } from '../dexie';
-import { AttendanceRecord, AttendanceStatus } from '../../types';
+import { AttendanceRecord, AttendanceStatus, LabAttendanceRule } from '../../types';
 import { attendanceRecordSchema, validateEntity } from '../schemas';
 import { generateUUID } from '../../utils/uuid';
 import { recordDataChange } from '../../utils/storage';
+import { getLabAttendanceRule } from '../../utils/preferences';
 
 export async function getAttendanceRecordsForCourse(courseId: string): Promise<AttendanceRecord[]> {
   return db.attendance_record
@@ -192,4 +193,91 @@ export async function clearAttendanceRecords(
 
   recordDataChange();
   return { deletedCount: recordIds.length, resetCoursesCount };
+}
+
+/**
+ * Synchronizes attendance record weights for a course based on its effective attendance counting rule.
+ * Ensures instant updates across all historical logs when a user toggles between 1pt and 2pts per session.
+ */
+export async function syncCourseAttendanceWeights(
+  courseId: string,
+  courseRule?: LabAttendanceRule | null,
+  globalRule?: LabAttendanceRule
+): Promise<number> {
+  const course = await db.course.get(courseId);
+  if (!course) return 0;
+
+  const effectiveGlobal = globalRule || getLabAttendanceRule();
+  const effectiveRule =
+    courseRule !== undefined
+      ? (courseRule || effectiveGlobal)
+      : (course.lab_attendance_rule || effectiveGlobal);
+
+  const slots = await db.timetable_slot
+    .where('course_id')
+    .equals(courseId)
+    .filter(s => s.deleted_at === null)
+    .toArray();
+
+  const slotsMap = new Map(slots.map(s => [s.id, s]));
+  const defaultSlotWeight =
+    slots.find(s => s.weight && s.weight > 1)?.weight || (course.type === 'lab' ? 2 : 1);
+
+  const records = await db.attendance_record
+    .where('course_id')
+    .equals(courseId)
+    .filter(r => r.deleted_at === null)
+    .toArray();
+
+  const updates: Array<{ id: string; weight: number }> = [];
+
+  for (const record of records) {
+    const slot = record.slot_id ? slotsMap.get(record.slot_id) : undefined;
+    const isLabOrMultiHour =
+      record.component_type === 'lab' ||
+      course.type === 'lab' ||
+      (slot && slot.weight && slot.weight > 1) ||
+      (course.lab_attendance_rule !== null && defaultSlotWeight > 1);
+
+    if (isLabOrMultiHour) {
+      const targetWeight =
+        effectiveRule === 'single_session' ? 1 : (slot?.weight || defaultSlotWeight || 2);
+      if (record.weight !== targetWeight) {
+        updates.push({ id: record.id, weight: targetWeight });
+      }
+    }
+  }
+
+  if (updates.length > 0) {
+    const now = new Date().toISOString();
+    await db.transaction('rw', db.attendance_record, async () => {
+      for (const u of updates) {
+        await db.attendance_record.update(u.id, {
+          weight: u.weight,
+          updated_at: now,
+        });
+      }
+    });
+    recordDataChange();
+  }
+
+  return updates.length;
+}
+
+/**
+ * Synchronizes attendance weights across all courses that follow the global default rule.
+ */
+export async function syncAllCoursesAttendanceWeights(newGlobalRule: LabAttendanceRule): Promise<number> {
+  const courses = await db.course.filter(c => c.deleted_at === null).toArray();
+  let totalUpdated = 0;
+
+  for (const course of courses) {
+    // Only update courses that follow the global rule (course.lab_attendance_rule === null)
+    if (course.lab_attendance_rule === null) {
+      const updated = await syncCourseAttendanceWeights(course.id, null, newGlobalRule);
+      totalUpdated += updated;
+    }
+  }
+
+  return totalUpdated;
 }

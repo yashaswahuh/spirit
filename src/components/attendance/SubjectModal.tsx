@@ -107,7 +107,7 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
       initial_attended: Math.max(0, Number(initialAttended) || 0),
       initial_conducted: Math.max(0, Number(initialConducted) || 0),
       tracking_start_date: trackingStartDate ? trackingStartDate : null,
-      lab_attendance_rule: (type === 'lab' || type === 'theory_and_lab') ? labAttendanceRule : null,
+      lab_attendance_rule: labAttendanceRule,
     });
     onClose();
   };
@@ -221,34 +221,32 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
           </div>
         </div>
 
-        {/* Lab Attendance Counting Rule (Per-subject override) */}
-        {(type === 'lab' || type === 'theory_and_lab') && (
-          <div className="p-3.5 rounded-2xl bg-sky-50/70 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/50 space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-sky-900 dark:text-sky-200">
-                🧪 Lab Attendance Counting Rule
-              </label>
-              <span className="text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-sky-100 dark:bg-sky-900/60 px-2 py-0.5 rounded-full">
-                {labAttendanceRule === null ? 'Default from Settings' : labAttendanceRule === 'single_session' ? '1 per Lab Session' : '1 per Hour / Period'}
-              </span>
-            </div>
-            <p className="text-[11px] text-sky-700 dark:text-sky-400">
-              How does your college count attendance for practicals / labs in this subject?
-            </p>
-            <select
-              value={labAttendanceRule ?? ''}
-              onChange={e => {
-                const val = e.target.value;
-                setLabAttendanceRule(val === 'per_hour' || val === 'single_session' ? val : null);
-              }}
-              className="w-full px-3 py-2 text-xs rounded-xl border border-sky-200 dark:border-sky-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-sky-500 min-h-[40px]"
-            >
-              <option value="">⚙️ Default (Follow App Settings)</option>
-              <option value="per_hour">⏱️ 1 attendance per hour / period (2hr lab = 2 attendance)</option>
-              <option value="single_session">🧪 1 attendance per lab session (2hr lab = 1 attendance)</option>
-            </select>
+        {/* Attendance Counting Rule (Available for all subjects e.g. labs, electives like NSS, multi-period classes) */}
+        <div className="p-3.5 rounded-2xl bg-sky-50/70 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/50 space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-sky-900 dark:text-sky-200">
+              Attendance Counting Rule
+            </label>
+            <span className="text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-sky-100 dark:bg-sky-900/60 px-2 py-0.5 rounded-full">
+              {labAttendanceRule === null ? 'Default from Settings' : labAttendanceRule === 'single_session' ? '1 per Session' : '1 per Hour / Period'}
+            </span>
           </div>
-        )}
+          <p className="text-[11px] text-sky-700 dark:text-sky-400">
+            Configure how multi-hour periods, practicals, or electives (e.g. 2-hour labs or NSS) count toward attendance in this subject.
+          </p>
+          <select
+            value={labAttendanceRule ?? ''}
+            onChange={e => {
+              const val = e.target.value;
+              setLabAttendanceRule(val === 'per_hour' || val === 'single_session' ? val : null);
+            }}
+            className="w-full px-3 py-2 text-xs rounded-xl border border-sky-200 dark:border-sky-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-sky-500 min-h-[40px]"
+          >
+            <option value="">⚙️ Default (Follow App Settings)</option>
+            <option value="per_hour">⏱️ 1 attendance per hour / period (e.g. 2hr session = 2 attendance points)</option>
+            <option value="single_session">🎯 1 attendance per session (e.g. 2hr session = 1 attendance point)</option>
+          </select>
+        </div>
 
         <CourseColorPicker
           value={color}

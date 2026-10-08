@@ -79,6 +79,9 @@ export const AttendanceScreen: React.FC = () => {
         initialConducted: course.initial_conducted,
         trackingStartDate: course.tracking_start_date,
         slots,
+        courseType: course.type,
+        labAttendanceRule: course.lab_attendance_rule,
+        globalLabRule: getLabAttendanceRule(),
       }
     );
 

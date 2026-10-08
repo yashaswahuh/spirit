@@ -81,6 +81,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
         initialConducted: c.initial_conducted,
         trackingStartDate: c.tracking_start_date,
         slots,
+        courseType: c.type,
+        labAttendanceRule: c.lab_attendance_rule,
+        globalLabRule: getLabAttendanceRule(),
       }
     );
 

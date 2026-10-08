@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { db } from '../db/dexie';
 import { seedDemoData, hasDemoData, clearDemoData, resetDatabase } from '../db/repositories/setup.repo';
+import { syncAllCoursesAttendanceWeights } from '../db/repositories/attendance.repo';
 import { PageContainer } from '../components/layout/PageContainer';
 import { TasksTrackerModal } from '../components/tasks/TasksTrackerModal';
 import { BackupModal } from '../components/safety/BackupModal';
@@ -134,9 +135,10 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   const [defaultThreshold, setDefaultThreshold] = useState<number>(profile?.default_attendance_threshold || 75);
   const [thresholdGoalSaved, setThresholdGoalSaved] = useState(false);
 
-  const handleLabAttendanceRuleChange = (rule: LabAttendanceRule) => {
+  const handleLabAttendanceRuleChange = async (rule: LabAttendanceRule) => {
     setLabAttendanceRule(rule);
     setLabAttendanceRuleState(rule);
+    await syncAllCoursesAttendanceWeights(rule);
   };
 
   // Notification status

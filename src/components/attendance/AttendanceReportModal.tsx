@@ -4,6 +4,7 @@ import { Printer, CheckCircle2, AlertTriangle, Filter } from 'lucide-react';
 import { db } from '../../db/dexie';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import { computeCourseAttendanceStats } from '../../engine/attendance';
+import { getLabAttendanceRule } from '../../utils/preferences';
 
 interface AttendanceReportModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
   const activeTerm = useLiveQuery(() => db.term.filter(t => t.deleted_at === null && t.status === 'ongoing').first());
   const courses = useLiveQuery(() => db.course.filter(c => c.deleted_at === null).toArray()) || [];
   const records = useLiveQuery(() => db.attendance_record.filter(r => r.deleted_at === null).toArray()) || [];
+  const slots = useLiveQuery(() => db.timetable_slot.filter(s => s.deleted_at === null).toArray()) || [];
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const [startDate, setStartDate] = useState(activeTerm?.start_date || todayStr);
@@ -83,6 +85,10 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
         {
           initialAttended: startDate <= (course.tracking_start_date || activeTerm?.start_date || '') ? course.initial_attended : 0,
           initialConducted: startDate <= (course.tracking_start_date || activeTerm?.start_date || '') ? course.initial_conducted : 0,
+          slots,
+          courseType: course.type,
+          labAttendanceRule: course.lab_attendance_rule,
+          globalLabRule: getLabAttendanceRule(),
         }
       );
 

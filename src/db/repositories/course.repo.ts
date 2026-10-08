@@ -7,6 +7,7 @@ import { db, LOCAL_USER_ID } from '../dexie';
 import { Course } from '../../types';
 import { courseSchema, validateEntity } from '../schemas';
 import { generateUUID } from '../../utils/uuid';
+import { syncCourseAttendanceWeights } from './attendance.repo';
 
 export async function getActiveCourses(termId?: string): Promise<Course[]> {
   let collection = db.course.filter(c => c.deleted_at === null);
@@ -65,6 +66,11 @@ export async function updateCourse(id: string, updates: Partial<Course>): Promis
   // If faculty is explicitly modified, sync across all timetable slots for this course
   if (updates.faculty !== undefined) {
     await updateCourseFaculty(id, cleanFaculty);
+  }
+
+  // If lab_attendance_rule is explicitly modified, sync all existing attendance record weights immediately
+  if (updates.lab_attendance_rule !== undefined) {
+    await syncCourseAttendanceWeights(id, updates.lab_attendance_rule);
   }
 
   return updated;

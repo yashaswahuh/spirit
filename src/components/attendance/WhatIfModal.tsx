@@ -17,6 +17,7 @@ import {
   WhatIfSimulationResult,
 } from '../../engine/whatif';
 import { computeCourseAttendanceStats } from '../../engine/attendance';
+import { getLabAttendanceRule } from '../../utils/preferences';
 
 interface WhatIfModalProps {
   isOpen: boolean;
@@ -77,6 +78,10 @@ export const WhatIfModal: React.FC<WhatIfModalProps> = ({
         initialAttended: c.initial_attended,
         initialConducted: c.initial_conducted,
         trackingStartDate: c.tracking_start_date,
+        courseType: c.type,
+        labAttendanceRule: c.lab_attendance_rule,
+        globalLabRule: getLabAttendanceRule(),
+        slots,
       }
     );
 

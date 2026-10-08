@@ -242,25 +242,34 @@
     - **Settings Screen (`MoreScreen.tsx`)**: Added `Clear Logged Attendance Data` button in the Local Storage & Database Management section right alongside the total wipe button.
     - **Attendance Screen Header (`AttendanceScreen.tsx`)**: Added `Clear Logs` button in the action bar next to Report and Catch Up.
     - **Subject Attendance Card (`CourseAttendanceCard.tsx`)**: Added `Clear Subject Attendance` directly in each course card's 3-dots dropdown menu with pre-selected subject scope.
-  - **Comprehensive Unit Tests (`clear-attendance.test.ts`)**:
-    - Added 5 unit tests verifying scope filtering, soft-deleted record exclusion, date range bounds, and preservation of course metadata.
-    - All 161 unit and accessibility tests pass across 16 test suites. Clean production build verified.
-
-### Schema Changes & Migration History (Dexie v3 -> v4 -> v5 -> v6 -> v7)
-- **New Columns Added**:
-  - `BaseEntity`: Added `is_demo?: boolean` flag across all 14 Dexie tables to isolate demo records from user data.
-  - `Term`: Added `saturday_rule?: SaturdayRule` to support alternate Saturday holiday rules (2nd Saturday off, 2nd & 4th Saturday off, all off), and `lab_attendance_rule?: LabAttendanceRule`.
-  - `AttendanceRecord`: Added `component_type?: CourseType` to track whether logged attendance was for a theory lecture or lab session.
-  - `Course`: Added `faculty?: string | null` to track the subject instructor/professor globally, and `lab_attendance_rule?: LabAttendanceRule | null`.
-  - `TimetableSlot`: Added `attendance_weight?: number | null` to configure how many periods a multi-period slot counts for attendance.
-- **Database Version Upgrades**:
-  - `Dexie.version(4)`: Non-destructive in-place upgrade backfilling `is_demo: false` on existing records without data loss.
-  - `Dexie.version(5)`: Non-destructive in-place upgrade backfilling `faculty: null` on `Course`, harvesting any existing `slot.faculty` names from timetable slots to maintain full data consistency.
-  - `Dexie.version(6)`: Non-destructive in-place upgrade backfilling `attendance_weight: null` on `TimetableSlot`.
-  - `Dexie.version(7)`: Non-destructive in-place upgrade backfilling `lab_attendance_rule: null` on `Course`.
+- **Instant Retroactive Attendance Point Updates & Universal Attendance Counting Rule**:
+  - **Dual Weight Synchronization Engine (`attendance.repo.ts`, `course.repo.ts`, `MoreScreen.tsx`)**:
+    - Implemented `syncCourseAttendanceWeights(courseId, courseRule?, globalRule?)` executing an atomic Dexie transaction to update stored attendance records to the target weight (1 for `single_session` vs slot weight/2 for `per_hour`).
+    - Implemented `syncAllCoursesAttendanceWeights(newGlobalRule)` triggering reactive updates across all courses following the global default.
+    - Hooked course persistence in `updateCourse` to automatically trigger weight synchronization whenever `lab_attendance_rule` changes.
+  - **Dynamic Calculation Engine (`src/engine/attendance.ts`)**:
+    - Extended `computeCourseAttendanceStats` with dynamic rule evaluation using `CourseAttendanceCalculationOptions` (`courseType`, `labAttendanceRule`, `globalLabRule`, `slots`).
+    - Multi-period sessions dynamically evaluate to 1 attendance point under `single_session` or slot weight (e.g. 2) under `per_hour`.
+    - Synchronized across `HomeScreen.tsx`, `AttendanceScreen.tsx`, `GradesScreen.tsx`, `AttendanceReportModal.tsx`, and `WhatIfModal.tsx`.
+    - Instant app-wide recalculation: Changing between 2h = 2pts and 2h = 1pt instantly reflects across all statistics (e.g., 10 conducted classes drops to 5, or vice-versa).
+  - **Universal "Attendance Counting Rule" for All Subjects (`SubjectModal.tsx`)**:
+    - Renamed and unlocked the attendance counting rule selector for **all course types** (Theory, Lab, Theory + Lab, Project, Audit).
+    - Students can now configure electives and multi-hour blocks (such as NSS, physical education, seminars) that award 1 attendance point for a 2-hour block while regular courses follow 1 point per hour.
+  - **Comprehensive User Guide Overhaul (`UserGuideModal.tsx`)**:
+    - Completely revamped user guide into clear, structured, student-focused tabs:
+      - **Quick Start**: 3-step setup, mid-semester opening balances, and 1-tap daily marking.
+      - **Attendance Math & Rules**: Clear explanation of 1 pt vs 2 pts counting rules with instant recalculation, Safe Bunks ($\lfloor \text{Attended} / \text{Target} - \text{Conducted} \rfloor$), and Must Attend ($\lceil (\text{Target} \times \text{Conducted} - \text{Attended}) / (1 - \text{Target}) \rceil$) with practical examples.
+      - **Timetable & Upload**: Drag-and-drop parsing, alternate Saturdays, mid-term versions, and day swaps.
+      - **Grades & GPA**: Best of N, drop lowest, and required end-sem marks solver.
+      - **Data Safety & Reset**: Distinction between non-destructive "Clear Logged Attendance Only" and full factory wipes, plus persistent storage.
+      - **Calendar Alarms & PWA**: Offline install and RFC 5545 `.ics` export with alarms.
+  - **Testing & Verification**:
+    - Added unit test in `src/engine/__tests__/attendance.test.ts` verifying instant retroactive recalculation from 10 to 5 attended/conducted points.
+    - All 162 unit and accessibility tests pass across 16 test suites. Clean production build and Capacitor Android asset sync verified.
 
 ## Remaining
 - All planned phases, user features, attendance clear options, and APK build workflows fully implemented, tested, and verified.
 
 ## Known Issues
 - None.
+
