@@ -327,7 +327,6 @@ export const CourseCalendarModal: React.FC<CourseCalendarModalProps> = ({
                       title={isSelected ? `${btn.label} (Tap to unmark)` : `Mark ${btn.label}`}
                     >
                       <span>{btn.label}</span>
-                      {isSelected && <span className="text-[10px] font-black">✓</span>}
                     </button>
                   );
                 })}

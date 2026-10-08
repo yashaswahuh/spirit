@@ -125,7 +125,294 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
   }, [courses, selectedCourseIds, filteredRecords, defaultThreshold, startDate, activeTerm]);
 
   const handlePrint = () => {
-    window.print();
+    // Generate isolated print document in hidden iframe to guarantee no viewport clipping, no scrollbars, and full table visibility
+    const printFrame = document.createElement('iframe');
+    printFrame.setAttribute('aria-hidden', 'true');
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
+
+    const doc = printFrame.contentWindow?.document;
+    if (!doc) return;
+
+    const studentName = profile?.name || 'Student';
+    const programStr = `${program?.degree_type || 'Degree'} (${program?.branch_department || 'Branch'})`;
+    const termStr = `${activeTerm?.name || 'Current Term'} | ${startDate} to ${endDate}`;
+    const generatedDate = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    const rowsHtml = reportData.subjectReports.length === 0
+      ? `<tr><td colspan="9" style="text-align:center; padding: 24px; color: #6b7280;">No subjects selected or no records found in the specified date range.</td></tr>`
+      : reportData.subjectReports.map(({ course, stats, absentCount, medicalCount, dutyLeaveCount }) => {
+          const reqThreshold = course.attendance_threshold_override || defaultThreshold;
+          const statusBadge = stats.is_in_danger
+            ? `<span class="badge badge-risk">⚠️ At Risk</span>`
+            : `<span class="badge badge-safe">✓ Safe</span>`;
+          const guidanceText = stats.is_in_danger
+            ? `<span style="color: #dc2626; font-weight: bold;">Must Attend ${stats.must_attend}</span>`
+            : `<span style="color: #059669; font-weight: 600;">Can Skip ${stats.safe_bunks}</span>`;
+          const pctColor = stats.is_in_danger ? '#dc2626' : '#059669';
+
+          return `
+            <tr>
+              <td style="text-align: left;">
+                <div style="font-weight: 700; color: #111827;">${course.name}</div>
+                <div style="font-size: 10px; color: #6b7280;">${course.code || 'Course'} • ${course.credits} Credits • ${course.type}</div>
+              </td>
+              <td style="text-align: center;">${stats.conducted}</td>
+              <td style="text-align: center; font-weight: 600; color: #111827;">${stats.attended}</td>
+              <td style="text-align: center; color: #dc2626; font-weight: 600;">${absentCount}</td>
+              <td style="text-align: center; color: #4b5563;">${medicalCount}/${dutyLeaveCount}</td>
+              <td style="text-align: center; font-weight: 800; color: ${pctColor};">
+                ${stats.conducted > 0 ? `${stats.percentage.toFixed(1)}%` : '100%'}
+              </td>
+              <td style="text-align: center; color: #4b5563;">${reqThreshold}%</td>
+              <td style="text-align: center;">${statusBadge}</td>
+              <td style="text-align: right;">${guidanceText}</td>
+            </tr>
+          `;
+        }).join('');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>Spirit Attendance Report - ${studentName}</title>
+        <style>
+          @page {
+            size: portrait;
+            margin: 12mm 10mm;
+          }
+          * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #111827;
+            background: #ffffff;
+            margin: 0;
+            padding: 10px;
+            font-size: 12px;
+            line-height: 1.4;
+          }
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            border-bottom: 2px solid #111827;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+          }
+          .title {
+            font-size: 22px;
+            font-weight: 900;
+            letter-spacing: -0.5px;
+            margin: 0;
+            color: #111827;
+          }
+          .subtitle {
+            font-size: 11px;
+            color: #6b7280;
+            margin-top: 2px;
+          }
+          .meta-info {
+            text-align: right;
+            font-size: 11px;
+            color: #374151;
+            line-height: 1.4;
+          }
+          .meta-info strong {
+            color: #111827;
+          }
+          .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 18px;
+          }
+          .card {
+            border: 1px solid #e5e7eb;
+            background-color: #f9fafb;
+            border-radius: 8px;
+            padding: 10px 12px;
+          }
+          .card-label {
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #6b7280;
+            margin-bottom: 4px;
+            display: block;
+          }
+          .card-value {
+            font-size: 18px;
+            font-weight: 800;
+            color: #111827;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 4px;
+          }
+          .card-sub {
+            font-size: 9px;
+            color: #9ca3af;
+            margin-top: 2px;
+          }
+          .badge {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 9999px;
+            white-space: nowrap;
+          }
+          .badge-safe {
+            background-color: #ecfdf5;
+            color: #065f46;
+            border: 1px solid #a7f3d0;
+          }
+          .badge-risk {
+            background-color: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            margin-bottom: 18px;
+          }
+          thead {
+            display: table-header-group;
+          }
+          tr {
+            page-break-inside: avoid;
+          }
+          th {
+            background-color: #f3f4f6;
+            color: #374151;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 9px;
+            letter-spacing: 0.05em;
+            padding: 8px 6px;
+            border: 1px solid #d1d5db;
+          }
+          td {
+            padding: 7px 6px;
+            border: 1px solid #e5e7eb;
+            vertical-align: middle;
+          }
+          tbody tr:nth-child(even) td {
+            background-color: #f9fafb;
+          }
+          .footer {
+            border-top: 1px solid #e5e7eb;
+            padding-top: 10px;
+            font-size: 10px;
+            color: #6b7280;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <h1 class="title">Official Attendance Report</h1>
+            <div class="subtitle">Generated via Spirit • Local-First Academic Management</div>
+          </div>
+          <div class="meta-info">
+            <div><strong>Student:</strong> ${studentName}</div>
+            <div><strong>Program:</strong> ${programStr}</div>
+            <div><strong>Term:</strong> ${termStr}</div>
+          </div>
+        </div>
+
+        <div class="cards-grid">
+          <div class="card">
+            <span class="card-label">Overall Attendance</span>
+            <div class="card-value">
+              <span>${reportData.grandPercentage.toFixed(1)}%</span>
+              <span class="badge ${reportData.isOverallSafe ? 'badge-safe' : 'badge-risk'}">
+                ${reportData.isOverallSafe ? '✓ Safe' : '⚠️ Detention Risk'}
+              </span>
+            </div>
+            <div class="card-sub">${reportData.inDangerCount > 0 ? `${reportData.inDangerCount} subject(s) at risk` : 'All subjects safe'}</div>
+          </div>
+
+          <div class="card">
+            <span class="card-label">Conducted vs Attended</span>
+            <div class="card-value">${reportData.grandAttended} / ${reportData.grandConducted}</div>
+            <div class="card-sub">Total Period Units</div>
+          </div>
+
+          <div class="card">
+            <span class="card-label">Absences Logged</span>
+            <div class="card-value" style="color: #dc2626;">${reportData.grandAbsent}</div>
+            <div class="card-sub">Total Unexcused Misses</div>
+          </div>
+
+          <div class="card">
+            <span class="card-label">Approved Leaves</span>
+            <div class="card-value">${reportData.grandMedical + reportData.grandDutyLeave}</div>
+            <div class="card-sub">Medical: ${reportData.grandMedical} | OD: ${reportData.grandDutyLeave}</div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align: left; width: 26%;">Subject / Code</th>
+              <th style="text-align: center; width: 9%;">Conducted</th>
+              <th style="text-align: center; width: 9%;">Attended</th>
+              <th style="text-align: center; width: 8%;">Absent</th>
+              <th style="text-align: center; width: 10%;">Leave (Med/OD)</th>
+              <th style="text-align: center; width: 10%;">Percentage</th>
+              <th style="text-align: center; width: 8%;">Target</th>
+              <th style="text-align: center; width: 10%;">Status</th>
+              <th style="text-align: right; width: 10%;">Guidance</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+
+        <div class="footer">
+          <span>Calculated using university-compliant attendance formulas (Opening Balances + Weight-adjusted Periods).</span>
+          <span>Generated on ${generatedDate}</span>
+        </div>
+      </body>
+      </html>
+    `;
+
+    doc.open();
+    doc.write(htmlContent);
+    doc.close();
+
+    // Trigger print
+    setTimeout(() => {
+      printFrame.contentWindow?.focus();
+      printFrame.contentWindow?.print();
+      // Cleanup iframe after print dialog interaction
+      setTimeout(() => {
+        try {
+          document.body.removeChild(printFrame);
+        } catch {
+          // ignore if already removed
+        }
+      }, 2000);
+    }, 250);
   };
 
   return (
@@ -133,7 +420,7 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Attendance Report"
-      maxWidth="xl"
+      maxWidth="4xl"
     >
       <div className="space-y-6">
         {/* Controls - Hidden on print */}
@@ -246,48 +533,52 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
 
           {/* Overall Summary Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 print:border-gray-300 print:bg-gray-50">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Overall Attendance</span>
-              <div className="flex items-baseline gap-2 mt-1">
+            <div className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 print:border-gray-300 print:bg-gray-50 min-w-0">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block truncate">Overall Attendance</span>
+              <div className="flex items-center justify-between gap-1.5 flex-wrap mt-1">
                 <span className="text-2xl font-black text-gray-900 dark:text-white print:text-black">
                   {reportData.grandPercentage.toFixed(1)}%
                 </span>
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                  reportData.isOverallSafe ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                  reportData.isOverallSafe ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
                 }`}>
-                  {reportData.isOverallSafe ? 'Safe' : 'Detention Risk'}
+                  {reportData.isOverallSafe ? (
+                    <><CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" /> Safe</>
+                  ) : (
+                    <><AlertTriangle className="w-3 h-3 text-rose-600 dark:text-rose-400 shrink-0" /> At Risk</>
+                  )}
                 </span>
               </div>
             </div>
 
-            <div className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 print:border-gray-300 print:bg-gray-50">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Conducted vs Attended</span>
+            <div className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 print:border-gray-300 print:bg-gray-50 min-w-0">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block truncate">Conducted vs Attended</span>
               <div className="text-xl font-bold text-gray-900 dark:text-white print:text-black mt-1">
                 {reportData.grandAttended} / {reportData.grandConducted}
               </div>
               <span className="text-[10px] text-gray-400">Total Period Units</span>
             </div>
 
-            <div className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 print:border-gray-300 print:bg-gray-50">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Absences Logged</span>
+            <div className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 print:border-gray-300 print:bg-gray-50 min-w-0">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block truncate">Absences Logged</span>
               <div className="text-xl font-bold text-gray-900 dark:text-white print:text-black mt-1">
                 {reportData.grandAbsent}
               </div>
               <span className="text-[10px] text-gray-400">Total Unexcused Misses</span>
             </div>
 
-            <div className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 print:border-gray-300 print:bg-gray-50">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block">Approved Leaves</span>
+            <div className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50 print:border-gray-300 print:bg-gray-50 min-w-0">
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider block truncate">Approved Leaves</span>
               <div className="text-xl font-bold text-gray-900 dark:text-white print:text-black mt-1">
                 {reportData.grandMedical + reportData.grandDutyLeave}
               </div>
-              <span className="text-[10px] text-gray-400">Medical: {reportData.grandMedical} | OD: {reportData.grandDutyLeave}</span>
+              <span className="text-[10px] text-gray-400 truncate block">Med: {reportData.grandMedical} | OD: {reportData.grandDutyLeave}</span>
             </div>
           </div>
 
           {/* Detailed Per-Subject Table */}
-          <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800 print:border-gray-400">
-            <table className="w-full text-left text-xs border-collapse">
+          <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800 print:border-gray-400 print:overflow-visible">
+            <table className="w-full text-left text-xs border-collapse min-w-[620px] print:min-w-0">
               <thead>
                 <tr className="bg-gray-100 dark:bg-gray-800/80 print:bg-gray-100 text-gray-700 dark:text-gray-300 print:text-black font-bold uppercase text-[10px] tracking-wider border-b border-gray-200 dark:border-gray-700 print:border-gray-400">
                   <th className="py-2.5 px-3">Subject / Code</th>

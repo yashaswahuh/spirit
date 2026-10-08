@@ -782,28 +782,19 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
                             effectiveWeight
                           )
                         }
-                        className={`inline-flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-bold transition-all min-h-[44px] cursor-pointer ${
+                        className={`inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-bold transition-all min-h-[44px] cursor-pointer ${
                           btn.status === 'duty_leave' ? 'col-span-2 sm:col-span-1' : ''
                         } ${
                           isSelected
-                            ? `${btn.activeBg} ${btn.activeRing} scale-[1.02] shadow-md`
-                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750 active:scale-95'
+                            ? `${btn.activeBg} shadow-md`
+                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750'
                         }`}
                         aria-pressed={isSelected}
                         aria-label={`${btn.label} - ${isSelected ? 'Selected (Tap again to clear)' : 'Not Selected'}`}
                         title={isSelected ? `${btn.label} (Tap again to clear)` : `Mark ${btn.label}`}
                       >
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          {btn.icon(isSelected ? 'w-4 h-4 stroke-[2.5]' : 'w-4 h-4 text-gray-400 dark:text-gray-500')}
-                          <span className="truncate">{btn.label}</span>
-                        </div>
-                        {isSelected ? (
-                          <span className="ml-1 px-1.5 py-0.5 rounded-md bg-white/25 text-[10px] font-black uppercase tracking-wider flex items-center justify-center">
-                            ✓
-                          </span>
-                        ) : (
-                          <span className="w-3.5 h-3.5 rounded-full border-2 border-gray-300 dark:border-gray-600 flex-shrink-0" />
-                        )}
+                        {btn.icon(isSelected ? 'w-4 h-4 stroke-[2.5]' : 'w-4 h-4 text-gray-400 dark:text-gray-500')}
+                        <span>{btn.label}</span>
                       </button>
                     );
                   })}

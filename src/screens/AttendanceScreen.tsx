@@ -15,6 +15,7 @@ import { AttendanceReportModal } from '../components/attendance/AttendanceReport
 import { createCourse, updateCourse, deleteCourse } from '../db/repositories/course.repo';
 import { markAttendance } from '../db/repositories/attendance.repo';
 import { PageContainer } from '../components/layout/PageContainer';
+import { getLabAttendanceRule } from '../utils/preferences';
 
 export const AttendanceScreen: React.FC = () => {
   const profile = useLiveQuery(() => db.profile.filter(p => p.deleted_at === null).first());
@@ -139,12 +140,36 @@ export const AttendanceScreen: React.FC = () => {
     setEditingCourse(undefined);
   };
 
-  const handleMarkCourse = async (courseId: string, status: AttendanceStatus) => {
+  const handleMarkCourse = async (
+    courseId: string,
+    status: AttendanceStatus,
+    componentType?: 'theory' | 'lab'
+  ) => {
+    const course = courses.find(c => c.id === courseId);
+    const globalLabRule = getLabAttendanceRule();
+    const effectiveLabRule = course?.lab_attendance_rule || globalLabRule;
+
+    let weight = 1;
+    const targetComp = componentType || (course?.type === 'lab' ? 'lab' : 'theory');
+
+    if (targetComp === 'lab') {
+      if (effectiveLabRule === 'single_session') {
+        weight = 1;
+      } else {
+        const labSlot = slots.find(
+          s => s.course_id === courseId && (s.component_type === 'lab' || course?.type === 'lab')
+        );
+        weight = labSlot?.weight || 2;
+      }
+    }
+
     await markAttendance({
       course_id: courseId,
       date: todayStr,
       status,
       slot_id: null,
+      weight,
+      component_type: targetComp,
     });
   };
 
@@ -323,21 +348,31 @@ export const AttendanceScreen: React.FC = () => {
                 </button>
               </div>
             ) : (
-              filteredItems.map(({ course, stats, projection }) => (
-                <CourseAttendanceCard
-                  key={course.id}
-                  course={course}
-                  stats={stats}
-                  projection={projection}
-                  onMark={status => handleMarkCourse(course.id, status)}
-                  onEdit={() => {
-                    setEditingCourse(course);
-                    setIsModalOpen(true);
-                  }}
-                  onDelete={() => handleDeleteCourse(course.id)}
-                  onViewCalendar={() => setCalendarCourse(course)}
-                />
-              ))
+              filteredItems.map(({ course, stats, projection }) => {
+                const labSlot = slots.find(
+                  s => s.course_id === course.id && (s.component_type === 'lab' || course.type === 'lab')
+                );
+                const globalLabRule = getLabAttendanceRule();
+                const effectiveLabRule = course.lab_attendance_rule || globalLabRule;
+                const labAttendancePoints = effectiveLabRule === 'single_session' ? 1 : (labSlot?.weight || 2);
+
+                return (
+                  <CourseAttendanceCard
+                    key={course.id}
+                    course={course}
+                    stats={stats}
+                    projection={projection}
+                    labAttendancePoints={labAttendancePoints}
+                    onMark={(status, component) => handleMarkCourse(course.id, status, component)}
+                    onEdit={() => {
+                      setEditingCourse(course);
+                      setIsModalOpen(true);
+                    }}
+                    onDelete={() => handleDeleteCourse(course.id)}
+                    onViewCalendar={() => setCalendarCourse(course)}
+                  />
+                );
+              })
             )}
           </div>
         </>

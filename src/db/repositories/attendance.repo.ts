@@ -51,13 +51,16 @@ export async function markAttendance(params: MarkAttendanceParams): Promise<Atte
     .filter(r => r.deleted_at === null && r.date === date)
     .toArray();
 
-  // Find matching record: exact slot_id match first, or adopt existing unslotted record
+  // Find matching record: exact slot_id match first, or match by component_type, or adopt existing record
   let existing: AttendanceRecord | undefined;
   if (slot_id) {
     existing = records.find(r => r.slot_id === slot_id);
     if (!existing) {
-      existing = records.find(r => !r.slot_id);
+      existing = records.find(r => !r.slot_id && (!component_type || r.component_type === component_type));
     }
+  } else if (component_type) {
+    // If component_type is specified (e.g. theory or lab), match that component's record
+    existing = records.find(r => r.component_type === component_type);
   } else {
     existing = records[0];
   }
@@ -69,7 +72,7 @@ export async function markAttendance(params: MarkAttendanceParams): Promise<Atte
       slot_id: slot_id ?? existing.slot_id,
       note: note !== undefined ? note : existing.note,
       weight: weight !== undefined ? weight : existing.weight,
-      component_type: component_type ?? existing.component_type,
+      component_type: component_type !== undefined ? (component_type || null) : existing.component_type,
       updated_at: now,
     };
     validateEntity(attendanceRecordSchema, updated);
