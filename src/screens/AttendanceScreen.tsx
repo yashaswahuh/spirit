@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Plus, Search, Filter, CalendarCheck, Sparkles, LayoutGrid, CalendarDays, FileText, RotateCcw } from 'lucide-react';
 import { db } from '../db/dexie';
@@ -14,7 +14,7 @@ import { CourseCalendarModal } from '../components/attendance/CourseCalendarModa
 import { AttendanceReportModal } from '../components/attendance/AttendanceReportModal';
 import { ClearAttendanceModal } from '../components/attendance/ClearAttendanceModal';
 import { createCourse, updateCourse, deleteCourse } from '../db/repositories/course.repo';
-import { markAttendance } from '../db/repositories/attendance.repo';
+import { markAttendance, syncAllCoursesAttendanceWeights } from '../db/repositories/attendance.repo';
 import { PageContainer } from '../components/layout/PageContainer';
 import { getLabAttendanceRule } from '../utils/preferences';
 
@@ -146,6 +146,11 @@ export const AttendanceScreen: React.FC = () => {
     setEditingCourse(undefined);
   };
 
+  // Sync existing attendance weights across all courses on mount to fix any past inconsistent records
+  useEffect(() => {
+    syncAllCoursesAttendanceWeights().catch(() => {});
+  }, []);
+
   const handleMarkCourse = async (
     courseId: string,
     status: AttendanceStatus,
@@ -156,16 +161,17 @@ export const AttendanceScreen: React.FC = () => {
     const effectiveLabRule = course?.lab_attendance_rule || globalLabRule;
 
     let weight = 1;
-    const targetComp = componentType || (course?.type === 'lab' ? 'lab' : 'theory');
+    const isCourseLab = course?.type === 'lab';
+    const targetComp = componentType || (isCourseLab ? 'lab' : 'theory');
 
-    if (targetComp === 'lab') {
+    if (targetComp === 'lab' || isCourseLab) {
       if (effectiveLabRule === 'single_session') {
         weight = 1;
       } else {
         const labSlot = slots.find(
-          s => s.course_id === courseId && (s.component_type === 'lab' || course?.type === 'lab')
+          s => s.course_id === courseId && (s.component_type === 'lab' || isCourseLab)
         );
-        weight = labSlot?.weight || 2;
+        weight = labSlot?.weight && labSlot.weight > 1 ? labSlot.weight : 2;
       }
     }
 

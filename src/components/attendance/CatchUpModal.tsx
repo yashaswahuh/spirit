@@ -55,6 +55,8 @@ export const CatchUpModal: React.FC<CatchUpModalProps> = ({
       records.map(r => `${r.course_id}:${r.date}:${r.slot_id || ''}`)
     );
 
+    const globalLabRule = getLabAttendanceRule();
+
     while (current <= end) {
       const dateStr = current.toISOString().slice(0, 10);
       const schedule = resolveDaySchedule({
@@ -64,6 +66,9 @@ export const CatchUpModal: React.FC<CatchUpModalProps> = ({
         calendarEvents,
         overrides,
         workingDays: activeTerm.working_days || [1, 2, 3, 4, 5, 6],
+        saturdayRule: activeTerm.saturday_rule,
+        courses,
+        labAttendanceRule: globalLabRule,
       });
 
       if (!schedule.is_holiday && schedule.slots.length > 0) {
@@ -100,16 +105,16 @@ export const CatchUpModal: React.FC<CatchUpModalProps> = ({
     try {
       const globalLabRule = getLabAttendanceRule();
       for (const slot of item.unmarkedSlots) {
-        const saved = await markAttendance({
+        const course = courseMap.get(slot.course_id);
+        const attWeight = resolveSlotAttendanceWeight(slot, course, globalLabRule);
+        await markAttendance({
           course_id: slot.course_id,
           date: item.date,
           slot_id: slot.slot_id,
           status,
+          weight: attWeight,
+          component_type: slot.component_type || course?.type,
         });
-        const attWeight = resolveSlotAttendanceWeight(slot, courseMap.get(slot.course_id), globalLabRule);
-        if (attWeight > 1) {
-          await db.attendance_record.update(saved.id, { weight: attWeight });
-        }
       }
       onCatchUpDone?.();
     } finally {

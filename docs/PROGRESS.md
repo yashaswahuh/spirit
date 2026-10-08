@@ -263,9 +263,17 @@
       - **Grades & GPA**: Best of N, drop lowest, and required end-sem marks solver.
       - **Data Safety & Reset**: Distinction between non-destructive "Clear Logged Attendance Only" and full factory wipes, plus persistent storage.
       - **Calendar Alarms & PWA**: Offline install and RFC 5545 `.ics` export with alarms.
-  - **Testing & Verification**:
-    - Added unit test in `src/engine/__tests__/attendance.test.ts` verifying instant retroactive recalculation from 10 to 5 attended/conducted points.
-    - All 162 unit and accessibility tests pass across 16 test suites. Clean production build and Capacitor Android asset sync verified.
+  - **Lab Attendance Day-by-Day Consistency Fix**:
+    - **Root Cause**: Lab slots across different weekdays had inconsistent stored weights (e.g. 2 periods on Tuesday vs 1 period on Thursday due to presets or CSV parsing), and resolution engines (`resolveSlotAttendanceWeight`, `DayPickerView.getSlotEffectiveWeight`, `AttendanceScreen`, `CourseCalendarModal`) relied on stale per-slot or per-record values, causing the same lab to count for +2 on some days and only +1 on others.
+    - **Engine Fix (`timetable.ts` & `attendance.ts`)**:
+      - `resolveSlotAttendanceWeight`: Now inspects slot duration ($\ge 90$ mins spans $\ge 2$ periods), course type, and component type. Under `per_hour`, all lab sessions for a lab/multi-period course consistently evaluate to $\ge 2$ points across all weekdays; under `single_session`, all sessions consistently evaluate to 1 point.
+      - `computeCourseAttendanceStats`: Guarantees that within a course, every lab/multi-hour record evaluates to the same canonical weight without leaving isolated days at 1.
+    - **Repository & Screen Normalization**:
+      - `DayPickerView.tsx`: `getSlotEffectiveWeight` now dynamically references rule-resolved weights rather than stale prior records, and day summary stats accurately accumulate effective attendance points.
+      - `timetable.repo.ts`: `getEffectiveDaySchedule` and `getTodayTimetableSlots` pass courses and global lab rules and preserve `attendance_weight`.
+      - `HomeScreen.tsx` & `AttendanceScreen.tsx` & `CatchUpModal.tsx`: Synchronized to pass accurate weights and component types.
+      - `AttendanceScreen.tsx`: Automatically runs `syncAllCoursesAttendanceWeights` on mount to reconcile historical records.
+    - **Testing**: Added unit test in `attendance.test.ts` verifying that lab sessions on different weekdays with mixed historical records or slot weights consistently evaluate to 4 under `per_hour` and 2 under `single_session`. All 163 tests pass.
 
 ## Remaining
 - All planned phases, user features, attendance clear options, and APK build workflows fully implemented, tested, and verified.

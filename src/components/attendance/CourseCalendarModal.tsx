@@ -124,12 +124,17 @@ export const CourseCalendarModal: React.FC<CourseCalendarModalProps> = ({
     } else {
       const globalLabRule = getLabAttendanceRule();
       const rule = course.lab_attendance_rule || globalLabRule;
-      const weight = (course.type === 'lab' && rule === 'per_hour') ? 2 : 1;
+      const isLabCourse = course.type === 'lab' || course.type === 'theory_and_lab';
+      let weight = 1;
+      if (isLabCourse) {
+        weight = rule === 'single_session' ? 1 : 2;
+      }
       await markAttendance({
         course_id: course.id,
         date: selectedRecordDate,
         status,
         weight,
+        component_type: isLabCourse ? 'lab' : 'theory',
       });
     }
     setSelectedRecordDate(null);

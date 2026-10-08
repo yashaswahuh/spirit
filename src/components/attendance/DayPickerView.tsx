@@ -212,11 +212,8 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
     courseId: string,
     slotId: string | null,
     defaultAttWeight: number,
-    existingRecord?: AttendanceRecord
+    _existingRecord?: AttendanceRecord
   ): number => {
-    if (existingRecord?.weight !== undefined) {
-      return existingRecord.weight;
-    }
     const key = slotId || courseId;
     if (slotCustomWeights[key] !== undefined) {
       return slotCustomWeights[key];
@@ -248,6 +245,7 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
   ) => {
     const existing = getSlotRecord(courseId, slotId);
     const course = courseMap.get(courseId);
+    const slot = slotId ? daySchedule.slots.find(s => s.slot_id === slotId) : undefined;
     const courseName = course?.name || 'Class';
 
     if (existing && existing.status === targetStatus) {
@@ -270,6 +268,7 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
         slot_id: slotId,
         status: targetStatus,
         weight: attendanceWeight,
+        component_type: slot?.component_type || course?.type,
       });
 
       setLastAction({
@@ -372,11 +371,12 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
 
   for (const s of daySchedule.slots) {
     const rec = getSlotRecord(s.course_id, s.slot_id);
+    const effWeight = getSlotEffectiveWeight(s.course_id, s.slot_id, s.attendance_weight, rec);
     if (!rec || !rec.status) {
       unmarkedCount++;
     } else if (rec.status === 'present') {
       presentCount++;
-      presentPoints += rec.weight ?? 1;
+      presentPoints += effWeight;
     } else if (rec.status === 'absent') {
       absentCount++;
     } else if (rec.status === 'cancelled') {

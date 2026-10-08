@@ -9,6 +9,7 @@ import { attendanceRecordSchema, validateEntity } from '../schemas';
 import { generateUUID } from '../../utils/uuid';
 import { recordDataChange } from '../../utils/storage';
 import { getLabAttendanceRule } from '../../utils/preferences';
+import { resolveSlotAttendanceWeight, timeToMinutes } from '../../engine/timetable';
 
 export async function getAttendanceRecordsForCourse(courseId: string): Promise<AttendanceRecord[]> {
   return db.attendance_record
@@ -220,8 +221,18 @@ export async function syncCourseAttendanceWeights(
     .toArray();
 
   const slotsMap = new Map(slots.map(s => [s.id, s]));
-  const defaultSlotWeight =
-    slots.find(s => s.weight && s.weight > 1)?.weight || (course.type === 'lab' ? 2 : 1);
+
+  // Canonical lab weight for this course: max of slot durations or 2 if lab course
+  const maxSlotWeight = slots.reduce((max, s) => {
+    const diff = (s.start_time && s.end_time)
+      ? timeToMinutes(s.end_time) - timeToMinutes(s.start_time)
+      : 0;
+    const calcWeight = diff >= 150 ? 3 : diff >= 90 ? 2 : (s.weight || 1);
+    return Math.max(max, calcWeight);
+  }, 1);
+
+  const canonicalLabWeight =
+    maxSlotWeight > 1 ? maxSlotWeight : (course.type === 'lab' ? 2 : 1);
 
   const records = await db.attendance_record
     .where('course_id')
@@ -233,15 +244,28 @@ export async function syncCourseAttendanceWeights(
 
   for (const record of records) {
     const slot = record.slot_id ? slotsMap.get(record.slot_id) : undefined;
-    const isLabOrMultiHour =
+    const diffMins = (slot?.start_time && slot?.end_time)
+      ? timeToMinutes(slot.end_time) - timeToMinutes(slot.start_time)
+      : 0;
+
+    const isTheoryLecture = record.component_type === 'theory' && course.type === 'theory_and_lab';
+    const isLab = !isTheoryLecture && (
       record.component_type === 'lab' ||
       course.type === 'lab' ||
-      (slot && slot.weight && slot.weight > 1) ||
-      (course.lab_attendance_rule !== null && defaultSlotWeight > 1);
+      diffMins >= 90 ||
+      (slot && slot.weight !== undefined && slot.weight > 1) ||
+      (slot && slot.attendance_weight !== undefined && slot.attendance_weight !== null && slot.attendance_weight > 1) ||
+      (course.lab_attendance_rule !== null && canonicalLabWeight > 1) ||
+      (record.weight !== undefined && record.weight > 1)
+    );
 
-    if (isLabOrMultiHour) {
+    if (isLab) {
+      const slotWeight = slot
+        ? resolveSlotAttendanceWeight(slot, course, effectiveGlobal)
+        : canonicalLabWeight;
       const targetWeight =
-        effectiveRule === 'single_session' ? 1 : (slot?.weight || defaultSlotWeight || 2);
+        effectiveRule === 'single_session' ? 1 : Math.max(2, slotWeight);
+
       if (record.weight !== targetWeight) {
         updates.push({ id: record.id, weight: targetWeight });
       }
@@ -265,18 +289,17 @@ export async function syncCourseAttendanceWeights(
 }
 
 /**
- * Synchronizes attendance weights across all courses that follow the global default rule.
+ * Synchronizes attendance weights across all courses to normalize historical records.
  */
-export async function syncAllCoursesAttendanceWeights(newGlobalRule: LabAttendanceRule): Promise<number> {
+export async function syncAllCoursesAttendanceWeights(newGlobalRule?: LabAttendanceRule): Promise<number> {
+  const globalRule = newGlobalRule || getLabAttendanceRule();
   const courses = await db.course.filter(c => c.deleted_at === null).toArray();
   let totalUpdated = 0;
 
   for (const course of courses) {
-    // Only update courses that follow the global rule (course.lab_attendance_rule === null)
-    if (course.lab_attendance_rule === null) {
-      const updated = await syncCourseAttendanceWeights(course.id, null, newGlobalRule);
-      totalUpdated += updated;
-    }
+    // Sync all courses so historical inconsistent logs are immediately reconciled
+    const updated = await syncCourseAttendanceWeights(course.id, course.lab_attendance_rule, globalRule);
+    totalUpdated += updated;
   }
 
   return totalUpdated;

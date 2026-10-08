@@ -23,22 +23,56 @@ import {
  * 1. An explicit slot-level attendance_weight override
  * 2. Course-level lab_attendance_rule ('single_session' vs 'per_hour')
  * 3. Global lab_attendance_rule setting
- * For multi-period lab classes in colleges that count 1 attendance point per lab session,
- * returns 1 instead of the slot's multi-period duration.
+ * 4. Slot duration / time difference (>= 90 mins spans at least 2 periods)
+ * 5. Course type (lab or theory_and_lab) and slot component type
+ *
+ * Ensures labs consistently count for the exact same points (+1 or +2) across all days of the week.
  */
 export function resolveSlotAttendanceWeight(
-  slot: { weight?: number; attendance_weight?: number | null; component_type?: CourseType },
+  slot: {
+    weight?: number;
+    attendance_weight?: number | null;
+    component_type?: CourseType;
+    start_time?: string;
+    end_time?: string;
+  },
   course?: { lab_attendance_rule?: LabAttendanceRule | null; type?: CourseType } | null,
   globalLabRule: LabAttendanceRule = 'per_hour'
 ): number {
   if (slot.attendance_weight != null && slot.attendance_weight > 0) {
     return slot.attendance_weight;
   }
-  const isLab = slot.component_type ? slot.component_type === 'lab' : course?.type === 'lab';
+
+  const diffMins = (slot.start_time && slot.end_time)
+    ? timeToMinutes(slot.end_time) - timeToMinutes(slot.start_time)
+    : 0;
+  const isMultiPeriodTime = diffMins >= 90;
+  const isLabSlot = slot.component_type === 'lab';
+  const isExplicitTheory = slot.component_type === 'theory';
+  const isLab =
+    isLabSlot ||
+    (course?.type === 'lab' && !isExplicitTheory) ||
+    (!isExplicitTheory && isMultiPeriodTime) ||
+    (!isExplicitTheory && slot.weight !== undefined && slot.weight > 1);
+
   const effectiveRule = course?.lab_attendance_rule || globalLabRule;
-  if (isLab && effectiveRule === 'single_session') {
-    return 1;
+
+  if (isLab) {
+    if (effectiveRule === 'single_session') {
+      return 1;
+    }
+    // Under per_hour: calculate duration periods (minimum 2 for a lab or multi-hour block)
+    if (slot.weight && slot.weight > 1) {
+      return slot.weight;
+    }
+    if (diffMins >= 150) return 3;
+    if (diffMins >= 90) return 2;
+    // Default for any lab course/session under per_hour is 2 attendance points
+    if (slot.component_type === 'lab' || course?.type === 'lab') {
+      return 2;
+    }
   }
+
   return slot.weight && slot.weight > 0 ? slot.weight : 1;
 }
 

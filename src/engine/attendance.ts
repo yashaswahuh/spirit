@@ -4,6 +4,7 @@
  */
 
 import { AttendanceRecord, CourseAttendanceRules, AttendanceStats, CourseType, LabAttendanceRule, TimetableSlot } from '../types';
+import { timeToMinutes } from './timetable';
 
 /**
  * Normalizes threshold input to a decimal fraction in (0, 1].
@@ -121,27 +122,47 @@ export function computeCourseAttendanceStats(
     let weight = record.weight && record.weight > 0 ? record.weight : 1;
 
     let compType = record.component_type;
-    if (!compType && record.slot_id && slotLookup) {
-      compType = slotLookup.get(record.slot_id)?.component_type;
+    const slot = record.slot_id && slotLookup ? slotLookup.get(record.slot_id) : undefined;
+    if (!compType && slot?.component_type) {
+      compType = slot.component_type;
     }
-    const isLab = compType === 'lab' || options?.courseType === 'lab';
 
-    // Dynamic attendance rule evaluation for seamless retroactive updates
-    if (effectiveRule === 'single_session') {
-      if (isLab || options?.labAttendanceRule === 'single_session') {
+    const diffMins = (slot?.start_time && slot?.end_time)
+      ? timeToMinutes(slot.end_time) - timeToMinutes(slot.start_time)
+      : 0;
+
+    const courseSlots = options?.slots?.filter(s => s.course_id === record.course_id);
+    const hasMultiPeriodSlot = courseSlots?.some(s => (s.weight && s.weight > 1) || s.component_type === 'lab') ?? false;
+
+    // A session is considered a lab / multi-hour block if:
+    // - explicitly marked as lab component_type
+    // - course itself is a pure lab
+    // - slot duration spans >= 90 mins (or has weight > 1)
+    // - or course is lab/has multi-period slots and not an explicitly marked theory lecture
+    const isTheoryLecture = compType === 'theory' && options?.courseType === 'theory_and_lab';
+    const isLab = !isTheoryLecture && (
+      compType === 'lab' ||
+      options?.courseType === 'lab' ||
+      diffMins >= 90 ||
+      (slot && slot.weight !== undefined && slot.weight > 1) ||
+      (record.weight !== undefined && record.weight > 1) ||
+      hasMultiPeriodSlot
+    );
+
+    // Dynamic attendance rule evaluation for seamless, consistent updates across all days
+    if (isLab || options?.labAttendanceRule !== undefined) {
+      if (effectiveRule === 'single_session') {
         weight = 1;
-      }
-    } else if (effectiveRule === 'per_hour') {
-      if (isLab && weight === 1) {
-        const slot = record.slot_id && slotLookup ? slotLookup.get(record.slot_id) : undefined;
-        if (slot?.weight && slot.weight > 1) {
-          weight = slot.weight;
-        } else {
-          const multiSlot = options?.slots?.find(s => s.weight && s.weight > 1);
-          if (multiSlot?.weight) {
-            weight = multiSlot.weight;
-          }
-        }
+      } else if (effectiveRule === 'per_hour') {
+        const slotW = slot?.weight || (diffMins >= 150 ? 3 : diffMins >= 90 ? 2 : 0);
+        const maxCourseSlotW = courseSlots?.reduce((max, s) => {
+          const d = (s.start_time && s.end_time)
+            ? timeToMinutes(s.end_time) - timeToMinutes(s.start_time)
+            : 0;
+          return Math.max(max, d >= 90 ? 2 : (s.weight || 1));
+        }, 1) || 2;
+        const targetW = slotW > 1 ? slotW : Math.max(2, maxCourseSlotW);
+        weight = targetW;
       }
     }
 

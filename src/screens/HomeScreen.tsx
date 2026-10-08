@@ -141,10 +141,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
 
   const handleMarkToday = async (courseId: string, slotId: string | null, status: any) => {
     const slot = slotId ? slots.find(s => s.id === slotId) : null;
+    const todaySlot = slotId ? todaySlots.find(s => s.id === slotId) : null;
+    const effectiveSlot = slot || todaySlot;
     const course = courseMap.get(courseId);
-    const attWeight = slot
-      ? resolveSlotAttendanceWeight(slot, course, getLabAttendanceRule())
-      : 1;
+    const globalLabRule = getLabAttendanceRule();
+    const attWeight = effectiveSlot
+      ? resolveSlotAttendanceWeight(effectiveSlot, course, globalLabRule)
+      : (course?.type === 'lab' ? (globalLabRule === 'single_session' ? 1 : 2) : 1);
 
     // Check if a record already exists with this status -> tapping again unmarks!
     const existing = recordsToday.find(
@@ -162,7 +165,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
       slot_id: slotId,
       status,
       weight: attWeight,
-      component_type: slot?.component_type || course?.type,
+      component_type: effectiveSlot?.component_type || (course?.type === 'lab' ? 'lab' : 'theory'),
     });
   };
 

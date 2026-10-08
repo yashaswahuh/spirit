@@ -297,6 +297,38 @@ describe('Attendance Engine', () => {
       expect(statsNssSingleSession.attended).toBe(5);
       expect(statsNssSingleSession.conducted).toBe(5);
     });
+
+    it('ensures lab attendance applies consistently across all days even if past records had mixed weights', () => {
+      // Suppose Monday's record was stored as weight 2, and Wednesday's record was stored as weight 1
+      const mixedDaysRecords: AttendanceRecord[] = [
+        { id: 'mon', user_id: 'u1', course_id: 'c-lab', slot_id: 's-mon', date: '2026-10-05', status: 'present', weight: 2, note: null, created_at: '', updated_at: '', deleted_at: null },
+        { id: 'wed', user_id: 'u1', course_id: 'c-lab', slot_id: 's-wed', date: '2026-10-07', status: 'present', weight: 1, note: null, created_at: '', updated_at: '', deleted_at: null },
+      ];
+
+      const slots = [
+        { id: 's-mon', course_id: 'c-lab', weekday: 1, start_time: '14:00', end_time: '16:00', weight: 2, component_type: 'lab', deleted_at: null } as any,
+        // Wednesday slot was accidentally saved with weight 1, but spans 2 hours (14:00 to 16:00)
+        { id: 's-wed', course_id: 'c-lab', weekday: 3, start_time: '14:00', end_time: '16:00', weight: 1, component_type: 'lab', deleted_at: null } as any,
+      ];
+
+      // Under per_hour: both Monday and Wednesday MUST consistently award 2 points each -> total 4
+      const statsPerHour = computeCourseAttendanceStats(mixedDaysRecords, rulesStrict, 75, {
+        courseType: 'lab',
+        labAttendanceRule: 'per_hour',
+        slots,
+      });
+      expect(statsPerHour.attended).toBe(4);
+      expect(statsPerHour.conducted).toBe(4);
+
+      // Under single_session: both Monday and Wednesday MUST consistently award 1 point each -> total 2
+      const statsSingle = computeCourseAttendanceStats(mixedDaysRecords, rulesStrict, 75, {
+        courseType: 'lab',
+        labAttendanceRule: 'single_session',
+        slots,
+      });
+      expect(statsSingle.attended).toBe(2);
+      expect(statsSingle.conducted).toBe(2);
+    });
   });
 
   describe('countUnmarkedClasses', () => {
