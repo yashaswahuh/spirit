@@ -464,6 +464,11 @@ export const GradesScreen: React.FC = () => {
                             <span className="text-xs text-gray-500 font-medium">
                               {course.credits} Credits
                             </span>
+                            {course.type === 'theory_and_lab' && (
+                              <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 rounded text-[10px] font-bold">
+                                Theory + Lab
+                              </span>
+                            )}
                             {!course.counts_toward_gpa && (
                               <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded text-[10px] font-bold">
                                 Audit (No GPA)

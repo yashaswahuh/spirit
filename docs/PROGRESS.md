@@ -360,9 +360,11 @@
     - **Open Source Licensing**: Created permissive [`LICENSE`](file:///d:/spirit/LICENSE) (MIT License) with full user permissions.
     - **Repository Hardening**: Hardened [`.gitignore`](file:///d:/spirit/.gitignore) to exclude Android Studio `local.properties`, keystores (`*.keystore`, `*.jks`), temporary OTA dists (`dist-ota/`), and local IDE settings (`.idea/`, `.vscode/`).
     - **Package Metadata**: Updated `package.json` with repository URL, description, and `"license": "MIT"`.
-    - **Dual-Domain High-Availability Deployment (`https://yashaswahuh.is-a.dev/spirit/` & `https://yashaswahuh.github.io/spirit/`)**:
-      - Configured Live OTA auto-update manifests (`scripts/package-ota.js`, `src/utils/updater.ts`) to serve from primary URL `https://yashaswahuh.is-a.dev/spirit/` with automatic fallback to GitHub Pages for both manifest retrieval AND zip bundle downloading if the primary domain ever encounters downtime.
-      - Updated `README.md` with primary and backup mirror links, badges, and documentation.
+    - **Hybrid Course Type in Grades Screen Rules (`CourseRulesModal.tsx`)**:
+      - Added `theory_and_lab` ("Theory + Practical / Lab (Integrated / Hybrid)") option to the Course Rules modal in Grades, matching the Attendance screen options.
+      - Added attendance counting rule selector (`lab_attendance_rule`) to `CourseRulesModal.tsx` so students can set custom 1 per session vs 1 per hour rules directly from Grades.
+      - Added dynamic `Theory + Lab` indicator badge on `GradesScreen.tsx` course cards.
+      - Added unit test in `schemas.test.ts`. All 171 unit tests passing.
 
 ## Remaining
 - All planned phases, user features, attendance clear options, APK build workflows, and multi-hour attendance counting rules fully implemented, tested, and verified.

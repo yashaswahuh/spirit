@@ -108,6 +108,21 @@ describe('Zod Validation Schemas', () => {
       };
       expect(() => validateEntity(courseSchema, validCourseWithFaculty)).not.toThrow();
     });
+
+    it('validates hybrid theory_and_lab course with custom attendance counting rule', () => {
+      const validHybrid = {
+        ...validBase,
+        term_id: 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
+        name: 'Database Management Systems',
+        code: 'CS301',
+        credits: 4,
+        type: 'theory_and_lab' as const,
+        counts_toward_gpa: true,
+        lab_attendance_rule: 'single_session' as const,
+        color: '#6366f1',
+      };
+      expect(() => validateEntity(courseSchema, validHybrid)).not.toThrow();
+    });
   });
 
   describe('timetableSlotSchema', () => {
