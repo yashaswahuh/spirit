@@ -352,6 +352,9 @@
       - Updated `AndroidManifest.xml` to declare `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`, `READ_MEDIA_IMAGES`, and `MANAGE_EXTERNAL_STORAGE` without restrictive `maxSdkVersion` constraints.
       - Added `src/utils/storagePermissions.ts` to check and request Android runtime storage permissions.
       - Integrated automatic storage permission requests into PDF export, JSON backup, CSV export, and calendar `.ics` download flows, plus an explicit permission control in `MoreScreen.tsx`.
+    - **APK Binary Naming (`spirit-v1.apk`)**:
+      - Updated Gradle `applicationVariants` in `android/app/build.gradle` so generated APK binary outputs as `spirit-v1.apk`.
+      - Updated `.github/workflows/build-android.yml` CI release pipeline to upload artifact `spirit-v1` and attach `spirit-v1.apk` to GitHub Releases.
     - **Version Upgrade**:
       - Bumped version to `1.0.0` (versionCode `1000`) across `package.json`, `android/app/build.gradle`, `UserGuideModal.tsx`, `MoreScreen.tsx`, and CI workflows.
       - All 170 unit tests pass across 18 test files.

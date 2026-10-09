@@ -322,3 +322,4 @@ export async function exportAttendancePdf(data: AttendancePdfData): Promise<'sha
   doc.save(filename);
   return 'downloaded';
 }
+

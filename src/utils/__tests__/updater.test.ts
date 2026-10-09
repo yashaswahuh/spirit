@@ -19,3 +19,4 @@ describe('Live OTA Updater Engine', () => {
     expect(res.currentVersion).toBe('1.0.0');
   });
 });
+
