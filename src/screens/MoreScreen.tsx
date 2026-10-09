@@ -278,7 +278,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
 
   const handleCheckForUpdates = async () => {
     setIsCheckingUpdate(true);
-    setUpdateStatusMsg('Checking GitHub Pages for updates...');
+    setUpdateStatusMsg('Checking for updates...');
     try {
       const res = await checkForLiveUpdate();
       if (res.hasUpdate) {
