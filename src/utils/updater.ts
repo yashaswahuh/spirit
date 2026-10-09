@@ -11,6 +11,7 @@ export interface VersionManifest {
   version: string;
   build: number;
   bundleUrl: string;
+  fallbackBundleUrl?: string;
   releaseNotes?: string;
   minNativeVersion?: string;
 }
@@ -116,11 +117,29 @@ export async function checkForLiveUpdate(options?: {
       };
     }
 
-    // Download the new web bundle in the background
-    const downloaded = await CapacitorUpdater.download({
-      url: manifest.bundleUrl,
-      version: manifest.version,
-    });
+    // Download the new web bundle in the background with automatic dual-domain fallback
+    let downloaded: BundleInfo;
+    try {
+      downloaded = await CapacitorUpdater.download({
+        url: manifest.bundleUrl,
+        version: manifest.version,
+      });
+    } catch (primaryErr) {
+      const fallbackUrl =
+        manifest.fallbackBundleUrl ||
+        manifest.bundleUrl.replace('yashaswahuh.is-a.dev', 'yashaswahuh.github.io');
+      if (fallbackUrl && fallbackUrl !== manifest.bundleUrl) {
+        if (!options?.silent) {
+          console.warn('Primary bundle download failed, falling back to backup domain:', fallbackUrl, primaryErr);
+        }
+        downloaded = await CapacitorUpdater.download({
+          url: fallbackUrl,
+          version: manifest.version,
+        });
+      } else {
+        throw primaryErr;
+      }
+    }
 
     // Mark the bundle to be activated on the next background / app restart
     await CapacitorUpdater.next({ id: downloaded.id });

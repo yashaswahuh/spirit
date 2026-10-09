@@ -59,6 +59,7 @@ const manifest = {
   version,
   build,
   bundleUrl: 'https://yashaswahuh.is-a.dev/spirit/dist-ota.zip',
+  fallbackBundleUrl: 'https://yashaswahuh.github.io/spirit/dist-ota.zip',
   releaseNotes: `Spirit v${version} - Official Release with live OTA auto-updates, PDF attendance reports, and native storage integration.`,
   updatedAt: new Date().toISOString(),
 };

@@ -5,6 +5,7 @@
 [![Version](https://img.shields.io/badge/release-v1.0.0-blue)](https://github.com/yashaswahuh/spirit/releases/latest)
 [![Android APK](https://img.shields.io/badge/Download%20APK-spirit--v1.apk-success?logo=android&logoColor=white)](https://github.com/yashaswahuh/spirit/releases/latest)
 [![Live Web App](https://img.shields.io/badge/Live%20Web%20App-Online-emerald)](https://yashaswahuh.is-a.dev/spirit/)
+[![Mirror Web App](https://img.shields.io/badge/Backup%20Mirror-GitHub%20Pages-blue)](https://yashaswahuh.github.io/spirit/)
 
 > **Fast, private, local-first academic tracker and attendance companion for university students.**
 
@@ -12,7 +13,8 @@ Spirit runs entirely on your device. Zero accounts, no tracking, no external dat
 
 | Quick Links | |
 | :--- | :--- |
-| 🌐 **Live Web App** | [yashaswahuh.is-a.dev/spirit/](https://yashaswahuh.is-a.dev/spirit/) |
+| 🌐 **Live Web App (Primary)** | [yashaswahuh.is-a.dev/spirit/](https://yashaswahuh.is-a.dev/spirit/) |
+| 🔄 **Live Web App (Backup Mirror)** | [yashaswahuh.github.io/spirit/](https://yashaswahuh.github.io/spirit/) |
 | 📱 **Download Android APK** | [`spirit-v1.apk` on GitHub Releases](https://github.com/yashaswahuh/spirit/releases/latest) |
 | 📖 **User Manual** | [Complete How-To-Use Guide & Manual](docs/USER_GUIDE.md) |
 | 📄 **Open Source License** | [MIT License](LICENSE) |
