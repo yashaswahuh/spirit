@@ -13,6 +13,9 @@ const config: CapacitorConfig = {
     backgroundColor: '#ffffff',
   },
   plugins: {
+    CapacitorHttp: {
+      enabled: true,
+    },
     CapacitorUpdater: {
       autoUpdate: false,
       appReadyTimeout: 10000,

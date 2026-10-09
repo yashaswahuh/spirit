@@ -37,16 +37,19 @@ async function fetchManifestJson(url: string): Promise<VersionManifest> {
   const cacheBustedUrl = `${url}?_t=${Date.now()}`;
 
   if (Capacitor.isNativePlatform()) {
-    const res = await CapacitorHttp.get({
-      url: cacheBustedUrl,
-      headers: {
-        Accept: 'application/json',
-      },
-    });
-    if (res.status !== 200 || !res.data) {
-      throw new Error(`HTTP status: ${res.status}`);
+    try {
+      const res = await CapacitorHttp.get({
+        url: cacheBustedUrl,
+        headers: {
+          Accept: 'application/json',
+        },
+      });
+      if (res.status === 200 && res.data) {
+        return typeof res.data === 'string' ? JSON.parse(res.data) : (res.data as VersionManifest);
+      }
+    } catch (nativeErr) {
+      console.warn('CapacitorHttp get failed, falling back to window.fetch:', nativeErr);
     }
-    return typeof res.data === 'string' ? JSON.parse(res.data) : (res.data as VersionManifest);
   }
 
   const res = await fetch(cacheBustedUrl, {
