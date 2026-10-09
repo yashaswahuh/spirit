@@ -579,3 +579,85 @@ export function findNextAvailablePeriodTiming(
   return unscheduled || teachingPeriods[0];
 }
 
+/**
+ * Calculates the maximum conducted classes possible for a course up to dateStr (inclusive).
+ * Ensures that attendance count can NEVER exceed the total lectures that have actually been scheduled/conducted till dateStr.
+ *
+ * Accounts for:
+ * - course.initial_conducted opening balance (from college portal)
+ * - Timetable slots scheduled between startDate and dateStr (excluding holidays)
+ * - Slot weights and lab attendance rules
+ * - Existing recorded conducted classes
+ */
+export function calculateCourseMaxConductedTillDate({
+  course,
+  dateStr,
+  termStartDate,
+  versions = [],
+  slots = [],
+  calendarEvents = [],
+  overrides = [],
+  workingDays = [1, 2, 3, 4, 5, 6],
+  saturdayRule,
+  courses = [],
+  globalLabRule = 'per_hour',
+  existingConducted = 0,
+}: {
+  course: Course;
+  dateStr: string;
+  termStartDate: string;
+  versions?: TimetableVersion[];
+  slots?: TimetableSlot[];
+  calendarEvents?: CalendarEvent[];
+  overrides?: TimetableOverride[];
+  workingDays?: Weekday[];
+  saturdayRule?: SaturdayRule;
+  courses?: Course[];
+  globalLabRule?: LabAttendanceRule;
+  existingConducted?: number;
+}): number {
+  const initialConducted = Math.max(0, course.initial_conducted || 0);
+  const courseSlots = slots.filter(s => s.course_id === course.id);
+
+  if (courseSlots.length === 0) {
+    // Course does not use timetable slots. The limit is the established initial/recorded total.
+    return Math.max(initialConducted, existingConducted);
+  }
+
+  const startDate = course.tracking_start_date || termStartDate;
+  if (!startDate || startDate > dateStr) {
+    return Math.max(initialConducted, existingConducted);
+  }
+
+  let scheduledWeight = 0;
+  const current = new Date(startDate + 'T00:00:00Z');
+  const end = new Date(dateStr + 'T00:00:00Z');
+
+  while (current <= end) {
+    const curDateStr = current.toISOString().slice(0, 10);
+    const daySchedule = resolveDaySchedule({
+      date: curDateStr,
+      versions,
+      slots,
+      calendarEvents,
+      overrides,
+      workingDays,
+      saturdayRule,
+      courses,
+      labAttendanceRule: globalLabRule,
+    });
+
+    if (!daySchedule.is_holiday) {
+      const dayCourseSlots = daySchedule.slots.filter(s => s.course_id === course.id);
+      for (const slot of dayCourseSlots) {
+        scheduledWeight += resolveSlotAttendanceWeight(slot, course, globalLabRule);
+      }
+    }
+
+    current.setUTCDate(current.getUTCDate() + 1);
+  }
+
+  const maxFromSchedule = initialConducted + scheduledWeight;
+  return Math.max(maxFromSchedule, existingConducted);
+}
+

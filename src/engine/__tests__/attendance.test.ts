@@ -441,6 +441,30 @@ describe('Attendance Engine', () => {
       expect(stats.is_in_danger).toBe(true);
       expect(stats.must_attend).toBe(1);
     });
+    it('correctly aggregates multiple class sessions on the same date (e.g. 2 NSS classes on one day)', () => {
+      // User scenario: initial 7/8.
+      // 1st click on Present adds session 1 -> 8/9.
+      // 2nd click on Present adds session 2 -> 9/10.
+      // 3rd click on Absent adds session 3 -> 9/11.
+      const sameDateRecords: AttendanceRecord[] = [
+        { id: '1', user_id: 'u1', course_id: 'c1', slot_id: null, note: null, date: '2026-10-09', status: 'present', weight: 1, created_at: '', updated_at: '', deleted_at: null },
+        { id: '2', user_id: 'u1', course_id: 'c1', slot_id: null, note: null, date: '2026-10-09', status: 'present', weight: 1, created_at: '', updated_at: '', deleted_at: null },
+        { id: '3', user_id: 'u1', course_id: 'c1', slot_id: null, note: null, date: '2026-10-09', status: 'absent', weight: 1, created_at: '', updated_at: '', deleted_at: null },
+      ];
+
+      const stats = computeCourseAttendanceStats(
+        sameDateRecords,
+        { medical_counts_as_present: false, duty_leave_counts_as_present: false },
+        75,
+        { initialAttended: 7, initialConducted: 8 }
+      );
+
+      // Total attended: 7 + 1 + 1 + 0 = 9
+      // Total conducted: 8 + 1 + 1 + 1 = 11
+      expect(stats.attended).toBe(9);
+      expect(stats.conducted).toBe(11);
+      expect(stats.percentage).toBeCloseTo((9 / 11) * 100, 1);
+    });
   });
 });
 

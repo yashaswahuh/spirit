@@ -35,36 +35,41 @@ export interface MarkAttendanceParams {
   note?: string | null;
   weight?: number;
   component_type?: any;
+  createNew?: boolean;
 }
 
 /**
  * One-tap attendance mark or toggle.
  * If an attendance record already exists for (course_id, date, slot_id), updates its status.
  * Otherwise creates a new record.
+ * If createNew is true, always creates a new session record.
  */
 export async function markAttendance(params: MarkAttendanceParams): Promise<AttendanceRecord> {
   const now = new Date().toISOString();
-  const { course_id, date, status, slot_id = null, note = null, weight = 1, component_type } = params;
+  const { course_id, date, status, slot_id = null, note = null, weight = 1, component_type, createNew = false } = params;
 
-  // Query existing active records for this course and date
-  const records = await db.attendance_record
-    .where('course_id')
-    .equals(course_id)
-    .filter(r => r.deleted_at === null && r.date === date)
-    .toArray();
-
-  // Find matching record: exact slot_id match first, or match by component_type, or adopt existing record
   let existing: AttendanceRecord | undefined;
-  if (slot_id) {
-    existing = records.find(r => r.slot_id === slot_id);
-    if (!existing) {
-      existing = records.find(r => !r.slot_id && (!component_type || r.component_type === component_type));
+
+  if (!createNew) {
+    // Query existing active records for this course and date
+    const records = await db.attendance_record
+      .where('course_id')
+      .equals(course_id)
+      .filter(r => r.deleted_at === null && r.date === date)
+      .toArray();
+
+    // Find matching record: exact slot_id match first, or match by component_type, or adopt existing record
+    if (slot_id) {
+      existing = records.find(r => r.slot_id === slot_id);
+      if (!existing) {
+        existing = records.find(r => !r.slot_id && (!component_type || r.component_type === component_type));
+      }
+    } else if (component_type) {
+      // If component_type is specified (e.g. theory or lab), match that component's record
+      existing = records.find(r => r.component_type === component_type);
+    } else {
+      existing = records[0];
     }
-  } else if (component_type) {
-    // If component_type is specified (e.g. theory or lab), match that component's record
-    existing = records.find(r => r.component_type === component_type);
-  } else {
-    existing = records[0];
   }
 
   if (existing) {

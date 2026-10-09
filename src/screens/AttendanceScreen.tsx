@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Plus, Search, Filter, CalendarCheck, Sparkles, LayoutGrid, CalendarDays, FileText, RotateCcw } from 'lucide-react';
+import { Plus, Search, Filter, CalendarCheck, Sparkles, LayoutGrid, CalendarDays, FileText, RotateCcw, AlertCircle, X } from 'lucide-react';
 import { db } from '../db/dexie';
 import { Course, AttendanceStatus } from '../types';
 import { computeCourseAttendanceStats, countUnmarkedClasses } from '../engine/attendance';
@@ -14,10 +14,10 @@ import { CourseCalendarModal } from '../components/attendance/CourseCalendarModa
 import { AttendanceReportModal } from '../components/attendance/AttendanceReportModal';
 import { ClearAttendanceModal } from '../components/attendance/ClearAttendanceModal';
 import { createCourse, updateCourse, deleteCourse } from '../db/repositories/course.repo';
-import { markAttendance, syncAllCoursesAttendanceWeights } from '../db/repositories/attendance.repo';
+import { markAttendance, deleteAttendanceRecord, syncAllCoursesAttendanceWeights } from '../db/repositories/attendance.repo';
 import { PageContainer } from '../components/layout/PageContainer';
 import { getLabAttendanceRule } from '../utils/preferences';
-import { timeToMinutes } from '../engine/timetable';
+import { timeToMinutes, resolveDaySchedule, resolveSlotAttendanceWeight, calculateCourseMaxConductedTillDate } from '../engine/timetable';
 
 export const AttendanceScreen: React.FC = () => {
   const profile = useLiveQuery(() => db.profile.filter(p => p.deleted_at === null).first());
@@ -41,6 +41,20 @@ export const AttendanceScreen: React.FC = () => {
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isClearAttendanceOpen, setIsClearAttendanceOpen] = useState(false);
   const [clearInitialCourseId, setClearInitialCourseId] = useState<string | null>(null);
+
+  // In-app Notification / Toast (auto-dismissing)
+  const [notification, setNotification] = useState<{ message: string; type: 'info' | 'warning' } | null>(null);
+
+  const showNotification = (message: string, type: 'info' | 'warning' = 'info') => {
+    setNotification({ message, type });
+  };
+
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 3500);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -158,6 +172,8 @@ export const AttendanceScreen: React.FC = () => {
     componentType?: 'theory' | 'lab'
   ) => {
     const course = courses.find(c => c.id === courseId);
+    if (!course) return;
+
     const globalLabRule = getLabAttendanceRule();
     const effectiveLabRule = course?.lab_attendance_rule || globalLabRule;
 
@@ -192,6 +208,152 @@ export const AttendanceScreen: React.FC = () => {
       }
     }
 
+    // Check today's schedule for this course
+    const todayRes = resolveDaySchedule({
+      date: todayStr,
+      versions,
+      slots,
+      calendarEvents,
+      overrides,
+      workingDays: activeTerm?.working_days || [1, 2, 3, 4, 5, 6],
+      saturdayRule: activeTerm?.saturday_rule,
+      courses,
+      labAttendanceRule: globalLabRule,
+    });
+
+    const courseTodaySlots = todayRes.slots.filter(s => s.course_id === courseId);
+    const courseRecordsToday = records.filter(
+      r => r.course_id === courseId && r.date === todayStr && !r.deleted_at
+    );
+
+    // Compute current stats for dialog preview
+    const courseStats = computeCourseAttendanceStats(
+      records.filter(r => r.course_id === courseId),
+      {
+        medical_counts_as_present: course.medical_counts_as_present,
+        duty_leave_counts_as_present: course.duty_leave_counts_as_present,
+      },
+      course.attendance_threshold_override || defaultThreshold,
+      {
+        initialAttended: course.initial_attended,
+        initialConducted: course.initial_conducted,
+        trackingStartDate: course.tracking_start_date,
+        slots,
+        courseType: course.type,
+        labAttendanceRule: course.lab_attendance_rule,
+        globalLabRule,
+      }
+    );
+
+    // Guard: Prevent excessive sessions on a single date (cap at 3)
+    if (courseRecordsToday.length >= 3) {
+      alert(`Maximum 3 sessions can be recorded for ${course.name} on a single date. Please check your timetable or edit subject details.`);
+      return;
+    }
+
+    const maxConductedTillToday = calculateCourseMaxConductedTillDate({
+      course,
+      dateStr: todayStr,
+      termStartDate: activeTerm?.start_date || todayStr,
+      versions,
+      slots,
+      calendarEvents,
+      overrides,
+      workingDays: activeTerm?.working_days || [1, 2, 3, 4, 5, 6],
+      saturdayRule: activeTerm?.saturday_rule,
+      courses,
+      globalLabRule,
+      existingConducted: courseStats.conducted,
+    });
+
+    // Case 1: Course has scheduled slots on today's timetable
+    if (courseTodaySlots.length > 0) {
+      // Find first unmarked scheduled slot for today
+      const unmarkedSlot = courseTodaySlots.find(s => {
+        if (targetComp && s.component_type && s.component_type !== targetComp) return false;
+        return !records.some(r => r.course_id === courseId && r.date === todayStr && r.slot_id === s.slot_id && !r.deleted_at);
+      });
+
+      if (unmarkedSlot && unmarkedSlot.slot_id) {
+        // Mark the scheduled slot
+        const slotDef = slots.find(s => s.id === unmarkedSlot.slot_id);
+        const slotWeight = resolveSlotAttendanceWeight(slotDef || (unmarkedSlot as any), course, globalLabRule);
+        await markAttendance({
+          course_id: courseId,
+          date: todayStr,
+          status,
+          slot_id: unmarkedSlot.slot_id,
+          weight: slotWeight,
+          component_type: unmarkedSlot.component_type || targetComp,
+        });
+        return;
+      }
+
+      // All scheduled slots for today are marked!
+      // If there is a record today and user clicked a DIFFERENT status, update that record without inflating count!
+      if (courseRecordsToday.length > 0 && courseRecordsToday[0].status !== status) {
+        await markAttendance({
+          course_id: courseId,
+          date: todayStr,
+          status,
+          slot_id: courseRecordsToday[0].slot_id,
+          weight: courseRecordsToday[0].weight || weight,
+          component_type: targetComp,
+          createNew: false,
+        });
+        return;
+      }
+
+      // If user clicked the SAME status, do not inflate! Warn user.
+      showNotification(
+        `${course.name} is already marked ${courseRecordsToday[0]?.status || status} for today. All ${maxConductedTillToday} lectures conducted till today are recorded.`
+      );
+      return;
+    }
+
+    // Case 2: No scheduled slots on today's timetable
+    const hasAnySlots = slots.some(s => s.course_id === courseId);
+    if (hasAnySlots) {
+      // Course has timetable slots on other days, but NONE today.
+      // Do not allow creating phantom lectures on unscheduled days!
+      showNotification(
+        `No lecture is scheduled for ${course.name} today. Total conducted lectures till today is ${courseStats.conducted}.`
+      );
+      return;
+    }
+
+    // Case 3: Course does not use timetable slots at all
+    // If already has a record today and clicked a DIFFERENT status: switch/correct it!
+    if (courseRecordsToday.length > 0 && courseRecordsToday[0].status !== status) {
+      await markAttendance({
+        course_id: courseId,
+        date: todayStr,
+        status,
+        slot_id: courseRecordsToday[0].slot_id,
+        weight: courseRecordsToday[0].weight || weight,
+        component_type: targetComp,
+        createNew: false,
+      });
+      return;
+    }
+
+    // If already has a record today and clicked the SAME status:
+    if (courseRecordsToday.length > 0) {
+      showNotification(
+        `${course.name} is already marked ${status} for today. Total conducted lectures: ${courseStats.conducted}.`
+      );
+      return;
+    }
+
+    // If today has 0 records, but course already reached its maximum conducted limit:
+    if (courseStats.conducted >= maxConductedTillToday && maxConductedTillToday > 0) {
+      showNotification(
+        `${course.name} has already reached its limit of ${maxConductedTillToday} conducted lectures till today.`
+      );
+      return;
+    }
+
+    // No timetable used and 0 records today: log 1st class for today directly!
     await markAttendance({
       course_id: courseId,
       date: todayStr,
@@ -199,7 +361,20 @@ export const AttendanceScreen: React.FC = () => {
       slot_id: null,
       weight,
       component_type: targetComp,
+      createNew: true,
     });
+  };
+
+  const handleUndoCourseMark = async (courseId: string) => {
+    const courseRecordsToday = records.filter(
+      r => r.course_id === courseId && r.date === todayStr && !r.deleted_at
+    );
+    if (courseRecordsToday.length === 0) return;
+
+    // Pick the most recently updated/created record today
+    const sorted = [...courseRecordsToday].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+    const target = sorted[0];
+    await deleteAttendanceRecord(target.id);
   };
 
   const handleDeleteCourse = async (courseId: string) => {
@@ -404,14 +579,46 @@ export const AttendanceScreen: React.FC = () => {
                 const naturalWeight = multiSlot?.weight && multiSlot.weight > 1 ? multiSlot.weight : (course.type === 'lab' ? 2 : 1);
                 const subjectAttendancePoints = effectiveLabRule === 'single_session' ? 1 : naturalWeight;
 
+                const todayRes = resolveDaySchedule({
+                  date: todayStr,
+                  versions,
+                  slots,
+                  calendarEvents,
+                  overrides,
+                  workingDays: activeTerm?.working_days || [1, 2, 3, 4, 5, 6],
+                  saturdayRule: activeTerm?.saturday_rule,
+                  courses,
+                  labAttendanceRule: globalLabRule,
+                });
+                const courseTodaySlots = todayRes.slots.filter(s => s.course_id === course.id);
+                const maxConductedTillToday = calculateCourseMaxConductedTillDate({
+                  course,
+                  dateStr: todayStr,
+                  termStartDate: activeTerm?.start_date || todayStr,
+                  versions,
+                  slots,
+                  calendarEvents,
+                  overrides,
+                  workingDays: activeTerm?.working_days || [1, 2, 3, 4, 5, 6],
+                  saturdayRule: activeTerm?.saturday_rule,
+                  courses,
+                  globalLabRule,
+                  existingConducted: stats.conducted,
+                });
+
                 return (
                   <CourseAttendanceCard
                     key={course.id}
                     course={course}
                     stats={stats}
+                    todayRecords={records.filter(r => r.course_id === course.id && r.date === todayStr && !r.deleted_at)}
+                    todaySlotsCount={courseTodaySlots.length}
+                    maxConductedTillToday={maxConductedTillToday}
+                    hasTimetable={courseSlots.length > 0}
                     projection={projection}
                     labAttendancePoints={subjectAttendancePoints}
                     onMark={(status, component) => handleMarkCourse(course.id, status, component)}
+                    onUndo={() => handleUndoCourseMark(course.id)}
                     onEdit={() => {
                       setEditingCourse(course);
                       setIsModalOpen(true);
@@ -482,6 +689,21 @@ export const AttendanceScreen: React.FC = () => {
           }}
           initialCourseId={clearInitialCourseId}
         />
+      )}
+
+      {/* Floating In-App Toast Notification */}
+      {notification && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-3 rounded-2xl bg-gray-900 text-white text-xs font-bold shadow-2xl flex items-center gap-2.5 border border-gray-700 animate-slide-up max-w-[90vw] sm:max-w-md">
+          <AlertCircle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <span className="flex-1">{notification.message}</span>
+          <button
+            type="button"
+            onClick={() => setNotification(null)}
+            className="p-1 rounded-lg text-gray-400 hover:text-white transition-colors cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
       )}
     </PageContainer>
   );
