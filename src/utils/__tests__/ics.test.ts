@@ -107,5 +107,93 @@ describe('iCalendar generator', () => {
     expect(ics).toContain('TRIGGER:-PT2H'); // 2 hours before
     expect(ics).toContain('END:VCALENDAR');
   });
+
+  it('accurately incorporates second Saturday off and holiday exclusions using EXDATE', () => {
+    const termWithSatRule: Term = {
+      ...dummyTerm,
+      start_date: '2026-08-01', // Saturday (1st Saturday, working)
+      end_date: '2026-08-31',
+      saturday_rule: 'second_saturday_off',
+    };
+
+    const satSlot: TimetableSlot = {
+      id: 'slot-sat',
+      user_id: 'u-1',
+      course_id: 'c-1',
+      weekday: 6, // Saturday
+      start_time: '10:00',
+      end_time: '11:00',
+      room: 'Lab-1',
+      faculty: null,
+      component_type: 'lab',
+      weight: 1,
+      created_at: '2026-08-01T00:00:00Z',
+      updated_at: '2026-08-01T00:00:00Z',
+      deleted_at: null,
+    };
+
+    // Holiday on 3rd Saturday 2026-08-15 (Independence Day)
+    const holidays = [
+      {
+        id: 'hol-1',
+        user_id: 'u-1',
+        date: '2026-08-15',
+        type: 'holiday' as const,
+        swap_target_weekday: null,
+        note: 'Independence Day',
+        created_at: '2026-08-01T00:00:00Z',
+        updated_at: '2026-08-01T00:00:00Z',
+        deleted_at: null,
+      },
+    ];
+
+    const ics = generateTimetableIcs({
+      term: termWithSatRule,
+      slots: [satSlot],
+      courses: dummyCourses,
+      calendarEvents: holidays,
+    });
+
+    // DTSTART should be 1st Saturday (2026-08-01)
+    expect(ics).toContain('DTSTART:20260801T100000');
+    // 2nd Saturday (2026-08-08) is off via saturday_rule -> EXDATE
+    expect(ics).toContain('EXDATE:20260808T100000');
+    // 3rd Saturday (2026-08-15) is a holiday -> EXDATE
+    expect(ics).toContain('EXDATE:20260815T100000');
+  });
+
+  it('correctly sets DTSTART to first working day when term begins on an off-Saturday', () => {
+    const termStartingOnOffSat: Term = {
+      ...dummyTerm,
+      start_date: '2026-08-08', // 2nd Saturday (off)
+      end_date: '2026-08-31',
+      saturday_rule: 'second_saturday_off',
+    };
+
+    const satSlot: TimetableSlot = {
+      id: 'slot-sat-2',
+      user_id: 'u-1',
+      course_id: 'c-1',
+      weekday: 6,
+      start_time: '14:00',
+      end_time: '15:00',
+      room: 'CR-101',
+      faculty: null,
+      component_type: 'theory',
+      weight: 1,
+      created_at: '2026-08-01T00:00:00Z',
+      updated_at: '2026-08-01T00:00:00Z',
+      deleted_at: null,
+    };
+
+    const ics = generateTimetableIcs({
+      term: termStartingOnOffSat,
+      slots: [satSlot],
+      courses: dummyCourses,
+    });
+
+    // Since 2026-08-08 is off, DTSTART should start on 3rd Saturday (2026-08-15)
+    expect(ics).toContain('DTSTART:20260815T140000');
+  });
 });
 

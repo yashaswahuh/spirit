@@ -266,37 +266,37 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
     const generatedDate = formatDate(new Date(), dateFormat);
 
     const rowsHtml = reportData.subjectReports.length === 0
-      ? `<tr><td colspan="9" style="text-align:center; padding: 24px; color: #6b7280;">No subjects selected or no records found in the specified date range.</td></tr>`
+      ? `<tr><td colspan="9" style="text-align:center; padding: 24px; color: #475569;">No subjects selected or no records found in the specified date range.</td></tr>`
       : reportData.subjectReports.map(({ course, stats, absentCount, medicalCount, dutyLeaveCount }) => {
           const reqThreshold = course.attendance_threshold_override || defaultThreshold;
           const hasClasses = stats.conducted > 0;
           const statusBadge = !hasClasses
-            ? `<span class="badge" style="background-color: #f3f4f6; color: #4b5563; border: 1px solid #e5e7eb;">No Classes</span>`
+            ? `<span class="badge" style="background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1;">No Classes</span>`
             : stats.is_in_danger
             ? `<span class="badge badge-risk">⚠️ At Risk</span>`
             : `<span class="badge badge-safe">✓ Safe</span>`;
           const guidanceText = !hasClasses
-            ? `<span style="color: #9ca3af;">No classes held</span>`
+            ? `<span style="color: #64748b;">No classes held</span>`
             : stats.is_in_danger
-            ? `<span style="color: #dc2626; font-weight: bold;">Must Attend ${stats.must_attend}</span>`
-            : `<span style="color: #059669; font-weight: 600;">Can Skip ${stats.safe_bunks}</span>`;
-          const pctColor = !hasClasses ? '#6b7280' : stats.is_in_danger ? '#dc2626' : '#059669';
+            ? `<span style="color: #991b1b; font-weight: bold;">Must Attend ${stats.must_attend}</span>`
+            : `<span style="color: #065f46; font-weight: 700;">Can Skip ${stats.safe_bunks}</span>`;
+          const pctColor = !hasClasses ? '#64748b' : stats.is_in_danger ? '#991b1b' : '#065f46';
           const pctText = hasClasses ? `${stats.percentage.toFixed(1)}%` : '—';
 
           return `
             <tr>
               <td style="text-align: left;">
-                <div style="font-weight: 700; color: #111827;">${course.name}</div>
-                <div style="font-size: 10px; color: #6b7280;">${course.code || 'Course'} • ${course.credits} Credits • ${course.type}</div>
+                <div style="font-weight: 700; color: #0f172a;">${course.name}</div>
+                <div style="font-size: 10px; color: #475569; font-weight: 500;">${course.code || 'Course'} • ${course.credits} Credits • ${course.type}</div>
               </td>
-              <td style="text-align: center;">${stats.conducted}</td>
-              <td style="text-align: center; font-weight: 600; color: #111827;">${stats.attended}</td>
-              <td style="text-align: center; color: #dc2626; font-weight: 600;">${absentCount}</td>
-              <td style="text-align: center; color: #4b5563;">${medicalCount}/${dutyLeaveCount}</td>
+              <td style="text-align: center; color: #0f172a;">${stats.conducted}</td>
+              <td style="text-align: center; font-weight: 700; color: #0f172a;">${stats.attended}</td>
+              <td style="text-align: center; color: #991b1b; font-weight: 700;">${absentCount}</td>
+              <td style="text-align: center; color: #334155; font-weight: 500;">${medicalCount}/${dutyLeaveCount}</td>
               <td style="text-align: center; font-weight: 800; color: ${pctColor};">
                 ${pctText}
               </td>
-              <td style="text-align: center; color: #4b5563;">${reqThreshold}%</td>
+              <td style="text-align: center; color: #334155; font-weight: 500;">${reqThreshold}%</td>
               <td style="text-align: center;">${statusBadge}</td>
               <td style="text-align: right;">${guidanceText}</td>
             </tr>
@@ -364,8 +364,8 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
             margin-bottom: 18px;
           }
           .card {
-            border: 1px solid #e5e7eb;
-            background-color: #f9fafb;
+            border: 1px solid #cbd5e1;
+            background-color: #ffffff;
             border-radius: 8px;
             padding: 10px 12px;
           }
@@ -374,14 +374,14 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            color: #6b7280;
+            color: #334155;
             margin-bottom: 4px;
             display: block;
           }
           .card-value {
             font-size: 18px;
             font-weight: 800;
-            color: #111827;
+            color: #0f172a;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -389,9 +389,10 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
             gap: 4px;
           }
           .card-sub {
-            font-size: 9px;
-            color: #9ca3af;
+            font-size: 10px;
+            color: #475569;
             margin-top: 2px;
+            font-weight: 500;
           }
           .badge {
             display: inline-block;
@@ -404,12 +405,12 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
           .badge-safe {
             background-color: #ecfdf5;
             color: #065f46;
-            border: 1px solid #a7f3d0;
+            border: 1px solid #6ee7b7;
           }
           .badge-risk {
             background-color: #fef2f2;
             color: #991b1b;
-            border: 1px solid #fecaca;
+            border: 1px solid #fca5a5;
           }
           table {
             width: 100%;
@@ -424,25 +425,25 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
             page-break-inside: avoid;
           }
           th {
-            background-color: #f3f4f6;
-            color: #374151;
+            background-color: #f1f5f9;
+            color: #1e293b;
             font-weight: 700;
             text-transform: uppercase;
             font-size: 9px;
             letter-spacing: 0.05em;
             padding: 8px 6px;
-            border: 1px solid #d1d5db;
+            border: 1px solid #cbd5e1;
           }
           td {
             padding: 7px 6px;
-            border: 1px solid #e5e7eb;
+            border: 1px solid #cbd5e1;
             vertical-align: middle;
           }
           tbody tr:nth-child(even) td {
-            background-color: #f9fafb;
+            background-color: #f8fafc;
           }
           .footer {
-            border-top: 1px solid #e5e7eb;
+            border-top: 1px solid #cbd5e1;
             padding-top: 10px;
             font-size: 10px;
             color: #6b7280;
@@ -799,46 +800,46 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
                           <span className="font-bold text-gray-900 dark:text-white print:text-black block">
                             {course.name}
                           </span>
-                          <span className="text-[10px] text-gray-400 font-medium">
+                          <span className="text-[10px] text-gray-600 dark:text-gray-300 font-medium">
                             {course.code || 'Course'} • {course.credits} Credits • {course.type}
                           </span>
                         </td>
-                        <td className="py-2.5 px-2 text-center font-medium">{stats.conducted}</td>
-                        <td className="py-2.5 px-2 text-center font-semibold text-gray-900 dark:text-white print:text-black">{stats.attended}</td>
-                        <td className="py-2.5 px-2 text-center text-rose-600 font-medium">{absentCount}</td>
-                        <td className="py-2.5 px-2 text-center text-gray-500">{medicalCount}/{dutyLeaveCount}</td>
+                        <td className="py-2.5 px-2 text-center font-medium text-gray-900 dark:text-gray-100">{stats.conducted}</td>
+                        <td className="py-2.5 px-2 text-center font-bold text-gray-900 dark:text-white print:text-black">{stats.attended}</td>
+                        <td className="py-2.5 px-2 text-center text-rose-700 dark:text-rose-400 font-bold">{absentCount}</td>
+                        <td className="py-2.5 px-2 text-center text-gray-700 dark:text-gray-300 font-medium">{medicalCount}/{dutyLeaveCount}</td>
                         <td className="py-2.5 px-2 text-center font-black">
                           {hasClasses ? (
-                            <span className={stats.is_in_danger ? 'text-rose-600' : 'text-emerald-600'}>
+                            <span className={stats.is_in_danger ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-700 dark:text-emerald-400'}>
                               {stats.percentage.toFixed(1)}%
                             </span>
                           ) : (
-                            <span className="text-gray-400 dark:text-gray-500 font-semibold">—</span>
+                            <span className="text-gray-500 dark:text-gray-400 font-semibold">—</span>
                           )}
                         </td>
-                        <td className="py-2.5 px-2 text-center text-gray-500 font-medium">{reqThreshold}%</td>
+                        <td className="py-2.5 px-2 text-center text-gray-700 dark:text-gray-300 font-medium">{reqThreshold}%</td>
                         <td className="py-2.5 px-2 text-center">
                           {!hasClasses ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-500 bg-gray-100 dark:bg-gray-800 dark:text-gray-400 px-2 py-0.5 rounded border border-gray-200 dark:border-gray-700">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-700 bg-gray-100 dark:bg-gray-800 dark:text-gray-300 px-2 py-0.5 rounded border border-gray-300 dark:border-gray-700">
                               No Classes
                             </span>
                           ) : stats.is_in_danger ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-900/50">
-                              <AlertTriangle className="w-3 h-3 text-rose-600" /> At Risk
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-900 bg-rose-100 px-2 py-0.5 rounded border border-rose-300 dark:bg-rose-950/80 dark:text-rose-200 dark:border-rose-800">
+                              <AlertTriangle className="w-3 h-3 text-rose-700 dark:text-rose-400" /> At Risk
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/50">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Safe
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-900 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-200 dark:border-emerald-800">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-700 dark:text-emerald-400" /> Safe
                             </span>
                           )}
                         </td>
                         <td className="py-2.5 px-3 text-right font-medium">
                           {!hasClasses ? (
-                            <span className="text-gray-400 dark:text-gray-500 text-xs font-normal">No classes held</span>
+                            <span className="text-gray-500 dark:text-gray-400 text-xs font-normal">No classes held</span>
                           ) : stats.is_in_danger ? (
-                            <span className="text-rose-600 font-bold">Must Attend {stats.must_attend}</span>
+                            <span className="text-rose-700 dark:text-rose-400 font-bold">Must Attend {stats.must_attend}</span>
                           ) : (
-                            <span className="text-emerald-700 dark:text-emerald-400 font-semibold">Can Skip {stats.safe_bunks}</span>
+                            <span className="text-emerald-700 dark:text-emerald-400 font-bold">Can Skip {stats.safe_bunks}</span>
                           )}
                         </td>
                       </tr>
