@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Printer, CheckCircle2, AlertTriangle, Filter } from 'lucide-react';
+import { Printer, CheckCircle2, AlertTriangle, Filter, FileDown, Loader2 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { db } from '../../db/dexie';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import { computeCourseAttendanceStats } from '../../engine/attendance';
 import { getLabAttendanceRule } from '../../utils/preferences';
+import { exportAttendancePdf } from '../../utils/pdfExport';
 
 interface AttendanceReportModalProps {
   isOpen: boolean;
@@ -190,7 +192,58 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
     };
   }, [courses, selectedCourseIds, filteredRecords, defaultThreshold, shouldIncludeInitialBalance, startDate, slots]);
 
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+  const handleExportPdf = async () => {
+    try {
+      setIsExportingPdf(true);
+      await exportAttendancePdf({
+        studentName: profile?.name || 'Student',
+        degreeType: program?.degree_type || 'Degree',
+        branch: program?.branch_department || 'Branch',
+        termName: activeTerm?.name || 'Current Term',
+        startDate,
+        endDate,
+        grandConducted: reportData.grandConducted,
+        grandAttended: reportData.grandAttended,
+        grandAbsent: reportData.grandAbsent,
+        grandMedical: reportData.grandMedical,
+        grandDutyLeave: reportData.grandDutyLeave,
+        grandPercentage: reportData.grandPercentage,
+        isOverallSafe: reportData.isOverallSafe,
+        inDangerCount: reportData.inDangerCount,
+        subjects: reportData.subjectReports.map(sr => ({
+          name: sr.course.name,
+          code: sr.course.code,
+          credits: sr.course.credits,
+          type: sr.course.type,
+          conducted: sr.stats.conducted,
+          attended: sr.stats.attended,
+          absent: sr.absentCount,
+          medical: sr.medicalCount,
+          dutyLeave: sr.dutyLeaveCount,
+          percentage: sr.stats.percentage,
+          targetThreshold: sr.course.attendance_threshold_override || defaultThreshold,
+          isInDanger: sr.stats.is_in_danger,
+          safeBunks: sr.stats.safe_bunks,
+          mustAttend: sr.stats.must_attend,
+        })),
+      });
+    } catch (err: any) {
+      alert(`PDF export failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   const handlePrint = () => {
+    // On native mobile platforms, window.print() is unsupported by Android WebView.
+    // Seamlessly forward to the native PDF generator and share sheet.
+    if (Capacitor.isNativePlatform()) {
+      handleExportPdf();
+      return;
+    }
+
     // Generate isolated print document in hidden iframe to guarantee no viewport clipping, no scrollbars, and full table visibility
     const printFrame = document.createElement('iframe');
     printFrame.setAttribute('aria-hidden', 'true');
@@ -506,10 +559,26 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={handlePrint}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-indigo-500"
+                onClick={handleExportPdf}
+                disabled={isExportingPdf}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-indigo-500"
               >
-                <Printer className="w-4 h-4" /> Print / Save as PDF
+                {isExportingPdf ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Exporting PDF...
+                  </>
+                ) : (
+                  <>
+                    <FileDown className="w-4 h-4" /> Export PDF
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="hidden sm:inline-flex px-3.5 py-2 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 font-semibold rounded-xl text-xs items-center gap-1.5 shadow-xs transition-all"
+              >
+                <Printer className="w-3.5 h-3.5" /> Print
               </button>
             </div>
           </div>

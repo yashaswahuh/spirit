@@ -58,6 +58,9 @@ jobs:
           VITE_BASE_PATH: ${{ inputs.base_path || vars.VITE_BASE_PATH || '/spirit/' }}
         run: npm run build
 
+      - name: Package Live OTA auto-update bundle
+        run: node scripts/package-ota.js
+
       - name: Upload build artifact to GitHub Actions
         uses: actions/upload-artifact@v4
         with:

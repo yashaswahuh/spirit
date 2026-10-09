@@ -338,7 +338,23 @@
     - **Android Permissions**: Added `POST_NOTIFICATIONS`, `SCHEDULE_EXACT_ALARM`, `USE_EXACT_ALARM`, `WAKE_LOCK`, `VIBRATE`, `RECEIVE_BOOT_COMPLETED`, `READ_EXTERNAL_STORAGE`, and `WRITE_EXTERNAL_STORAGE` into `AndroidManifest.xml` with `requestLegacyExternalStorage="true"`. Configured `FileProvider` paths for cache, documents, and external storage in `file_paths.xml`.
     - **Native Notifications**: Replaced browser-only `Notification` checks with Capacitor `LocalNotifications` checks and permission requests. On Android 13+, tapping "Enable Alerts" prompts the native Android OS permission modal. Added native system notification dispatch for test alerts, class reminders, and backup warnings.
     - **Timetable & Exam Calendar Export**: Replaced web `<a>` blob download fallback with native `Filesystem` caching and `Share.share()` intent. On Android, tapping "Timetable (.ics)" or "Exams (.ics)" opens Android's system share sheet directly displaying Google Calendar, Samsung Calendar, and file save options.
-    - **Backup & CSV Export**: Updated `downloadOrShareFile` in `src/utils/backup.ts` to write through `Filesystem` and present the native Android Share sheet, enabling 1-tap backup saving to Google Drive, device storage, or messaging apps.
+  - **Spirit v1.0.0 Official Release — Live OTA Auto-Updates, Native PDF Export & Storage Permissions**:
+    - **Over-The-Air (OTA) Live Auto-Updates**:
+      - Integrated `@capgo/capacitor-updater` in self-hosted zero-cloud mode (`autoUpdate: false`).
+      - Created `scripts/package-ota.js` to compile the mobile bundle (`base="/"`) into `dist/dist-ota.zip` and generate `dist/version.json`.
+      - Built `src/utils/updater.ts`: automatically confirms bundle boot with `notifyAppReady()` on startup, checks GitHub Pages for updates in the background, downloads new bundles, and primes them for activation on next launch or restart.
+      - Added "Live Web App Auto-Updates" controls and status in `MoreScreen.tsx`, including manual "Check Updates" and immediate "Restart App" action.
+      - Updated `.github/workflows/deploy.yml` and `.github/workflows/build-android.yml` to automatically build, package, and publish `dist-ota.zip` and `version.json` with every GitHub release and Pages deployment.
+    - **Native & Web PDF Attendance Reports**:
+      - Implemented `src/utils/pdfExport.ts` using `jspdf` and `jspdf-autotable` to generate professional, university-compliant attendance report documents with metrics cards, color-coded percentages, and course status breakdown.
+      - Fixed mobile export in `AttendanceReportModal.tsx`: replaced failing `iframe.print()` with a primary "Export PDF" action that uses Capacitor `Filesystem` and `Share.share()` intent on Android and `doc.save()` on desktop browsers.
+    - **Android Storage Permissions**:
+      - Updated `AndroidManifest.xml` to declare `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`, `READ_MEDIA_IMAGES`, and `MANAGE_EXTERNAL_STORAGE` without restrictive `maxSdkVersion` constraints.
+      - Added `src/utils/storagePermissions.ts` to check and request Android runtime storage permissions.
+      - Integrated automatic storage permission requests into PDF export, JSON backup, CSV export, and calendar `.ics` download flows, plus an explicit permission control in `MoreScreen.tsx`.
+    - **Version Upgrade**:
+      - Bumped version to `1.0.0` (versionCode `1000`) across `package.json`, `android/app/build.gradle`, `UserGuideModal.tsx`, `MoreScreen.tsx`, and CI workflows.
+      - All 170 unit tests pass across 18 test files.
 
 ## Remaining
 - All planned phases, user features, attendance clear options, APK build workflows, and multi-hour attendance counting rules fully implemented, tested, and verified.

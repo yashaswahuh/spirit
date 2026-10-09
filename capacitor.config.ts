@@ -12,6 +12,14 @@ const config: CapacitorConfig = {
     allowMixedContent: false,
     backgroundColor: '#ffffff',
   },
+  plugins: {
+    CapacitorUpdater: {
+      autoUpdate: false,
+      appReadyTimeout: 10000,
+      autoDeletePrevious: true,
+      autoDeleteFailed: true,
+    },
+  },
 };
 
 export default config;
