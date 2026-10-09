@@ -57,6 +57,46 @@ describe('Zod Validation Schemas', () => {
       };
       expect(() => validateEntity(programSchema, validProgram)).not.toThrow();
     });
+
+    it('validates custom degree types and custom duration years', () => {
+      const customProgram = {
+        ...validBase,
+        degree_type: 'B.Des (Interaction Design)',
+        branch_department: 'Design & Media',
+        start_year: 2023,
+        duration_years: 5,
+        entry_type: 'regular' as const,
+        term_system: 'semester' as const,
+        grading_scheme_id: 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
+      };
+      expect(() => validateEntity(programSchema, customProgram)).not.toThrow();
+    });
+
+    it('rejects invalid duration years (< 1 or > 10)', () => {
+      const invalidLow = {
+        ...validBase,
+        degree_type: 'Custom Diploma',
+        branch_department: 'General',
+        start_year: 2024,
+        duration_years: 0,
+        entry_type: 'regular' as const,
+        term_system: 'semester' as const,
+        grading_scheme_id: 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
+      };
+      expect(() => validateEntity(programSchema, invalidLow)).toThrow();
+
+      const invalidHigh = {
+        ...validBase,
+        degree_type: 'Lifelong Program',
+        branch_department: 'General',
+        start_year: 2024,
+        duration_years: 11,
+        entry_type: 'regular' as const,
+        term_system: 'semester' as const,
+        grading_scheme_id: 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12',
+      };
+      expect(() => validateEntity(programSchema, invalidHigh)).toThrow();
+    });
   });
 
   describe('courseSchema', () => {

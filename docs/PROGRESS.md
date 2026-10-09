@@ -364,7 +364,12 @@
       - Added `theory_and_lab` ("Theory + Practical / Lab (Integrated / Hybrid)") option to the Course Rules modal in Grades, matching the Attendance screen options.
       - Added attendance counting rule selector (`lab_attendance_rule`) to `CourseRulesModal.tsx` so students can set custom 1 per session vs 1 per hour rules directly from Grades.
       - Added dynamic `Theory + Lab` indicator badge on `GradesScreen.tsx` course cards.
-      - Added unit test in `schemas.test.ts`. All 171 unit tests passing.
+    - **Custom Degree Program Entry & Dynamic Course Duration (Years)**:
+      - **Custom Program Onboarding (`OnboardingWizard.tsx`)**: Added quick-access "Custom Program" option for degrees not in preset list. Prompts student for custom degree name (e.g. B.Des, BSc Nursing, BS-MS, PhD, BMS) and course duration in years (1 to 10 years).
+      - **Live Estimated Program Completion**: Automatically calculates and renders live estimated graduation year badge (`start_year + duration_years`) across onboarding and profile editing.
+      - **Profile & Settings Customization (`ProfileEditModal.tsx`)**: Students can edit degree name, choose custom degree program, adjust start year and course duration years at any time with instant live reactivity via Dexie.
+      - **Metadata Display**: Displays Batch, duration in years, and estimated completion year in `MoreScreen.tsx` Student Profile card, `GradesScreen.tsx` header subtitle, and `AttendanceReportModal.tsx` print and screen views.
+      - **Testing & Verification**: Added validation tests for custom degree names and duration boundary checks in `schemas.test.ts`. All 173 unit tests passing.
 
 ## Remaining
 - All planned phases, user features, attendance clear options, APK build workflows, and multi-hour attendance counting rules fully implemented, tested, and verified.

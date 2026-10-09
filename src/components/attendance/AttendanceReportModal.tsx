@@ -259,7 +259,8 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
     if (!doc) return;
 
     const studentName = profile?.name || 'Student';
-    const programStr = `${program?.degree_type || 'Degree'} (${program?.branch_department || 'Branch'})`;
+    const batchStr = program?.start_year ? `Batch ${program.start_year}–${program.start_year + (program.duration_years || 4)}` : '';
+    const programStr = `${program?.degree_type || 'Degree'} (${program?.branch_department || 'Branch'})${batchStr ? ` • ${batchStr}` : ''}`;
     const termStr = `${activeTerm?.name || 'Current Term'} | ${startDate} to ${endDate}`;
     const generatedDate = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -701,7 +702,7 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
             </div>
             <div className="text-left sm:text-right text-xs text-gray-600 dark:text-gray-400 print:text-gray-700 space-y-0.5">
               <p><span className="font-semibold">Student:</span> {profile?.name || 'Student'}</p>
-              <p><span className="font-semibold">Program:</span> {program?.degree_type || 'Degree'} ({program?.branch_department || 'Branch'})</p>
+              <p><span className="font-semibold">Program:</span> {program?.degree_type || 'Degree'} ({program?.branch_department || 'Branch'}){program?.start_year ? ` • Batch ${program.start_year}–${program.start_year + (program.duration_years || 4)}` : ''}</p>
               <p><span className="font-semibold">Term:</span> {activeTerm?.name || 'Current Term'} | {startDate} to {endDate}</p>
             </div>
           </div>

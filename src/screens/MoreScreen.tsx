@@ -391,6 +391,12 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
                 </span>
               </div>
               <div className="py-2.5 flex items-center justify-between">
+                <span className="text-gray-600 dark:text-gray-400">Batch & Graduation</span>
+                <span className="font-semibold text-gray-900 dark:text-white text-xs sm:text-sm">
+                  {program?.start_year} – {(program?.start_year || 0) + (program?.duration_years || 4)} ({program?.duration_years || 4} Yrs • Est. End: {(program?.start_year || 0) + (program?.duration_years || 4)})
+                </span>
+              </div>
+              <div className="py-2.5 flex items-center justify-between">
                 <span className="text-gray-600 dark:text-gray-400">Semester</span>
                 <button
                   type="button"

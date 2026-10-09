@@ -25,6 +25,9 @@ interface OnboardingWizardProps {
 export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }) => {
   const [step, setStep] = useState(1);
   const [selectedPreset, setSelectedPreset] = useState<ProgramPreset>(ALL_PROGRAM_PRESETS[0]);
+  const [customDegreeName, setCustomDegreeName] = useState('');
+  const [durationYears, setDurationYears] = useState<number>(ALL_PROGRAM_PRESETS[0].duration_years || 4);
+  const [isCustomProgram, setIsCustomProgram] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form states
@@ -55,9 +58,20 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
 
   const handlePresetSelect = (preset: ProgramPreset) => {
     setSelectedPreset(preset);
+    setIsCustomProgram(preset.degree_type === 'other_custom');
+    setDurationYears(preset.duration_years);
     setTermNumber(preset.starting_term_number);
     setTermName(`Semester ${preset.starting_term_number}`);
     setThreshold(preset.default_attendance_threshold);
+  };
+
+  const handleSelectCustom = () => {
+    const customPreset = ALL_PROGRAM_PRESETS.find(p => p.id === 'prog-custom') || ALL_PROGRAM_PRESETS[ALL_PROGRAM_PRESETS.length - 1];
+    setSelectedPreset(customPreset);
+    setIsCustomProgram(true);
+    setDurationYears(4);
+    setTermNumber(1);
+    setTermName('Semester 1');
   };
 
   const addCourse = () => {
@@ -110,11 +124,16 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
         });
       });
 
+      const effectiveDegree = (isCustomProgram || selectedPreset.degree_type === 'other_custom')
+        ? (customDegreeName.trim() || 'Custom Degree')
+        : selectedPreset.degree_type;
+
       const setupData: OnboardingData = {
         userName: userName.trim() || 'Student',
-        degreeType: selectedPreset.degree_type,
+        degreeType: effectiveDegree,
         branchName: branchName.trim() || 'General',
         startYear,
+        durationYears,
         entryType: selectedPreset.entry_type,
         termNumber,
         termName,
@@ -183,13 +202,36 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
               </span>
             </div>
 
+            {/* Custom Degree Quick Access Banner */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/40 dark:to-purple-950/30 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-between gap-3">
+              <div>
+                <h4 className="text-xs font-bold text-indigo-900 dark:text-indigo-200">
+                  Degree program not listed below?
+                </h4>
+                <p className="text-[11px] text-indigo-700 dark:text-indigo-300">
+                  Enter your own custom degree, course duration, and university rules.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleSelectCustom}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm whitespace-nowrap transition-colors ${
+                  isCustomProgram
+                    ? 'bg-indigo-600 text-white ring-2 ring-indigo-400'
+                    : 'bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50'
+                }`}
+              >
+                {isCustomProgram ? '✓ Custom Selected' : 'Custom Program'}
+              </button>
+            </div>
+
             <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
               {ALL_PROGRAM_PRESETS.map(p => (
                 <button
                   key={p.id}
                   onClick={() => handlePresetSelect(p)}
                   className={`w-full text-left p-3.5 rounded-2xl border transition-all ${
-                    selectedPreset.id === p.id
+                    selectedPreset.id === p.id && !isCustomProgram
                       ? 'border-indigo-600 bg-indigo-50/60 dark:bg-indigo-950/40 ring-1 ring-indigo-600'
                       : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 hover:border-gray-300'
                   }`}
@@ -238,6 +280,26 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
                 />
               </div>
 
+              {/* Custom Degree / Program Name if Custom or Not Listed */}
+              {(isCustomProgram || selectedPreset.degree_type === 'other_custom') && (
+                <div>
+                  <label className="block text-xs font-semibold text-indigo-700 dark:text-indigo-300 mb-1">
+                    Degree / Program Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. B.Des, BSc Nursing, BS-MS, PhD, BMS..."
+                    value={customDegreeName}
+                    onChange={e => setCustomDegreeName(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-indigo-300 dark:border-indigo-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
+                  />
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    Enter the exact degree designation conferred by your university.
+                  </p>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
                   Branch / Department
@@ -251,6 +313,7 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
                 />
               </div>
 
+              {/* Admission Start Year & Course Duration in Years */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
@@ -258,22 +321,50 @@ export const OnboardingWizard: React.FC<OnboardingWizardProps> = ({ onComplete }
                   </label>
                   <input
                     type="number"
+                    min="2000"
+                    max="2035"
                     value={startYear}
                     onChange={e => setStartYear(Number(e.target.value))}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                    Current Semester Name
+                    Course Duration (Years)
                   </label>
                   <input
-                    type="text"
-                    value={termName}
-                    onChange={e => setTermName(e.target.value)}
-                    className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={durationYears}
+                    onChange={e => setDurationYears(Math.max(1, Math.min(10, Number(e.target.value) || 1)))}
+                    className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
                   />
+                  <span className="text-[10px] text-gray-400">Total course length</span>
                 </div>
+              </div>
+
+              {/* Dynamic Estimated Graduation Year Banner */}
+              <div className="p-3 bg-indigo-50/70 dark:bg-indigo-950/30 rounded-xl border border-indigo-100 dark:border-indigo-900/40 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 text-indigo-900 dark:text-indigo-200 font-semibold">
+                  <GraduationCap className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                  <span>Estimated Program End:</span>
+                </div>
+                <div className="font-bold text-indigo-700 dark:text-indigo-300 font-mono text-sm">
+                  {startYear + durationYears} <span className="text-[11px] font-normal text-indigo-500">({durationYears} yr program)</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  Current Semester Name
+                </label>
+                <input
+                  type="text"
+                  value={termName}
+                  onChange={e => setTermName(e.target.value)}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">

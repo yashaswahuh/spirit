@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, GraduationCap, Calendar, Target, CheckCircle2, Save } from 'lucide-react';
+import { User, GraduationCap, Calendar, Target, CheckCircle2, Save, Clock } from 'lucide-react';
 import { db } from '../../db/dexie';
-import { Profile, Program, DegreeType } from '../../types';
+import { Profile, Program } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 
 interface ProfileEditModalProps {
@@ -11,7 +11,7 @@ interface ProfileEditModalProps {
   program: Program | null | undefined;
 }
 
-const DEGREE_OPTIONS: { value: DegreeType; label: string }[] = [
+const DEGREE_OPTIONS: { value: string; label: string }[] = [
   { value: 'BTech', label: 'B.Tech (Bachelor of Technology)' },
   { value: 'BE', label: 'B.E. (Bachelor of Engineering)' },
   { value: 'BCA', label: 'BCA (Bachelor of Computer Applications)' },
@@ -23,8 +23,39 @@ const DEGREE_OPTIONS: { value: DegreeType; label: string }[] = [
   { value: 'ME', label: 'M.E. (Master of Engineering)' },
   { value: 'MSc', label: 'M.Sc (Master of Science)' },
   { value: 'MBA', label: 'MBA (Master of Business Admin)' },
+  { value: 'BA', label: 'B.A. (Bachelor of Arts)' },
+  { value: 'MA', label: 'M.A. (Master of Arts)' },
+  { value: 'BArch', label: 'B.Arch (Bachelor of Architecture)' },
+  { value: 'BPharm', label: 'B.Pharm (Bachelor of Pharmacy)' },
+  { value: 'LLB', label: 'LL.B (Bachelor of Laws)' },
+  { value: 'MBBS', label: 'MBBS (Medicine & Surgery)' },
   { value: 'diploma', label: 'Diploma / Polytechnic' },
+  { value: 'integrated', label: 'Integrated Dual Degree (5 Years)' },
+  { value: 'other_custom', label: '✨ Other / Custom Program (Enter Custom Name)' },
 ];
+
+const DEFAULT_DURATIONS: Record<string, number> = {
+  BTech: 4,
+  BE: 4,
+  BArch: 5,
+  BPharm: 4,
+  MBBS: 5,
+  BSc: 3,
+  BCA: 3,
+  BCom: 3,
+  BBA: 3,
+  BA: 3,
+  LLB: 3,
+  diploma: 3,
+  integrated: 5,
+  MTech: 2,
+  ME: 2,
+  MCA: 2,
+  MSc: 2,
+  MBA: 2,
+  MCom: 2,
+  MA: 2,
+};
 
 export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
   isOpen,
@@ -33,7 +64,9 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
   program,
 }) => {
   const [name, setName] = useState('');
-  const [degreeType, setDegreeType] = useState<DegreeType>('BTech');
+  const [degreeType, setDegreeType] = useState<string>('BTech');
+  const [customDegreeName, setCustomDegreeName] = useState('');
+  const [durationYears, setDurationYears] = useState<number>(4);
   const [branch, setBranch] = useState('');
   const [startYear, setStartYear] = useState<number>(new Date().getFullYear());
   const [threshold, setThreshold] = useState<number>(75);
@@ -46,11 +79,28 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
       setThreshold(profile.default_attendance_threshold || 75);
     }
     if (program) {
-      setDegreeType(program.degree_type || 'BTech');
+      const isKnown = DEGREE_OPTIONS.some(
+        opt => opt.value.toLowerCase() === (program.degree_type || '').toLowerCase() && opt.value !== 'other_custom'
+      );
+      if (isKnown) {
+        setDegreeType(program.degree_type);
+        setCustomDegreeName('');
+      } else {
+        setDegreeType('other_custom');
+        setCustomDegreeName(program.degree_type || '');
+      }
       setBranch(program.branch_department || '');
       setStartYear(program.start_year || new Date().getFullYear());
+      setDurationYears(program.duration_years || 4);
     }
   }, [profile, program, isOpen]);
+
+  const handleDegreeChange = (newVal: string) => {
+    setDegreeType(newVal);
+    if (newVal !== 'other_custom' && DEFAULT_DURATIONS[newVal]) {
+      setDurationYears(DEFAULT_DURATIONS[newVal]);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,10 +119,15 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
       }
 
       if (program) {
+        const finalDegreeType = degreeType === 'other_custom'
+          ? (customDegreeName.trim() || 'Custom Degree')
+          : degreeType;
+
         await db.program.update(program.id, {
-          degree_type: degreeType,
+          degree_type: finalDegreeType as any,
           branch_department: branch.trim() || 'General Engineering',
           start_year: Number(startYear),
+          duration_years: Number(durationYears) || 4,
           updated_at: now,
         });
       }
@@ -96,15 +151,19 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   };
 
+  const displayDegree = degreeType === 'other_custom'
+    ? (customDegreeName || 'Custom Degree')
+    : degreeType;
+
   return (
     <ResponsiveDialog
       isOpen={isOpen}
       onClose={onClose}
       title="Customize Student Profile"
-      description="Update your name, degree, department, batch year, and attendance target."
+      description="Update your name, degree program, course duration, and attendance target."
       maxWidth="md"
     >
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {/* Avatar Preview */}
         <div className="flex items-center gap-4 p-3.5 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-100 dark:border-gray-800">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white text-xl font-black shadow-md flex-shrink-0">
@@ -115,10 +174,10 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
               {name || 'Student Name'}
             </h4>
             <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-              {degreeType} • {branch || 'Department'}
+              {displayDegree} • {branch || 'Department'}
             </p>
             <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
-              Batch of {startYear}
+              Batch of {startYear} – {startYear + durationYears} ({durationYears} Yrs)
             </span>
           </div>
         </div>
@@ -148,7 +207,7 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
             </label>
             <select
               value={degreeType}
-              onChange={e => setDegreeType(e.target.value as DegreeType)}
+              onChange={e => handleDegreeChange(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-xs sm:text-sm font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             >
               {DEGREE_OPTIONS.map(opt => (
@@ -174,7 +233,27 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
           </div>
         </div>
 
-        {/* Batch Year & Attendance Threshold */}
+        {/* Custom Degree Name if Custom is selected */}
+        {degreeType === 'other_custom' && (
+          <div>
+            <label className="block text-xs font-bold text-indigo-700 dark:text-indigo-300 mb-1">
+              Custom Degree / Program Name *
+            </label>
+            <input
+              type="text"
+              required
+              value={customDegreeName}
+              onChange={e => setCustomDegreeName(e.target.value)}
+              placeholder="e.g. B.Des, BSc Nursing, BS-MS, PhD, BMS..."
+              className="w-full px-3.5 py-2.5 rounded-xl border border-indigo-300 dark:border-indigo-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-xs sm:text-sm font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+            />
+            <p className="text-[11px] text-gray-400 mt-1">
+              Enter your specific degree name if it isn&apos;t in the standard presets.
+            </p>
+          </div>
+        )}
+
+        {/* Admission Year & Course Duration in Years */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
           <div>
             <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1.5">
@@ -193,19 +272,47 @@ export const ProfileEditModal: React.FC<ProfileEditModalProps> = ({
 
           <div>
             <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1.5">
-              <Target className="w-3.5 h-3.5 text-indigo-600" />
-              Target Attendance Threshold (%)
+              <Clock className="w-3.5 h-3.5 text-indigo-600" />
+              Course Duration (Years)
             </label>
             <input
               type="number"
-              min="50"
-              max="100"
-              value={threshold}
-              onChange={e => setThreshold(Number(e.target.value))}
+              min="1"
+              max="10"
+              value={durationYears}
+              onChange={e => setDurationYears(Math.max(1, Math.min(10, Number(e.target.value) || 1)))}
               className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-xs sm:text-sm font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             />
-            <span className="text-[10px] text-gray-400 mt-0.5 block">Standard university criteria is 75% or 80%</span>
+            <span className="text-[10px] text-gray-400 mt-0.5 block">Total years required to complete</span>
           </div>
+        </div>
+
+        {/* Dynamic Estimated Graduation Year Banner */}
+        <div className="p-3.5 bg-indigo-50/70 dark:bg-indigo-950/30 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-2 text-indigo-900 dark:text-indigo-200 font-bold">
+            <GraduationCap className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+            <span>Estimated Graduation / End Year:</span>
+          </div>
+          <div className="font-extrabold text-indigo-700 dark:text-indigo-300 font-mono text-sm">
+            {startYear + durationYears} <span className="text-[11px] font-normal text-indigo-500">({durationYears} yr duration • Batch {startYear}–{startYear + durationYears})</span>
+          </div>
+        </div>
+
+        {/* Attendance Threshold */}
+        <div>
+          <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1.5">
+            <Target className="w-3.5 h-3.5 text-indigo-600" />
+            Target Attendance Threshold (%)
+          </label>
+          <input
+            type="number"
+            min="50"
+            max="100"
+            value={threshold}
+            onChange={e => setThreshold(Number(e.target.value))}
+            className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-xs sm:text-sm font-semibold focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+          />
+          <span className="text-[10px] text-gray-400 mt-0.5 block">Standard university criteria is 75% or 80%</span>
         </div>
 
         {/* Buttons */}

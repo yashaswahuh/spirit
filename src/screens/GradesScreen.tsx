@@ -211,6 +211,7 @@ export const GradesScreen: React.FC = () => {
           </h2>
           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5">
             {program?.degree_type || 'Degree'} ({program?.branch_department || 'General'}) •{' '}
+            {program?.start_year ? `Batch ${program.start_year}–${program.start_year + (program.duration_years || 4)} (Est. End: ${program.start_year + (program.duration_years || 4)}) • ` : ''}
             {program?.entry_type === 'lateral' ? 'Lateral Entry (Starts Sem 3)' : 'Regular Entry'}
           </p>
         </div>
