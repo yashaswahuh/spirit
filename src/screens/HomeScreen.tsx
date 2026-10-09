@@ -422,7 +422,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
                           : 'text-emerald-600 dark:text-emerald-400'
                       }`}
                     >
-                      {stats.conducted > 0 ? `${stats.percentage.toFixed(0)}%` : '100%'}
+                      {stats.conducted > 0 ? `${stats.percentage.toFixed(1)}%` : '100%'}
                     </span>
                     <p className="text-[10px] text-gray-400 font-medium">
                       {stats.is_in_danger

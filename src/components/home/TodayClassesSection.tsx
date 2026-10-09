@@ -83,7 +83,7 @@ export const TodayClassesSection: React.FC<TodayClassesSectionProps> = ({
             return (
               <div
                 key={slot.id}
-                className={`rounded-2xl p-4 border shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 transition-all ${cardBorder}`}
+                className={`rounded-3xl p-4 sm:p-5 border shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all duration-200 hover:shadow-md ${cardBorder}`}
               >
                 {/* Left: Course details, color stripe, single-line time */}
                 <div className="flex items-start gap-3 min-w-0">
@@ -97,7 +97,7 @@ export const TodayClassesSection: React.FC<TodayClassesSectionProps> = ({
                         {course.name}
                       </h4>
                       {course.code && (
-                        <span className="text-[10px] font-mono font-bold text-gray-500 dark:text-gray-400 px-1.5 py-0.2 rounded bg-gray-100 dark:bg-gray-800 uppercase">
+                        <span className="text-[10px] font-mono font-bold text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 uppercase">
                           {course.code}
                         </span>
                       )}
@@ -110,13 +110,13 @@ export const TodayClassesSection: React.FC<TodayClassesSectionProps> = ({
                         {slot.start_time} - {slot.end_time}
                       </span>
                       {slot.room && (
-                        <span className="px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-[10px] font-medium text-gray-600 dark:text-gray-300">
+                        <span className="px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-[10px] font-medium text-gray-600 dark:text-gray-300">
                           Room {slot.room}
                         </span>
                       )}
                       {(slot.faculty || course.faculty) && (
                         <span
-                          className="px-1.5 py-0.5 rounded bg-indigo-50 dark:bg-indigo-950/60 text-[10px] font-medium text-indigo-700 dark:text-indigo-300 truncate max-w-[150px]"
+                          className="px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-950/60 text-[10px] font-medium text-indigo-700 dark:text-indigo-300 truncate max-w-[150px]"
                           title={slot.faculty || course.faculty || undefined}
                         >
                           👤 {slot.faculty || course.faculty}
@@ -144,7 +144,7 @@ export const TodayClassesSection: React.FC<TodayClassesSectionProps> = ({
                   <button
                     type="button"
                     onClick={() => onMarkAttendance(course.id, slot.id, 'present')}
-                    className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs min-h-[42px] sm:min-h-[38px] transition-all focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none cursor-pointer ${
+                    className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-2xl text-xs min-h-[42px] sm:min-h-[40px] transition-all focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none cursor-pointer active:scale-[0.97] ${
                       currentStatus === 'present'
                         ? 'bg-emerald-600 text-white shadow-md font-bold'
                         : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-750 font-medium'
@@ -157,7 +157,7 @@ export const TodayClassesSection: React.FC<TodayClassesSectionProps> = ({
                   <button
                     type="button"
                     onClick={() => onMarkAttendance(course.id, slot.id, 'absent')}
-                    className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs min-h-[42px] sm:min-h-[38px] transition-all focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none cursor-pointer ${
+                    className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-2xl text-xs min-h-[42px] sm:min-h-[40px] transition-all focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none cursor-pointer active:scale-[0.97] ${
                       currentStatus === 'absent'
                         ? 'bg-rose-600 text-white shadow-md font-bold'
                         : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-750 font-medium'
@@ -170,7 +170,7 @@ export const TodayClassesSection: React.FC<TodayClassesSectionProps> = ({
                   <button
                     type="button"
                     onClick={() => onMarkAttendance(course.id, slot.id, 'cancelled')}
-                    className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs min-h-[42px] sm:min-h-[38px] transition-all focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none cursor-pointer ${
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-2xl text-xs min-h-[42px] sm:min-h-[40px] transition-all focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:outline-none cursor-pointer active:scale-[0.97] ${
                       currentStatus === 'cancelled'
                         ? 'bg-amber-600 text-white shadow-md font-bold'
                         : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-750 font-medium'

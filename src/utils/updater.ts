@@ -1,8 +1,8 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { CapacitorUpdater, type BundleInfo } from '@capgo/capacitor-updater';
 
-export const CURRENT_APP_VERSION = '1.0.0';
-export const CURRENT_BUILD_NUMBER = 1000;
+export const CURRENT_APP_VERSION = '1.0.1';
+export const CURRENT_BUILD_NUMBER = 1001;
 
 export const UPDATE_MANIFEST_URL = 'https://yashaswahuh.is-a.dev/spirit/version.json';
 export const FALLBACK_MANIFEST_URL = 'https://yashaswahuh.github.io/spirit/version.json';

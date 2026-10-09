@@ -52,7 +52,7 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
     : (labAttendancePoints || 1);
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl p-4 border border-gray-100 dark:border-gray-800 shadow-sm relative transition-all">
+    <div className="bg-white dark:bg-gray-900 rounded-3xl p-5 border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all duration-200 relative">
       {/* Top Header: Code, Name, Credits & Menu */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
@@ -85,20 +85,20 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
         <div className="relative">
           <button
             onClick={() => setMenuOpen(!menuOpen)}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 min-h-[32px] min-w-[32px] flex items-center justify-center"
+            className="p-1.5 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 min-h-[32px] min-w-[32px] flex items-center justify-center transition-colors cursor-pointer"
             aria-label="Course options"
           >
             <MoreVertical className="w-4 h-4" />
           </button>
           {menuOpen && (
-            <div className="absolute right-0 top-8 z-20 w-36 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700 py-1 text-xs">
+            <div className="absolute right-0 top-8 z-20 w-40 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 py-1.5 text-xs animate-fade-in">
               {onViewCalendar && (
                 <button
                   onClick={() => {
                     setMenuOpen(false);
                     onViewCalendar();
                   }}
-                  className="w-full text-left px-3 py-2 text-indigo-600 dark:text-indigo-400 hover:bg-gray-50 dark:hover:bg-gray-700 font-medium"
+                  className="w-full text-left px-3.5 py-2 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/40 font-medium transition-colors"
                 >
                   View Calendar
                 </button>
@@ -109,7 +109,7 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
                     setMenuOpen(false);
                     onEdit();
                   }}
-                  className="w-full text-left px-3 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 font-medium"
+                  className="w-full text-left px-3.5 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/60 font-medium transition-colors"
                 >
                   Edit Subject
                 </button>
@@ -120,7 +120,7 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
                     setMenuOpen(false);
                     onClearAttendance();
                   }}
-                  className="w-full text-left px-3 py-2 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 font-medium"
+                  className="w-full text-left px-3.5 py-2 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 font-medium transition-colors"
                 >
                   Clear Subject Attendance
                 </button>
@@ -131,7 +131,7 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
                     setMenuOpen(false);
                     onDelete();
                   }}
-                  className="w-full text-left px-3 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 font-medium"
+                  className="w-full text-left px-3.5 py-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 font-medium transition-colors"
                 >
                   Delete Subject
                 </button>
@@ -172,7 +172,7 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
       </div>
 
       {/* Progress Bar */}
-      <div className="w-full bg-gray-100 dark:bg-gray-800 h-2 rounded-full overflow-hidden mt-2.5">
+      <div className="w-full bg-gray-100 dark:bg-gray-800 h-2.5 rounded-full overflow-hidden mt-3">
         <div
           className={`h-full rounded-full transition-all duration-300 ${
             stats.conducted === 0
@@ -186,7 +186,7 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
       </div>
 
       {/* Bunk / Must-Attend Insight Strip */}
-      <div className="mt-3 pt-2.5 border-t border-gray-50 dark:border-gray-800/80 flex items-center justify-between text-xs">
+      <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-gray-800/80 flex items-center justify-between text-xs">
         <span className="text-gray-500 dark:text-gray-400 font-medium">
           {stats.attended} of {stats.conducted} attended
           {course.initial_conducted ? (
@@ -209,12 +209,12 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
 
       {/* Semester Projection Strip */}
       {projection && projection.remainingClasses > 0 && (
-        <div className="mt-2.5 p-2 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 text-[11px] flex items-center justify-between">
+        <div className="mt-2.5 p-2.5 rounded-2xl bg-gray-50/80 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 text-[11px] flex items-center justify-between">
           <span className="text-gray-600 dark:text-gray-300 font-medium">
             Projections ({projection.remainingClasses} left):
           </span>
           <span className="font-mono font-bold text-gray-700 dark:text-gray-200">
-            Best: <span className="text-emerald-600">{projection.bestCase.toFixed(1)}%</span> | Worst: <span className="text-rose-600">{projection.worstCase.toFixed(1)}%</span>
+            Best: <span className="text-emerald-600 dark:text-emerald-400">{projection.bestCase.toFixed(1)}%</span> | Worst: <span className="text-rose-600 dark:text-rose-400">{projection.worstCase.toFixed(1)}%</span>
           </span>
         </div>
       )}
@@ -324,7 +324,7 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
                     isIntegrated ? selectedComponent : (course.type === 'lab' ? 'lab' : 'theory')
                   )
                 }
-                className={`flex items-center justify-center gap-1 py-2 px-2 rounded-xl text-xs transition-all min-h-[40px] focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none cursor-pointer ${
+                className={`flex items-center justify-center gap-1 py-2 px-2.5 rounded-2xl text-xs transition-all min-h-[42px] focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none cursor-pointer active:scale-[0.97] ${
                   isTodayPresent
                     ? 'bg-emerald-600 text-white shadow-md font-bold ring-2 ring-emerald-500 dark:ring-emerald-400'
                     : 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-semibold'
@@ -352,7 +352,7 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
                     isIntegrated ? selectedComponent : (course.type === 'lab' ? 'lab' : 'theory')
                   )
                 }
-                className={`flex items-center justify-center gap-1 py-2 px-2 rounded-xl text-xs transition-all min-h-[40px] focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none cursor-pointer ${
+                className={`flex items-center justify-center gap-1 py-2 px-2.5 rounded-2xl text-xs transition-all min-h-[42px] focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none cursor-pointer active:scale-[0.97] ${
                   isTodayAbsent
                     ? 'bg-rose-600 text-white shadow-md font-bold ring-2 ring-rose-500 dark:ring-rose-400'
                     : 'bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 font-semibold'
@@ -380,7 +380,7 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
                     isIntegrated ? selectedComponent : (course.type === 'lab' ? 'lab' : 'theory')
                   )
                 }
-                className={`flex items-center justify-center gap-1 py-2 px-2 rounded-xl text-xs transition-all min-h-[40px] focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:outline-none cursor-pointer ${
+                className={`flex items-center justify-center gap-1 py-2 px-2.5 rounded-2xl text-xs transition-all min-h-[42px] focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:outline-none cursor-pointer active:scale-[0.97] ${
                   isTodayCancelled
                     ? 'bg-amber-600 text-white shadow-md font-bold ring-2 ring-amber-500 dark:ring-amber-400'
                     : 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium'

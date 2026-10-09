@@ -11,8 +11,8 @@ const distDir = path.join(rootDir, 'dist');
 const distOtaDir = path.join(rootDir, 'dist-ota');
 
 const pkg = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf-8'));
-const version = pkg.version || '1.0.0';
-const build = 1000;
+const version = pkg.version || '1.0.1';
+const build = pkg.build || 1001;
 
 console.log(`\n=== Packaging Spirit OTA Bundle v${version} (Build ${build}) ===`);
 

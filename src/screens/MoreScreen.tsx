@@ -91,6 +91,7 @@ import {
   applyUpdateNow,
   isUpdatePendingRestart,
   CURRENT_APP_VERSION,
+  CURRENT_BUILD_NUMBER,
 } from '../utils/updater';
 
 interface MoreScreenProps {
@@ -737,7 +738,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
                     <span className="text-[11px] text-gray-400">
                       {isUpdatePending
                         ? 'New version downloaded! Ready to restart.'
-                        : updateStatusMsg || `Active Version: v${CURRENT_APP_VERSION} (Build 1000)`}
+                        : updateStatusMsg || `Active Version: v${CURRENT_APP_VERSION} (Build ${CURRENT_BUILD_NUMBER})`}
                     </span>
                   </div>
                   {isUpdatePending ? (
@@ -1034,7 +1035,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
 
           {/* About / Version Footer */}
           <div className="text-center text-[11px] text-gray-400 dark:text-gray-500 space-y-1">
-            <p className="font-semibold text-gray-600 dark:text-gray-400">Spirit v1.0.0 • Offline-First Academic Tracker</p>
+            <p className="font-semibold text-gray-600 dark:text-gray-400">Spirit v{CURRENT_APP_VERSION} • Offline-First Academic Tracker</p>
             <p>Built with Vite, React, TypeScript, Tailwind CSS, vitest & Dexie</p>
           </div>
         </div>

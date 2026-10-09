@@ -50,7 +50,7 @@ export const ResponsiveDialog: React.FC<ResponsiveDialogProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 overflow-y-auto animate-fade-in"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/65 backdrop-blur-md p-0 sm:p-4 overflow-y-auto animate-fade-in"
       role="dialog"
       aria-modal="true"
       aria-labelledby="responsive-dialog-title"
@@ -64,13 +64,13 @@ export const ResponsiveDialog: React.FC<ResponsiveDialogProps> = ({
 
       {/* Modal Dialog Content: Bottom sheet on phone (<640px), centered modal on tablet/desktop (>=640px) */}
       <div
-        className={`w-full ${maxWidthClasses} bg-white dark:bg-gray-900 rounded-t-3xl sm:rounded-2xl max-h-[90vh] sm:max-h-[85vh] flex flex-col border border-gray-100 dark:border-gray-800 shadow-2xl relative z-10 my-0 sm:my-auto focus:outline-none transition-all`}
+        className={`w-full ${maxWidthClasses} bg-white dark:bg-gray-900 rounded-t-[28px] sm:rounded-3xl max-h-[90vh] sm:max-h-[85vh] flex flex-col border border-gray-100 dark:border-gray-800 shadow-2xl relative z-10 my-0 sm:my-auto focus:outline-none transition-all`}
       >
         {/* Sheet drag indicator on mobile */}
-        <div className="w-12 h-1 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto mt-3 mb-1 sm:hidden flex-shrink-0" />
+        <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-700 rounded-full mx-auto mt-3 mb-1 sm:hidden flex-shrink-0" />
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800 flex-shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800/80 flex-shrink-0">
           <div>
             <h2
               id="responsive-dialog-title"
@@ -86,7 +86,7 @@ export const ResponsiveDialog: React.FC<ResponsiveDialogProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none min-h-[36px] min-w-[36px] flex items-center justify-center transition-colors"
+            className="p-1.5 rounded-xl text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none min-h-[36px] min-w-[36px] flex items-center justify-center transition-all active:scale-95 cursor-pointer"
             aria-label="Close dialog"
           >
             <X className="w-5 h-5" />

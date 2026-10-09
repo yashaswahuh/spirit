@@ -9,6 +9,7 @@ import {
   Moon,
 } from 'lucide-react';
 import { NavTab } from './BottomNav';
+import { CURRENT_APP_VERSION } from '../../utils/updater';
 
 export interface SidebarProps {
   activeTab: NavTab;
@@ -50,15 +51,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="min-w-0 flex-1">
               <h1 className="text-lg font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-1.5">
                 Spirit
-                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
-                  PWA
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 font-mono">
+                  v{CURRENT_APP_VERSION}
                 </span>
               </h1>
               {onOpenSemesterSwitcher ? (
                 <button
                   type="button"
                   onClick={onOpenSemesterSwitcher}
-                  className="text-xs text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 truncate flex items-center gap-1 transition-colors mt-0.5 text-left group"
+                  className="text-xs text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 truncate flex items-center gap-1 transition-colors mt-0.5 text-left group cursor-pointer"
                   title="Click to switch or manage semesters"
                 >
                   <span className="group-hover:underline truncate">{termName || 'Semester 1'}</span>
@@ -83,9 +84,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
-                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none ${
+                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl font-medium text-sm transition-all focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none cursor-pointer ${
                   isActive
-                    ? 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 font-bold shadow-sm'
+                    ? 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-bold shadow-xs border border-indigo-100/80 dark:border-indigo-900/40'
                     : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
                 }`}
                 aria-current={isActive ? 'page' : undefined}
