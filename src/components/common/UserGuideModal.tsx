@@ -416,7 +416,7 @@ export const UserGuideModal: React.FC<UserGuideModalProps> = ({ isOpen, onClose 
         {/* Footer */}
         <div className="pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between">
           <span className="text-[11px] text-gray-400 font-medium">
-            Spirit v0.5.5-alpha • 100% Local-First
+            Spirit v1.0.0 • 100% Local-First
           </span>
           <button
             type="button"

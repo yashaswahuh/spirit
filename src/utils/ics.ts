@@ -2,6 +2,7 @@ import { Course, TimetableSlot, Term, Task } from '../types';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
+import { requestStoragePermissions } from './storagePermissions';
 
 /**
  * RFC 5545 iCalendar (.ics) generator for Spirit
@@ -195,6 +196,8 @@ export async function downloadOrShareIcs(filename: string, icsContent: string): 
   // If running on native platform (Android / iOS)
   if (Capacitor.isNativePlatform()) {
     try {
+      await requestStoragePermissions();
+
       // 1. Write .ics file to Cache directory for Android FileProvider sharing
       const writeResult = await Filesystem.writeFile({
         path: filename,

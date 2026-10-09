@@ -25,6 +25,8 @@ import {
   BookOpen,
   ArrowRight,
   RotateCcw,
+  Check,
+  RefreshCw,
 } from 'lucide-react';
 import { db } from '../db/dexie';
 import { seedDemoData, hasDemoData, clearDemoData, resetDatabase } from '../db/repositories/setup.repo';
@@ -83,6 +85,16 @@ import {
   setBackupThresholds,
   StorageEstimateInfo,
 } from '../utils/storage';
+import {
+  checkStoragePermissions,
+  requestStoragePermissions,
+} from '../utils/storagePermissions';
+import {
+  checkForLiveUpdate,
+  applyUpdateNow,
+  isUpdatePendingRestart,
+  CURRENT_APP_VERSION,
+} from '../utils/updater';
 
 interface MoreScreenProps {
   isDark: boolean;
@@ -152,6 +164,14 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   const changesCount = getChangesSinceBackup();
   const isDemoMode = useLiveQuery(() => hasDemoData()) ?? false;
 
+  // Storage Permission status
+  const [hasStoragePerm, setHasStoragePerm] = useState(false);
+
+  // Live OTA Update status
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [updateStatusMsg, setUpdateStatusMsg] = useState<string | null>(null);
+  const [isUpdatePending, setIsUpdatePending] = useState(isUpdatePendingRestart());
+
   useEffect(() => {
     checkPersistentStorage().then(setIsPersisted);
     getStorageEstimate().then(setStorageInfo);
@@ -159,6 +179,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
     setDaysThreshold(thresholds.daysThreshold);
     setChangesThreshold(thresholds.changesThreshold);
     checkNotificationPermission().then(setNotifPermission);
+    checkStoragePermissions().then(setHasStoragePerm);
   }, []);
 
   useEffect(() => {
@@ -244,6 +265,34 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
       setIsTestingNotif(false);
       const updated = await checkNotificationPermission();
       setNotifPermission(updated);
+    }
+  };
+
+  const handleRequestStoragePermission = async () => {
+    const granted = await requestStoragePermissions();
+    setHasStoragePerm(granted);
+    if (granted) {
+      alert('Storage permission granted! Spirit can now save PDF reports and backups.');
+    } else {
+      alert('Storage permission was not granted. Please enable storage in Android App Permissions.');
+    }
+  };
+
+  const handleCheckForUpdates = async () => {
+    setIsCheckingUpdate(true);
+    setUpdateStatusMsg('Checking GitHub Pages for updates...');
+    try {
+      const res = await checkForLiveUpdate();
+      if (res.hasUpdate) {
+        setIsUpdatePending(true);
+        setUpdateStatusMsg(`v${res.latestVersion} downloaded! Ready to restart.`);
+      } else if (res.error) {
+        setUpdateStatusMsg(`Check failed: ${res.error}`);
+      } else {
+        setUpdateStatusMsg(`Up to date! Running latest v${res.currentVersion}`);
+      }
+    } finally {
+      setIsCheckingUpdate(false);
     }
   };
 
@@ -675,6 +724,74 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
               </div>
             </div>
 
+            {/* Storage Permissions (Native Android) */}
+            {isNativePlatform() && (
+              <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <span className="text-xs font-bold text-gray-800 dark:text-gray-200 block">
+                      Device Storage & File Access
+                    </span>
+                    <span className="text-[11px] text-gray-400">
+                      {hasStoragePerm
+                        ? 'Storage permission granted for PDF & backups'
+                        : 'Allows Spirit to save PDF reports & backups directly'}
+                    </span>
+                  </div>
+                  {hasStoragePerm ? (
+                    <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 rounded-xl text-xs font-bold flex items-center gap-1 border border-emerald-200 dark:border-emerald-900/50">
+                      <Check className="w-3 h-3" /> Granted
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleRequestStoragePermission}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm"
+                    >
+                      Allow Access
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Live Auto-Updates (Native Android) */}
+            {isNativePlatform() && (
+              <div className="space-y-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <span className="text-xs font-bold text-gray-800 dark:text-gray-200 block">
+                      Live Web App Auto-Updates
+                    </span>
+                    <span className="text-[11px] text-gray-400">
+                      {isUpdatePending
+                        ? 'New version downloaded! Ready to restart.'
+                        : updateStatusMsg || `Active Version: v${CURRENT_APP_VERSION} (Build 1000)`}
+                    </span>
+                  </div>
+                  {isUpdatePending ? (
+                    <button
+                      type="button"
+                      onClick={() => applyUpdateNow()}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1 animate-pulse"
+                    >
+                      <RefreshCw className="w-3 h-3" /> Restart App
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleCheckForUpdates}
+                      disabled={isCheckingUpdate}
+                      className="px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1"
+                    >
+                      <RefreshCw className={`w-3 h-3 text-indigo-600 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
+                      {isCheckingUpdate ? 'Checking...' : 'Check Updates'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Phone Calendar Sync (.ics export) */}
             <div className="pt-3 border-t border-gray-100 dark:border-gray-800 space-y-2">
               <span className="text-xs font-bold text-gray-800 dark:text-gray-200 block">
@@ -948,7 +1065,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
 
           {/* About / Version Footer */}
           <div className="text-center text-[11px] text-gray-400 dark:text-gray-500 space-y-1">
-            <p className="font-semibold text-gray-600 dark:text-gray-400">Spirit v0.5.5-alpha • Offline-First Academic Tracker</p>
+            <p className="font-semibold text-gray-600 dark:text-gray-400">Spirit v1.0.0 • Offline-First Academic Tracker</p>
             <p>Built with Vite, React, TypeScript, Tailwind CSS, vitest & Dexie</p>
           </div>
         </div>

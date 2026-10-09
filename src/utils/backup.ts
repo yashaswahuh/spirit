@@ -16,6 +16,7 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
+import { requestStoragePermissions } from './storagePermissions';
 
 export type { BackupPayload };
 
@@ -261,6 +262,8 @@ export async function downloadOrShareFile(options: {
   // Native Android/iOS handling
   if (Capacitor.isNativePlatform()) {
     try {
+      await requestStoragePermissions();
+
       // 1. Write file to Cache directory for Android FileProvider sharing
       const writeResult = await Filesystem.writeFile({
         path: filename,
