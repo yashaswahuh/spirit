@@ -14,10 +14,10 @@ import { CourseCalendarModal } from '../components/attendance/CourseCalendarModa
 import { AttendanceReportModal } from '../components/attendance/AttendanceReportModal';
 import { ClearAttendanceModal } from '../components/attendance/ClearAttendanceModal';
 import { createCourse, updateCourse, deleteCourse } from '../db/repositories/course.repo';
-import { markAttendance, syncAllCoursesAttendanceWeights } from '../db/repositories/attendance.repo';
+import { markAttendance, deleteAttendanceRecord, syncAllCoursesAttendanceWeights } from '../db/repositories/attendance.repo';
 import { PageContainer } from '../components/layout/PageContainer';
 import { getLabAttendanceRule } from '../utils/preferences';
-import { timeToMinutes } from '../engine/timetable';
+import { timeToMinutes, resolveDaySchedule, resolveSlotAttendanceWeight } from '../engine/timetable';
 
 export const AttendanceScreen: React.FC = () => {
   const profile = useLiveQuery(() => db.profile.filter(p => p.deleted_at === null).first());
@@ -192,14 +192,61 @@ export const AttendanceScreen: React.FC = () => {
       }
     }
 
-    await markAttendance({
-      course_id: courseId,
+    // Check today's schedule for this course
+    const todayRes = resolveDaySchedule({
       date: todayStr,
-      status,
-      slot_id: null,
-      weight,
-      component_type: targetComp,
+      versions,
+      slots,
+      calendarEvents,
+      overrides,
+      workingDays: activeTerm?.working_days || [1, 2, 3, 4, 5, 6],
+      saturdayRule: activeTerm?.saturday_rule,
+      courses,
+      labAttendanceRule: globalLabRule,
     });
+
+    // Find first unmarked scheduled slot for this course today
+    const unmarkedSlot = todayRes.slots.find(s => {
+      if (s.course_id !== courseId) return false;
+      if (targetComp && s.component_type && s.component_type !== targetComp) return false;
+      return !records.some(r => r.course_id === courseId && r.date === todayStr && r.slot_id === s.slot_id && !r.deleted_at);
+    });
+
+    if (unmarkedSlot && unmarkedSlot.slot_id) {
+      const slotDef = slots.find(s => s.id === unmarkedSlot.slot_id);
+      const slotWeight = resolveSlotAttendanceWeight(slotDef || (unmarkedSlot as any), course, globalLabRule);
+      await markAttendance({
+        course_id: courseId,
+        date: todayStr,
+        status,
+        slot_id: unmarkedSlot.slot_id,
+        weight: slotWeight,
+        component_type: unmarkedSlot.component_type || targetComp,
+      });
+    } else {
+      // Create a new session record for today
+      await markAttendance({
+        course_id: courseId,
+        date: todayStr,
+        status,
+        slot_id: null,
+        weight,
+        component_type: targetComp,
+        createNew: true,
+      });
+    }
+  };
+
+  const handleUndoCourseMark = async (courseId: string) => {
+    const courseRecordsToday = records.filter(
+      r => r.course_id === courseId && r.date === todayStr && !r.deleted_at
+    );
+    if (courseRecordsToday.length === 0) return;
+
+    // Pick the most recently updated/created record today
+    const sorted = [...courseRecordsToday].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+    const target = sorted[0];
+    await deleteAttendanceRecord(target.id);
   };
 
   const handleDeleteCourse = async (courseId: string) => {
@@ -409,9 +456,11 @@ export const AttendanceScreen: React.FC = () => {
                     key={course.id}
                     course={course}
                     stats={stats}
+                    todayRecords={records.filter(r => r.course_id === course.id && r.date === todayStr && !r.deleted_at)}
                     projection={projection}
                     labAttendancePoints={subjectAttendancePoints}
                     onMark={(status, component) => handleMarkCourse(course.id, status, component)}
+                    onUndo={() => handleUndoCourseMark(course.id)}
                     onEdit={() => {
                       setEditingCourse(course);
                       setIsModalOpen(true);

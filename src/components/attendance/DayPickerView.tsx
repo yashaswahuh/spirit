@@ -393,6 +393,22 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
     }
   }
 
+  const scheduledSlotIds = new Set(daySchedule.slots.map(s => s.slot_id).filter(Boolean));
+  const extraRecords = records.filter(
+    r => !r.slot_id || !scheduledSlotIds.has(r.slot_id)
+  );
+
+  for (const r of extraRecords) {
+    if (r.status === 'present') {
+      presentCount++;
+      presentPoints += (r.weight || 1);
+    } else if (r.status === 'absent') {
+      absentCount++;
+    } else if (r.status === 'cancelled') {
+      cancelledCount++;
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Date Navigation Bar */}
@@ -592,12 +608,13 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
               </button>
             </div>
           </div>
-        ) : daySchedule.slots.length === 0 ? (
+        ) : daySchedule.slots.length === 0 && extraRecords.length === 0 ? (
           <div className="p-12 text-center bg-white dark:bg-gray-900 rounded-3xl border border-gray-100 dark:border-gray-800 text-sm text-gray-500">
             No classes scheduled for {selectedDate}.
           </div>
         ) : (
-          daySchedule.slots.map(slot => {
+          <>
+            {daySchedule.slots.map(slot => {
             const course = courseMap.get(slot.course_id);
             const record = getSlotRecord(slot.course_id, slot.slot_id);
             const status = record?.status;
@@ -831,9 +848,70 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
                 </div>
               </div>
             );
-          })
-        )}
-      </div>
+          })}
+
+          {extraRecords.length > 0 && (
+            <div className="space-y-2 pt-2">
+              <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                <span>Extra / Unscheduled Sessions ({extraRecords.length})</span>
+              </h4>
+              <div className="space-y-2">
+                {extraRecords.map(rec => {
+                  const course = courseMap.get(rec.course_id);
+                  const statusCfg = STATUS_CONFIG[rec.status];
+                  return (
+                    <div
+                      key={rec.id}
+                      className="p-3.5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 flex items-center justify-between gap-3 shadow-xs"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span
+                          className="w-2.5 h-8 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: course?.color || '#6366f1' }}
+                        />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h5 className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                              {course?.name || 'Subject'}
+                            </h5>
+                            {rec.component_type && (
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 uppercase">
+                                {rec.component_type}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[11px] text-gray-500 font-mono">
+                            Logged session ({rec.weight || 1} {rec.weight === 1 ? 'pt' : 'pts'})
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-black ${statusCfg.badgeCls}`}>
+                          {statusCfg.icon}
+                          <span>{statusCfg.label}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await deleteAttendanceRecord(rec.id);
+                            onRecordChanged?.();
+                          }}
+                          className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                          title="Delete session"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
 
       {/* Undo Toast */}
       {lastAction && (

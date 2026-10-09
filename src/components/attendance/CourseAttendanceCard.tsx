@@ -1,12 +1,14 @@
 import React from 'react';
-import { CheckCircle2, AlertTriangle, ShieldCheck, MoreVertical, Plus, Minus, X } from 'lucide-react';
-import { Course, AttendanceStatus } from '../../types';
+import { CheckCircle2, AlertTriangle, ShieldCheck, MoreVertical, Plus, Minus, X, RotateCcw } from 'lucide-react';
+import { Course, AttendanceStatus, AttendanceRecord } from '../../types';
 import { AttendanceStats } from '../../types';
 
 interface CourseAttendanceCardProps {
   course: Course;
   stats: AttendanceStats;
+  todayRecords?: AttendanceRecord[];
   onMark: (status: AttendanceStatus, componentType?: 'theory' | 'lab') => void;
+  onUndo?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
   onViewCalendar?: () => void;
@@ -23,7 +25,9 @@ interface CourseAttendanceCardProps {
 export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
   course,
   stats,
+  todayRecords = [],
   onMark,
+  onUndo,
   onEdit,
   onDelete,
   onViewCalendar,
@@ -253,6 +257,41 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
           >
             🧪 Lab (+{labAttendancePoints} {labAttendancePoints === 1 ? 'pt' : 'pts'})
           </button>
+        </div>
+      )}
+
+      {/* Today's Logged Sessions Strip & Undo Button */}
+      {todayRecords.length > 0 && (
+        <div className="mt-2.5 px-3 py-1.5 rounded-xl bg-gray-50 dark:bg-gray-800/80 border border-gray-100 dark:border-gray-800 flex items-center justify-between text-xs animate-fade-in">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">Marked today:</span>
+            {todayRecords.filter(r => r.status === 'present').length > 0 && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 font-bold text-[10px]">
+                +{todayRecords.filter(r => r.status === 'present').length} Present
+              </span>
+            )}
+            {todayRecords.filter(r => r.status === 'absent').length > 0 && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 font-bold text-[10px]">
+                +{todayRecords.filter(r => r.status === 'absent').length} Missed
+              </span>
+            )}
+            {todayRecords.filter(r => r.status === 'cancelled').length > 0 && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 font-bold text-[10px]">
+                {todayRecords.filter(r => r.status === 'cancelled').length} Cancelled
+              </span>
+            )}
+          </div>
+          {onUndo && (
+            <button
+              type="button"
+              onClick={onUndo}
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-600 hover:text-rose-600 dark:text-gray-300 dark:hover:text-rose-400 px-2 py-0.5 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+              title="Undo last session marked today"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Undo</span>
+            </button>
+          )}
         </div>
       )}
 

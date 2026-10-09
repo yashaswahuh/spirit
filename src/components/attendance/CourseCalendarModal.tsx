@@ -51,7 +51,12 @@ export const CourseCalendarModal: React.FC<CourseCalendarModalProps> = ({
       .toArray()
   ) || [];
 
-  const recordMap = new Map<string, AttendanceRecord>(records.map(r => [r.date, r]));
+  const recordsByDate = new Map<string, AttendanceRecord[]>();
+  for (const r of records) {
+    const list = recordsByDate.get(r.date) || [];
+    list.push(r);
+    recordsByDate.set(r.date, list);
+  }
 
   // Month navigation
   const handlePrevMonth = () => {
@@ -113,23 +118,31 @@ export const CourseCalendarModal: React.FC<CourseCalendarModalProps> = ({
     });
   }
 
-  // Handler for updating attendance on a picked date
+  // Handler for adding or updating attendance on a picked date
   const handleSetStatus = async (status: AttendanceStatus | 'clear') => {
     if (!selectedRecordDate) return;
+    const dayRecords = recordsByDate.get(selectedRecordDate) || [];
 
-    const existing = recordMap.get(selectedRecordDate);
-    if (status === 'clear' || (existing && existing.status === status)) {
-      if (existing) {
-        await deleteAttendanceRecord(existing.id);
+    if (status === 'clear') {
+      for (const r of dayRecords) {
+        await deleteAttendanceRecord(r.id);
       }
-    } else {
-      const globalLabRule = getLabAttendanceRule();
-      const rule = course.lab_attendance_rule || globalLabRule;
-      const isLabCourse = course.type === 'lab' || course.type === 'theory_and_lab';
-      let weight = 1;
-      if (isLabCourse) {
-        weight = rule === 'single_session' ? 1 : 2;
-      }
+      return;
+    }
+
+    const globalLabRule = getLabAttendanceRule();
+    const rule = course.lab_attendance_rule || globalLabRule;
+    const isLabCourse = course.type === 'lab' || course.type === 'theory_and_lab';
+    let weight = 1;
+    if (isLabCourse) {
+      weight = rule === 'single_session' ? 1 : 2;
+    }
+
+    if (dayRecords.length === 1 && dayRecords[0].status === status) {
+      // Tapping same status on single session clears it
+      await deleteAttendanceRecord(dayRecords[0].id);
+    } else if (dayRecords.length === 0) {
+      // First session on this date
       await markAttendance({
         course_id: course.id,
         date: selectedRecordDate,
@@ -137,8 +150,21 @@ export const CourseCalendarModal: React.FC<CourseCalendarModalProps> = ({
         weight,
         component_type: isLabCourse ? 'lab' : 'theory',
       });
+    } else {
+      // Add another session for this date
+      await markAttendance({
+        course_id: course.id,
+        date: selectedRecordDate,
+        status,
+        weight,
+        component_type: isLabCourse ? 'lab' : 'theory',
+        createNew: true,
+      });
     }
-    setSelectedRecordDate(null);
+  };
+
+  const handleDeleteSpecificRecord = async (recordId: string) => {
+    await deleteAttendanceRecord(recordId);
   };
 
   // Render status badge icon and color indicator (never color alone!)
@@ -258,7 +284,7 @@ export const CourseCalendarModal: React.FC<CourseCalendarModalProps> = ({
           {/* Days */}
           <div className="grid grid-cols-7 divide-x divide-y divide-gray-100 dark:divide-gray-800">
             {calendarDays.map((d, idx) => {
-              const record = recordMap.get(d.dateStr);
+              const dayRecords = recordsByDate.get(d.dateStr) || [];
               const isSelected = selectedRecordDate === d.dateStr;
 
               return (
@@ -276,8 +302,13 @@ export const CourseCalendarModal: React.FC<CourseCalendarModalProps> = ({
                   <span className={`text-[11px] font-bold ${isSelected ? 'text-indigo-600 font-black' : 'text-gray-700 dark:text-gray-300'}`}>
                     {d.dayNum}
                   </span>
-                  <div className="flex items-center justify-center">
-                    {renderStatusBadge(record)}
+                  <div className="flex items-center justify-center gap-0.5 flex-wrap">
+                    {dayRecords.slice(0, 3).map((r, i) => (
+                      <span key={r.id || i}>{renderStatusBadge(r)}</span>
+                    ))}
+                    {dayRecords.length > 3 && (
+                      <span className="text-[9px] font-bold text-gray-500">+{dayRecords.length - 3}</span>
+                    )}
                   </div>
                 </div>
               );
@@ -287,18 +318,17 @@ export const CourseCalendarModal: React.FC<CourseCalendarModalProps> = ({
 
         {/* Quick Edit Sheet / Popover for Selected Date */}
         {selectedRecordDate && (() => {
-          const currentRec = recordMap.get(selectedRecordDate);
-          const currentStatus = currentRec?.status;
+          const dayRecords = recordsByDate.get(selectedRecordDate) || [];
 
           return (
-            <div className="p-3.5 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 space-y-2.5 animate-fade-in">
+            <div className="p-3.5 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 space-y-3 animate-fade-in">
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-indigo-500" />
-                  <span>Edit Attendance for {formatDate(selectedRecordDate, dateFormat, { includeWeekday: true })}</span>
-                  {currentStatus && (
+                  <span>Attendance for {formatDate(selectedRecordDate, dateFormat, { includeWeekday: true })}</span>
+                  {dayRecords.length > 0 && (
                     <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded-md">
-                      Currently: {currentStatus}
+                      {dayRecords.length} {dayRecords.length === 1 ? 'Session' : 'Sessions'} Logged
                     </span>
                   )}
                 </h4>
@@ -311,39 +341,80 @@ export const CourseCalendarModal: React.FC<CourseCalendarModalProps> = ({
                 </button>
               </div>
 
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-                {[
-                  { status: 'present' as AttendanceStatus, label: 'Present', activeBg: 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-gray-900' },
-                  { status: 'absent' as AttendanceStatus, label: 'Absent', activeBg: 'bg-rose-600 text-white shadow-md ring-2 ring-rose-500 ring-offset-2 dark:ring-offset-gray-900' },
-                  { status: 'cancelled' as AttendanceStatus, label: 'Cancelled', activeBg: 'bg-amber-600 text-white shadow-md ring-2 ring-amber-500 ring-offset-2 dark:ring-offset-gray-900' },
-                  { status: 'medical' as AttendanceStatus, label: 'Medical', activeBg: 'bg-cyan-600 text-white shadow-md ring-2 ring-cyan-500 ring-offset-2 dark:ring-offset-gray-900' },
-                  { status: 'duty_leave' as AttendanceStatus, label: 'Duty', activeBg: 'bg-violet-600 text-white shadow-md ring-2 ring-violet-500 ring-offset-2 dark:ring-offset-gray-900' },
-                ].map(btn => {
-                  const isSelected = currentStatus === btn.status;
-                  return (
+              {dayRecords.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    Logged Sessions ({dayRecords.length}):
+                  </div>
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {dayRecords.map((r, idx) => (
+                      <div
+                        key={r.id}
+                        className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-xs"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400 font-mono text-[10px]">#{idx + 1}</span>
+                          {renderStatusBadge(r)}
+                          <span className="font-bold capitalize text-gray-800 dark:text-gray-200">
+                            {r.status.replace('_', ' ')}
+                          </span>
+                          {r.weight && r.weight > 1 && (
+                            <span className="text-[10px] text-gray-400 font-mono">
+                              ({r.weight} pts)
+                            </span>
+                          )}
+                          {r.component_type && (
+                            <span className="text-[10px] uppercase font-bold text-indigo-500">
+                              {r.component_type}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSpecificRecord(r.id)}
+                          className="text-rose-500 hover:text-rose-700 text-xs font-bold px-2 py-0.5 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 cursor-pointer"
+                          title="Delete this session"
+                        >
+                          ✕ Delete
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <div className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5">
+                  {dayRecords.length === 0 ? 'Mark Class Session:' : 'Add Another Session / Quick Mark:'}
+                </div>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
+                  {[
+                    { status: 'present' as AttendanceStatus, label: '+ Present' },
+                    { status: 'absent' as AttendanceStatus, label: '+ Absent' },
+                    { status: 'cancelled' as AttendanceStatus, label: 'Cancelled' },
+                    { status: 'medical' as AttendanceStatus, label: 'Medical' },
+                    { status: 'duty_leave' as AttendanceStatus, label: 'Duty' },
+                  ].map(btn => (
                     <button
                       key={btn.status}
                       type="button"
                       onClick={() => handleSetStatus(btn.status)}
-                      className={`py-2 px-1.5 rounded-xl text-xs font-bold transition-all min-h-[40px] flex items-center justify-center gap-1 cursor-pointer ${
-                        isSelected
-                          ? `${btn.activeBg} font-black scale-[1.02]`
-                          : 'bg-white dark:bg-gray-700/80 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600'
-                      }`}
-                      title={isSelected ? `${btn.label} (Tap to unmark)` : `Mark ${btn.label}`}
+                      className="py-2 px-1.5 rounded-xl text-xs font-bold transition-all min-h-[40px] flex items-center justify-center gap-1 cursor-pointer bg-white dark:bg-gray-700/80 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-600"
                     >
                       <span>{btn.label}</span>
                     </button>
-                  );
-                })}
-                <button
-                  type="button"
-                  onClick={() => handleSetStatus('clear')}
-                  className="py-2 px-1.5 rounded-xl bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 text-xs font-bold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors min-h-[40px] cursor-pointer"
-                  title="Clear attendance mark for this date"
-                >
-                  Clear Log
-                </button>
+                  ))}
+                  {dayRecords.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => handleSetStatus('clear')}
+                      className="py-2 px-1.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900 text-xs font-bold hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors min-h-[40px] cursor-pointer"
+                      title="Clear all sessions for this date"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           );
