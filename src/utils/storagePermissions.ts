@@ -34,3 +34,4 @@ export async function requestStoragePermissions(): Promise<boolean> {
     return false;
   }
 }
+

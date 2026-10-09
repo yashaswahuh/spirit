@@ -76,3 +76,4 @@ try {
 }
 
 console.log('=== OTA package generation complete ===\n');
+
