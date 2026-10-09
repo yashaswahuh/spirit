@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Plus, Search, Filter, CalendarCheck, Sparkles, LayoutGrid, CalendarDays, FileText, RotateCcw } from 'lucide-react';
+import { Plus, Search, Filter, CalendarCheck, Sparkles, LayoutGrid, CalendarDays, FileText, RotateCcw, AlertTriangle } from 'lucide-react';
 import { db } from '../db/dexie';
 import { Course, AttendanceStatus } from '../types';
 import { computeCourseAttendanceStats, countUnmarkedClasses } from '../engine/attendance';
@@ -16,6 +16,7 @@ import { ClearAttendanceModal } from '../components/attendance/ClearAttendanceMo
 import { createCourse, updateCourse, deleteCourse } from '../db/repositories/course.repo';
 import { markAttendance, deleteAttendanceRecord, syncAllCoursesAttendanceWeights } from '../db/repositories/attendance.repo';
 import { PageContainer } from '../components/layout/PageContainer';
+import { ResponsiveDialog } from '../components/layout/ResponsiveDialog';
 import { getLabAttendanceRule } from '../utils/preferences';
 import { timeToMinutes, resolveDaySchedule, resolveSlotAttendanceWeight } from '../engine/timetable';
 
@@ -41,6 +42,36 @@ export const AttendanceScreen: React.FC = () => {
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [isClearAttendanceOpen, setIsClearAttendanceOpen] = useState(false);
   const [clearInitialCourseId, setClearInitialCourseId] = useState<string | null>(null);
+
+  // Extra Class Confirmation Dialog State
+  interface PendingExtraClass {
+    course: Course;
+    status: AttendanceStatus;
+    componentType?: 'theory' | 'lab';
+    weight: number;
+    reason: 'scheduled_already_marked' | 'unscheduled_day' | 'duplicate_session';
+    currentAttended: number;
+    currentConducted: number;
+  }
+  const [pendingExtraClass, setPendingExtraClass] = useState<PendingExtraClass | null>(null);
+
+  const handleConfirmExtraClass = async () => {
+    if (!pendingExtraClass) return;
+    await markAttendance({
+      course_id: pendingExtraClass.course.id,
+      date: todayStr,
+      status: pendingExtraClass.status,
+      slot_id: null,
+      weight: pendingExtraClass.weight,
+      component_type: pendingExtraClass.componentType,
+      createNew: true,
+    });
+    setPendingExtraClass(null);
+  };
+
+  const handleCancelExtraClass = () => {
+    setPendingExtraClass(null);
+  };
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -158,6 +189,8 @@ export const AttendanceScreen: React.FC = () => {
     componentType?: 'theory' | 'lab'
   ) => {
     const course = courses.find(c => c.id === courseId);
+    if (!course) return;
+
     const globalLabRule = getLabAttendanceRule();
     const effectiveLabRule = course?.lab_attendance_rule || globalLabRule;
 
@@ -205,36 +238,143 @@ export const AttendanceScreen: React.FC = () => {
       labAttendanceRule: globalLabRule,
     });
 
-    // Find first unmarked scheduled slot for this course today
-    const unmarkedSlot = todayRes.slots.find(s => {
-      if (s.course_id !== courseId) return false;
-      if (targetComp && s.component_type && s.component_type !== targetComp) return false;
-      return !records.some(r => r.course_id === courseId && r.date === todayStr && r.slot_id === s.slot_id && !r.deleted_at);
-    });
+    const courseTodaySlots = todayRes.slots.filter(s => s.course_id === courseId);
+    const courseRecordsToday = records.filter(
+      r => r.course_id === courseId && r.date === todayStr && !r.deleted_at
+    );
 
-    if (unmarkedSlot && unmarkedSlot.slot_id) {
-      const slotDef = slots.find(s => s.id === unmarkedSlot.slot_id);
-      const slotWeight = resolveSlotAttendanceWeight(slotDef || (unmarkedSlot as any), course, globalLabRule);
-      await markAttendance({
-        course_id: courseId,
-        date: todayStr,
-        status,
-        slot_id: unmarkedSlot.slot_id,
-        weight: slotWeight,
-        component_type: unmarkedSlot.component_type || targetComp,
-      });
-    } else {
-      // Create a new session record for today
-      await markAttendance({
-        course_id: courseId,
-        date: todayStr,
-        status,
-        slot_id: null,
-        weight,
-        component_type: targetComp,
-        createNew: true,
-      });
+    // Compute current stats for dialog preview
+    const courseStats = computeCourseAttendanceStats(
+      records.filter(r => r.course_id === courseId),
+      {
+        medical_counts_as_present: course.medical_counts_as_present,
+        duty_leave_counts_as_present: course.duty_leave_counts_as_present,
+      },
+      course.attendance_threshold_override || defaultThreshold,
+      {
+        initialAttended: course.initial_attended,
+        initialConducted: course.initial_conducted,
+        trackingStartDate: course.tracking_start_date,
+        slots,
+        courseType: course.type,
+        labAttendanceRule: course.lab_attendance_rule,
+        globalLabRule,
+      }
+    );
+
+    // Guard: Prevent excessive sessions on a single date (cap at 3)
+    if (courseRecordsToday.length >= 3) {
+      alert(`Maximum 3 sessions can be recorded for ${course.name} on a single date. Please check your timetable or edit subject details.`);
+      return;
     }
+
+    // Case 1: Course has scheduled slots on today's timetable
+    if (courseTodaySlots.length > 0) {
+      // Find first unmarked scheduled slot for today
+      const unmarkedSlot = courseTodaySlots.find(s => {
+        if (targetComp && s.component_type && s.component_type !== targetComp) return false;
+        return !records.some(r => r.course_id === courseId && r.date === todayStr && r.slot_id === s.slot_id && !r.deleted_at);
+      });
+
+      if (unmarkedSlot && unmarkedSlot.slot_id) {
+        // Mark the scheduled slot
+        const slotDef = slots.find(s => s.id === unmarkedSlot.slot_id);
+        const slotWeight = resolveSlotAttendanceWeight(slotDef || (unmarkedSlot as any), course, globalLabRule);
+        await markAttendance({
+          course_id: courseId,
+          date: todayStr,
+          status,
+          slot_id: unmarkedSlot.slot_id,
+          weight: slotWeight,
+          component_type: unmarkedSlot.component_type || targetComp,
+        });
+        return;
+      }
+
+      // All scheduled slots for today are marked!
+      // If there is exactly 1 record today and user clicked a DIFFERENT status, update that record without inflating count!
+      if (courseRecordsToday.length === 1 && courseRecordsToday[0].status !== status) {
+        await markAttendance({
+          course_id: courseId,
+          date: todayStr,
+          status,
+          slot_id: courseRecordsToday[0].slot_id,
+          weight: courseRecordsToday[0].weight || weight,
+          component_type: targetComp,
+          createNew: false,
+        });
+        return;
+      }
+
+      // If user clicked the SAME status (or already has extra classes), require explicit confirmation to add an extra makeup class!
+      setPendingExtraClass({
+        course,
+        status,
+        componentType: targetComp,
+        weight,
+        reason: 'scheduled_already_marked',
+        currentAttended: courseStats.attended,
+        currentConducted: courseStats.conducted,
+      });
+      return;
+    }
+
+    // Case 2: No scheduled slots on today's timetable
+    // Check if course has slots on other days (meaning student uses timetable, but NSS is not on today's timetable)
+    const hasAnySlots = slots.some(s => s.course_id === courseId);
+
+    if (hasAnySlots && courseRecordsToday.length === 0) {
+      // Unscheduled day on timetable! Confirm before adding makeup class
+      setPendingExtraClass({
+        course,
+        status,
+        componentType: targetComp,
+        weight,
+        reason: 'unscheduled_day',
+        currentAttended: courseStats.attended,
+        currentConducted: courseStats.conducted,
+      });
+      return;
+    }
+
+    // If already has 1 record today and user clicked a DIFFERENT status, switch/correct it!
+    if (courseRecordsToday.length === 1 && courseRecordsToday[0].status !== status) {
+      await markAttendance({
+        course_id: courseId,
+        date: todayStr,
+        status,
+        slot_id: courseRecordsToday[0].slot_id,
+        weight: courseRecordsToday[0].weight || weight,
+        component_type: targetComp,
+        createNew: false,
+      });
+      return;
+    }
+
+    // If already has 1 record today and user clicked the SAME status: confirm extra session!
+    if (courseRecordsToday.length >= 1) {
+      setPendingExtraClass({
+        course,
+        status,
+        componentType: targetComp,
+        weight,
+        reason: 'duplicate_session',
+        currentAttended: courseStats.attended,
+        currentConducted: courseStats.conducted,
+      });
+      return;
+    }
+
+    // No timetable used and 0 records today: log 1st class for today directly!
+    await markAttendance({
+      course_id: courseId,
+      date: todayStr,
+      status,
+      slot_id: null,
+      weight,
+      component_type: targetComp,
+      createNew: true,
+    });
   };
 
   const handleUndoCourseMark = async (courseId: string) => {
@@ -531,6 +671,70 @@ export const AttendanceScreen: React.FC = () => {
           }}
           initialCourseId={clearInitialCourseId}
         />
+      )}
+
+      {/* Extra / Makeup Class Confirmation Modal */}
+      {pendingExtraClass && (
+        <ResponsiveDialog
+          isOpen={!!pendingExtraClass}
+          onClose={handleCancelExtraClass}
+          title="Log Extra / Makeup Class?"
+          description={`Confirm adding an extra class session for ${pendingExtraClass.course.name}`}
+          maxWidth="md"
+        >
+          <div className="space-y-4">
+            <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 text-xs text-amber-900 dark:text-amber-200">
+              <div className="font-bold flex items-center gap-1.5 mb-1">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                <span>
+                  {pendingExtraClass.reason === 'unscheduled_day'
+                    ? 'No Class Scheduled Today'
+                    : 'Today’s Scheduled Class Already Logged'}
+                </span>
+              </div>
+              <p className="text-amber-700 dark:text-amber-300">
+                {pendingExtraClass.reason === 'unscheduled_day'
+                  ? `No class for ${pendingExtraClass.course.name} is on today's timetable. Did your professor hold an extra / unscheduled makeup class today?`
+                  : `You have already logged today's class for ${pendingExtraClass.course.name}. Did your professor conduct an additional makeup lecture or extra session today?`}
+              </p>
+            </div>
+
+            {/* Attendance Impact Preview */}
+            <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-700 text-xs space-y-1.5">
+              <div className="flex items-center justify-between text-gray-600 dark:text-gray-300">
+                <span>Current Total Conducted:</span>
+                <span className="font-mono font-bold text-gray-900 dark:text-white">
+                  {pendingExtraClass.currentAttended} / {pendingExtraClass.currentConducted}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-indigo-600 dark:text-indigo-400 font-bold">
+                <span>After Extra Class ({pendingExtraClass.status}):</span>
+                <span className="font-mono">
+                  {pendingExtraClass.status === 'present'
+                    ? `${pendingExtraClass.currentAttended + pendingExtraClass.weight} / ${pendingExtraClass.currentConducted + pendingExtraClass.weight}`
+                    : `${pendingExtraClass.currentAttended} / ${pendingExtraClass.currentConducted + pendingExtraClass.weight}`}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleCancelExtraClass}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer min-h-[40px]"
+              >
+                Cancel (Keep {pendingExtraClass.currentConducted})
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmExtraClass}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md transition-colors cursor-pointer min-h-[40px]"
+              >
+                Yes, Add Extra Class (+1)
+              </button>
+            </div>
+          </div>
+        </ResponsiveDialog>
       )}
     </PageContainer>
   );
