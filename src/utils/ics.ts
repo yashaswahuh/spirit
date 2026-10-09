@@ -1,4 +1,5 @@
-import { Course, TimetableSlot, Term, Task } from '../types';
+import { Course, TimetableSlot, Term, Task, CalendarEvent } from '../types';
+import { isSaturdayOff } from '../engine/timetable';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
@@ -44,31 +45,16 @@ function escapeIcalText(text: string): string {
 }
 
 /**
- * Finds the first specific day of week (0=Sun ... 6=Sat) on or after startDateStr
- */
-function getFirstDateForWeekday(startDateStr: string, targetWeekday: number): string {
-  const start = new Date(startDateStr);
-  const currentJsDay = start.getDay(); // 0 is Sunday, 1 is Monday...
-
-  let diffDays = targetWeekday - currentJsDay;
-  if (diffDays < 0) {
-    diffDays += 7;
-  }
-
-  const firstDate = new Date(start);
-  firstDate.setDate(firstDate.getDate() + diffDays);
-  return firstDate.toISOString().slice(0, 10);
-}
-
-/**
- * Generates .ics file content for recurring timetable slots
+ * Generates .ics file content for recurring timetable slots, accurately
+ * accounting for Saturday rules (2nd off, 2nd & 4th off, all off) and holidays.
  */
 export function generateTimetableIcs(params: {
   term: Term;
   slots: TimetableSlot[];
   courses: Course[];
+  calendarEvents?: CalendarEvent[];
 }): string {
-  const { term, slots, courses } = params;
+  const { term, slots, courses, calendarEvents = [] } = params;
   const courseMap = new Map<string, Course>(courses.map(c => [c.id, c]));
 
   const lines: string[] = [
@@ -83,13 +69,61 @@ export function generateTimetableIcs(params: {
   for (const slot of slots) {
     const course = courseMap.get(slot.course_id);
     const summary = course ? `${course.name} (${course.code || slot.component_type})` : `Class (${slot.component_type})`;
-    
-    // Calculate the first instance of this slot
-    const firstDate = getFirstDateForWeekday(term.start_date, slot.weekday);
+
+    // Collect all candidate dates for this slot's weekday within the term
+    const candidateDates: string[] = [];
+    const cur = new Date(term.start_date + 'T00:00:00Z');
+    const end = new Date(term.end_date + 'T23:59:59Z');
+
+    const startWeekday = cur.getUTCDay();
+    let diff = slot.weekday - startWeekday;
+    if (diff < 0) diff += 7;
+    cur.setUTCDate(cur.getUTCDate() + diff);
+
+    while (cur <= end) {
+      candidateDates.push(cur.toISOString().slice(0, 10));
+      cur.setUTCDate(cur.getUTCDate() + 7);
+    }
+
+    if (candidateDates.length === 0) continue;
+
+    const isDateOff = (dateStr: string): boolean => {
+      // 1. Saturday working rules
+      if (slot.weekday === 6 && isSaturdayOff(dateStr, term.saturday_rule)) {
+        return true;
+      }
+      // 2. Term holidays
+      const isHol = calendarEvents.some(e => {
+        if (e.deleted_at || e.type !== 'holiday') return false;
+        if (e.end_date) {
+          return dateStr >= e.date && dateStr <= e.end_date;
+        }
+        return dateStr === e.date;
+      });
+      return isHol;
+    };
+
+    // Find first working occurrence in the term for DTSTART
+    const firstWorkingIdx = candidateDates.findIndex(d => !isDateOff(d));
+    if (firstWorkingIdx === -1) {
+      // All occurrences of this weekday are off during the term
+      continue;
+    }
+
+    const firstDate = candidateDates[firstWorkingIdx];
     const dtStart = formatIcalDateTime(firstDate, slot.start_time);
     const dtEnd = formatIcalDateTime(firstDate, slot.end_time);
     const until = formatIcalUntil(term.end_date);
     const byDay = DAY_MAP[slot.weekday] || 'MO';
+
+    // Collect EXDATEs for off-Saturdays and holidays after the first working date
+    const exDates: string[] = [];
+    for (let i = firstWorkingIdx + 1; i < candidateDates.length; i++) {
+      const d = candidateDates[i];
+      if (isDateOff(d)) {
+        exDates.push(formatIcalDateTime(d, slot.start_time));
+      }
+    }
 
     const descParts: string[] = [];
     if (slot.room) descParts.push(`Room: ${slot.room}`);
@@ -103,6 +137,9 @@ export function generateTimetableIcs(params: {
     lines.push(`DTSTART:${dtStart}`);
     lines.push(`DTEND:${dtEnd}`);
     lines.push(`RRULE:FREQ=WEEKLY;UNTIL=${until};BYDAY=${byDay}`);
+    for (const exDate of exDates) {
+      lines.push(`EXDATE:${exDate}`);
+    }
     lines.push(`SUMMARY:${escapeIcalText(summary)}`);
     if (slot.room) lines.push(`LOCATION:${escapeIcalText(slot.room)}`);
     lines.push(`DESCRIPTION:${escapeIcalText(descParts.join(' | '))}`);
@@ -151,7 +188,7 @@ export function generateTasksIcs(params: {
     const timeStr = task.due_at.length >= 16 ? task.due_at.slice(11, 16) : '09:00';
     const dtStart = formatIcalDateTime(dateStr, timeStr);
     
-    // Default duration: 1 hour or 2 hours for exam
+    // Default duration: 1 hour or 2-3 hours for exam
     const endHour = (parseInt(timeStr.slice(0, 2), 10) + (task.type === 'exam' || task.type === 'mid_sem' || task.type === 'end_sem' ? 3 : 1)).toString().padStart(2, '0');
     const dtEnd = formatIcalDateTime(dateStr, `${endHour}:${timeStr.slice(3, 5)}`);
 
@@ -190,15 +227,14 @@ export function generateTasksIcs(params: {
 }
 
 /**
- * Downloads or shares the generated .ics file
+ * Directly opens or imports the .ics calendar file using the device's native Calendar app
+ * (Google Calendar, Samsung Calendar, Apple Calendar, etc.)
  */
-export async function downloadOrShareIcs(filename: string, icsContent: string): Promise<boolean> {
-  // If running on native platform (Android / iOS)
+export async function openInCalendarApp(filename: string, icsContent: string): Promise<boolean> {
   if (Capacitor.isNativePlatform()) {
     try {
       await requestStoragePermissions();
 
-      // 1. Write .ics file to Cache directory for Android FileProvider sharing
       const writeResult = await Filesystem.writeFile({
         path: filename,
         data: icsContent,
@@ -206,38 +242,59 @@ export async function downloadOrShareIcs(filename: string, icsContent: string): 
         encoding: Encoding.UTF8,
       });
 
-      // 2. Open Android system share sheet (user can pick Google Calendar, Samsung Calendar, or Save to files)
+      // Passing files without text allows Android FileProvider to recognize MIME text/calendar,
+      // prompting Android to display Calendar apps (Google Calendar, Samsung Calendar, etc.).
       await Share.share({
         title: filename,
-        text: 'Spirit Academic Calendar export',
-        url: writeResult.uri,
-        dialogTitle: 'Import into Calendar or Save .ics',
+        files: [writeResult.uri],
+        dialogTitle: 'Open with Calendar',
       });
       return true;
     } catch (err: any) {
       if (err?.message?.includes('canceled') || err?.message?.includes('cancelled')) {
-        return true; // User dismissed share sheet
-      }
-      console.warn('Native Share failed for .ics, attempting Documents write fallback:', err);
-      try {
-        await Filesystem.writeFile({
-          path: filename,
-          data: icsContent,
-          directory: Directory.Documents,
-          encoding: Encoding.UTF8,
-        });
         return true;
-      } catch (writeErr) {
-        console.error('Filesystem write to Documents failed:', writeErr);
       }
+      console.warn('Native open in calendar failed, falling back to download:', err);
     }
   }
 
-  const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+  // On Web / Desktop: download the .ics file which triggers default desktop calendar app
+  return downloadIcsFile(filename, icsContent);
+}
 
-  // On modern mobile web devices, try native Web Share API
+/**
+ * Shares the .ics file via standard system share sheet (WhatsApp, Drive, Email, etc.)
+ */
+export async function shareIcsFile(filename: string, icsContent: string): Promise<boolean> {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await requestStoragePermissions();
+
+      const writeResult = await Filesystem.writeFile({
+        path: filename,
+        data: icsContent,
+        directory: Directory.Cache,
+        encoding: Encoding.UTF8,
+      });
+
+      await Share.share({
+        title: filename,
+        text: 'Spirit Academic Calendar export (.ics)',
+        files: [writeResult.uri],
+        dialogTitle: 'Share .ics Calendar File',
+      });
+      return true;
+    } catch (err: any) {
+      if (err?.message?.includes('canceled') || err?.message?.includes('cancelled')) {
+        return true;
+      }
+      console.warn('Native share failed, falling back to download:', err);
+    }
+  }
+
   if (typeof navigator !== 'undefined' && 'canShare' in navigator && navigator.canShare) {
     try {
+      const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
       const file = new File([blob], filename, { type: 'text/calendar' });
       if (navigator.canShare({ files: [file] })) {
         await navigator.share({
@@ -248,15 +305,36 @@ export async function downloadOrShareIcs(filename: string, icsContent: string): 
         return true;
       }
     } catch (err: any) {
-      if (err.name !== 'AbortError') {
+      if (err?.name !== 'AbortError') {
         console.warn('Web Share failed, falling back to download:', err);
       } else {
-        return true; // User cancelled share sheet
+        return true;
       }
     }
   }
 
-  // Standard browser file download fallback
+  return downloadIcsFile(filename, icsContent);
+}
+
+/**
+ * Downloads the .ics file directly to storage
+ */
+export async function downloadIcsFile(filename: string, icsContent: string): Promise<boolean> {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await requestStoragePermissions();
+      await Filesystem.writeFile({
+        path: filename,
+        data: icsContent,
+        directory: Directory.Documents,
+        encoding: Encoding.UTF8,
+      });
+    } catch (err) {
+      console.warn('Writing to Documents directory failed:', err);
+    }
+  }
+
+  const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -267,4 +345,21 @@ export async function downloadOrShareIcs(filename: string, icsContent: string): 
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   return true;
 }
+
+/**
+ * Downloads the .ics file and opens Google Calendar web import page in browser
+ */
+export async function openGoogleCalendarImport(filename: string, icsContent: string): Promise<boolean> {
+  await downloadIcsFile(filename, icsContent);
+  window.open('https://calendar.google.com/calendar/r/settings/export', '_blank');
+  return true;
+}
+
+/**
+ * Backward-compatible download or share helper
+ */
+export async function downloadOrShareIcs(filename: string, icsContent: string): Promise<boolean> {
+  return shareIcsFile(filename, icsContent);
+}
+
 

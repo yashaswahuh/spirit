@@ -101,60 +101,92 @@ export async function exportAttendancePdf(data: AttendancePdfData): Promise<'sha
   // Summary Metrics Cards
   const cardsTop = 46;
   const cardWidth = (pageWidth - margin * 2 - 9) / 4;
-  const cardHeight = 16;
+  const cardHeight = 18;
 
   // Card 1: Overall Percentage
-  doc.setFillColor(249, 250, 251);
-  doc.setDrawColor(229, 231, 235);
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.25);
   doc.roundedRect(margin, cardsTop, cardWidth, cardHeight, 2, 2, 'FD');
   doc.setFontSize(7);
-  doc.setTextColor(107, 114, 128);
-  doc.text('OVERALL ATTENDANCE', margin + 3, cardsTop + 4.5);
-  doc.setFontSize(11);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(51, 65, 85);
+  doc.text('OVERALL ATTENDANCE', margin + 3.5, cardsTop + 5);
+  doc.setFontSize(11.5);
   doc.setFont('helvetica', 'bold');
   if (data.grandConducted === 0) {
-    doc.setTextColor(156, 163, 175);
-    doc.text('—', margin + 3, cardsTop + 11.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('—', margin + 3.5, cardsTop + 11.5);
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 116, 139);
+    doc.text('No classes held', margin + 3.5, cardsTop + 15.5);
   } else {
-    doc.setTextColor(data.isOverallSafe ? 5 : 220, data.isOverallSafe ? 150 : 38, data.isOverallSafe ? 105 : 38);
-    doc.text(`${data.grandPercentage.toFixed(1)}%`, margin + 3, cardsTop + 11.5);
+    const isSafe = data.isOverallSafe;
+    doc.setTextColor(isSafe ? 6 : 153, isSafe ? 95 : 27, isSafe ? 70 : 27);
+    doc.text(`${data.grandPercentage.toFixed(1)}%`, margin + 3.5, cardsTop + 11.5);
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text(
+      isSafe ? '✓ SAFE' : `⚠️ ${data.inDangerCount} AT RISK`,
+      margin + 3.5,
+      cardsTop + 15.5
+    );
   }
 
   // Card 2: Conducted vs Attended
   const card2X = margin + cardWidth + 3;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(203, 213, 225);
   doc.roundedRect(card2X, cardsTop, cardWidth, cardHeight, 2, 2, 'FD');
   doc.setFontSize(7);
-  doc.setTextColor(107, 114, 128);
-  doc.setFont('helvetica', 'normal');
-  doc.text('ATTENDED / HELD', card2X + 3, cardsTop + 4.5);
-  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(17, 24, 39);
-  doc.text(`${data.grandAttended} / ${data.grandConducted}`, card2X + 3, cardsTop + 11.5);
+  doc.setTextColor(51, 65, 85);
+  doc.text('ATTENDED / HELD', card2X + 3.5, cardsTop + 5);
+  doc.setFontSize(11.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text(`${data.grandAttended} / ${data.grandConducted}`, card2X + 3.5, cardsTop + 11.5);
+  doc.setFontSize(6.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(71, 85, 105);
+  doc.text('Attended Periods', card2X + 3.5, cardsTop + 15.5);
 
   // Card 3: Absences
   const card3X = card2X + cardWidth + 3;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(203, 213, 225);
   doc.roundedRect(card3X, cardsTop, cardWidth, cardHeight, 2, 2, 'FD');
   doc.setFontSize(7);
-  doc.setTextColor(107, 114, 128);
-  doc.setFont('helvetica', 'normal');
-  doc.text('TOTAL ABSENT', card3X + 3, cardsTop + 4.5);
-  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(220, 38, 38);
-  doc.text(`${data.grandAbsent}`, card3X + 3, cardsTop + 11.5);
+  doc.setTextColor(51, 65, 85);
+  doc.text('TOTAL ABSENT', card3X + 3.5, cardsTop + 5);
+  doc.setFontSize(11.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(153, 27, 27);
+  doc.text(`${data.grandAbsent}`, card3X + 3.5, cardsTop + 11.5);
+  doc.setFontSize(6.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(71, 85, 105);
+  doc.text('Unexcused Misses', card3X + 3.5, cardsTop + 15.5);
 
   // Card 4: Approved Leaves
   const card4X = card3X + cardWidth + 3;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(203, 213, 225);
   doc.roundedRect(card4X, cardsTop, cardWidth, cardHeight, 2, 2, 'FD');
   doc.setFontSize(7);
-  doc.setTextColor(107, 114, 128);
-  doc.setFont('helvetica', 'normal');
-  doc.text('APPROVED LEAVE', card4X + 3, cardsTop + 4.5);
-  doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(79, 70, 229);
-  doc.text(`${data.grandMedical + data.grandDutyLeave} (M:${data.grandMedical} OD:${data.grandDutyLeave})`, card4X + 3, cardsTop + 11.5);
+  doc.setTextColor(51, 65, 85);
+  doc.text('APPROVED LEAVE', card4X + 3.5, cardsTop + 5);
+  doc.setFontSize(11.5);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(67, 56, 202);
+  doc.text(`${data.grandMedical + data.grandDutyLeave}`, card4X + 3.5, cardsTop + 11.5);
+  doc.setFontSize(6.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(71, 85, 105);
+  doc.text(`Med: ${data.grandMedical}  |  OD: ${data.grandDutyLeave}`, card4X + 3.5, cardsTop + 15.5);
 
   // Subject Table via autoTable
   const tableData = data.subjects.map((s) => {
@@ -205,50 +237,72 @@ export async function exportAttendancePdf(data: AttendancePdfData): Promise<'sha
     body: tableData,
     theme: 'grid',
     headStyles: {
-      fillColor: [31, 41, 55],
+      fillColor: [30, 41, 59],
       textColor: [255, 255, 255],
       fontSize: 8,
       fontStyle: 'bold',
       halign: 'center',
     },
+    bodyStyles: {
+      textColor: [15, 23, 42],
+      fontSize: 8,
+    },
     columnStyles: {
-      0: { halign: 'left', cellWidth: 50, fontStyle: 'bold', fontSize: 7.5 },
-      1: { halign: 'center', cellWidth: 12, fontSize: 8 },
-      2: { halign: 'center', cellWidth: 12, fontSize: 8 },
-      3: { halign: 'center', cellWidth: 12, fontSize: 8, textColor: [220, 38, 38] },
-      4: { halign: 'center', cellWidth: 14, fontSize: 7.5 },
+      0: { halign: 'left', cellWidth: 50, fontStyle: 'bold', fontSize: 7.5, textColor: [15, 23, 42] },
+      1: { halign: 'center', cellWidth: 12, fontSize: 8, textColor: [30, 41, 59] },
+      2: { halign: 'center', cellWidth: 12, fontSize: 8, fontStyle: 'bold', textColor: [15, 23, 42] },
+      3: { halign: 'center', cellWidth: 12, fontSize: 8, fontStyle: 'bold', textColor: [153, 27, 27] },
+      4: { halign: 'center', cellWidth: 14, fontSize: 7.5, textColor: [51, 65, 85] },
       5: { halign: 'center', cellWidth: 16, fontSize: 8.5, fontStyle: 'bold' },
-      6: { halign: 'center', cellWidth: 12, fontSize: 8 },
+      6: { halign: 'center', cellWidth: 12, fontSize: 8, textColor: [71, 85, 105] },
       7: { halign: 'center', cellWidth: 18, fontSize: 7.5, fontStyle: 'bold' },
       8: { halign: 'right', cellWidth: 36, fontSize: 7.5, fontStyle: 'bold' },
     },
     alternateRowStyles: {
-      fillColor: [249, 250, 251],
+      fillColor: [248, 250, 252],
     },
     styles: {
       cellPadding: 2.5,
-      lineColor: [229, 231, 235],
-      lineWidth: 0.15,
+      lineColor: [203, 213, 225],
+      lineWidth: 0.2,
       valign: 'middle',
     },
     didParseCell: (dataCell) => {
-      // Color-code the percentage and status cells
       if (dataCell.section === 'body') {
         const rawRow = data.subjects[dataCell.row.index];
-        if (!rawRow || rawRow.conducted === 0) return;
+        if (!rawRow) return;
 
-        if (dataCell.column.index === 5 || dataCell.column.index === 7) {
-          if (rawRow.isInDanger) {
-            dataCell.cell.styles.textColor = [220, 38, 38]; // Red
+        // Column 5: Percentage
+        if (dataCell.column.index === 5) {
+          if (rawRow.conducted > 0) {
+            dataCell.cell.styles.textColor = rawRow.isInDanger ? [153, 27, 27] : [6, 95, 70];
           } else {
-            dataCell.cell.styles.textColor = [5, 150, 105]; // Green
+            dataCell.cell.styles.textColor = [100, 116, 139];
           }
         }
-        if (dataCell.column.index === 8) {
-          if (rawRow.isInDanger) {
-            dataCell.cell.styles.textColor = [220, 38, 38];
+
+        // Column 7: Status Badge
+        if (dataCell.column.index === 7) {
+          if (rawRow.conducted === 0) {
+            dataCell.cell.styles.fillColor = [241, 245, 249];
+            dataCell.cell.styles.textColor = [71, 85, 105];
+          } else if (rawRow.isInDanger) {
+            dataCell.cell.styles.fillColor = [254, 242, 242]; // Light rose tint
+            dataCell.cell.styles.textColor = [153, 27, 27]; // Deep crimson
           } else {
-            dataCell.cell.styles.textColor = [5, 150, 105];
+            dataCell.cell.styles.fillColor = [236, 253, 245]; // Light emerald tint
+            dataCell.cell.styles.textColor = [6, 95, 70]; // Deep forest green
+          }
+        }
+
+        // Column 8: Guidance
+        if (dataCell.column.index === 8) {
+          if (rawRow.conducted === 0) {
+            dataCell.cell.styles.textColor = [100, 116, 139];
+          } else if (rawRow.isInDanger) {
+            dataCell.cell.styles.textColor = [153, 27, 27];
+          } else {
+            dataCell.cell.styles.textColor = [6, 95, 70];
           }
         }
       }
@@ -260,7 +314,7 @@ export async function exportAttendancePdf(data: AttendancePdfData): Promise<'sha
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     doc.setFontSize(7.5);
-    doc.setTextColor(156, 163, 175);
+    doc.setTextColor(71, 85, 105);
     doc.text(
       'Calculated using Indian university-compliant formulas (Opening Balances + Weight-adjusted Periods).',
       margin,

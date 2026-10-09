@@ -43,6 +43,7 @@ import { PeriodTimingsModal } from '../components/timetable/PeriodTimingsModal';
 import { ProfileEditModal } from '../components/profile/ProfileEditModal';
 import { SemesterSwitcherModal } from '../components/timetable/SemesterSwitcherModal';
 import { UserGuideModal } from '../components/common/UserGuideModal';
+import { CalendarExportModal } from '../components/timetable/CalendarExportModal';
 import { useI18n } from '../i18n';
 import {
   ThemePreference,
@@ -71,11 +72,6 @@ import {
   sendTestNotification,
   isNativePlatform,
 } from '../utils/notifications';
-import {
-  generateTimetableIcs,
-  generateTasksIcs,
-  downloadOrShareIcs,
-} from '../utils/ics';
 import {
   getLastBackupTimestamp,
   getChangesSinceBackup,
@@ -117,6 +113,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   const courses = useLiveQuery(() => db.course.filter(c => c.deleted_at === null).toArray()) || [];
   const slots = useLiveQuery(() => db.timetable_slot.filter(s => s.deleted_at === null).toArray()) || [];
   const tasks = useLiveQuery(() => db.task.filter(t => t.deleted_at === null).toArray()) || [];
+  const calendarEvents = useLiveQuery(() => db.calendar_event.filter(e => e.deleted_at === null).toArray()) || [];
   const gradingSchemes = useLiveQuery(() => db.grading_scheme.filter(g => g.deleted_at === null).toArray()) || [];
 
   // Modals state
@@ -131,6 +128,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   const [isProfileEditOpen, setIsProfileEditOpen] = useState(false);
   const [isSemesterSwitcherOpen, setIsSemesterSwitcherOpen] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [calendarExportTarget, setCalendarExportTarget] = useState<'timetable' | 'tasks' | null>(null);
 
   // Storage and Safety state
   const [isPersisted, setIsPersisted] = useState<boolean | null>(null);
@@ -159,7 +157,6 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   // Notification status
   const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>(getNotificationPermission);
   const [isTestingNotif, setIsTestingNotif] = useState(false);
-  const [icsExporting, setIcsExporting] = useState<'timetable' | 'tasks' | null>(null);
 
   const lastBackupAt = getLastBackupTimestamp();
   const changesCount = getChangesSinceBackup();
@@ -294,39 +291,6 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
       }
     } finally {
       setIsCheckingUpdate(false);
-    }
-  };
-
-  const handleExportTimetableIcs = async () => {
-    if (!activeTerm) {
-      alert('No active semester found to export timetable.');
-      return;
-    }
-    setIcsExporting('timetable');
-    try {
-      const ics = generateTimetableIcs({
-        term: activeTerm,
-        slots,
-        courses,
-      });
-      const filename = `Spirit_Timetable_${activeTerm.name.replace(/\s+/g, '_')}.ics`;
-      await downloadOrShareIcs(filename, ics);
-    } finally {
-      setIcsExporting(null);
-    }
-  };
-
-  const handleExportTasksIcs = async () => {
-    setIcsExporting('tasks');
-    try {
-      const ics = generateTasksIcs({
-        tasks,
-        courses,
-      });
-      const filename = `Spirit_Exams_Deadlines_${new Date().toISOString().slice(0, 10)}.ics`;
-      await downloadOrShareIcs(filename, ics);
-    } finally {
-      setIcsExporting(null);
     }
   };
 
@@ -810,21 +774,19 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={handleExportTimetableIcs}
-                  disabled={icsExporting !== null}
+                  onClick={() => setCalendarExportTarget('timetable')}
                   className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-semibold hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1.5"
                 >
                   <CalendarDays className="w-3.5 h-3.5 text-indigo-600" />
-                  {icsExporting === 'timetable' ? 'Exporting...' : 'Timetable (.ics)'}
+                  Timetable (.ics)
                 </button>
                 <button
                   type="button"
-                  onClick={handleExportTasksIcs}
-                  disabled={icsExporting !== null}
+                  onClick={() => setCalendarExportTarget('tasks')}
                   className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200 text-xs font-semibold hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center justify-center gap-1.5"
                 >
                   <CheckSquare className="w-3.5 h-3.5 text-emerald-600" />
-                  {icsExporting === 'tasks' ? 'Exporting...' : 'Exams (.ics)'}
+                  Exams (.ics)
                 </button>
               </div>
             </div>
@@ -1157,6 +1119,19 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
         <UserGuideModal
           isOpen={isGuideOpen}
           onClose={() => setIsGuideOpen(false)}
+        />
+      )}
+
+      {calendarExportTarget && (
+        <CalendarExportModal
+          isOpen={calendarExportTarget !== null}
+          onClose={() => setCalendarExportTarget(null)}
+          exportType={calendarExportTarget}
+          term={activeTerm}
+          slots={slots}
+          courses={courses}
+          tasks={tasks}
+          calendarEvents={calendarEvents}
         />
       )}
     </PageContainer>
