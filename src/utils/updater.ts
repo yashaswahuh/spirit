@@ -1,4 +1,4 @@
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { CapacitorUpdater, type BundleInfo } from '@capgo/capacitor-updater';
 
 export const CURRENT_APP_VERSION = '1.0.0';
@@ -26,6 +26,40 @@ export interface UpdateCheckResult {
 
 // In-memory tracking of downloaded bundle ready for reload
 let pendingBundle: BundleInfo | null = null;
+
+/**
+ * Fetches version manifest JSON safely:
+ * - On native platforms (Android): Uses CapacitorHttp to bypass WebView CORS and preflight restrictions entirely.
+ * - On web platforms: Uses standard fetch with simple CORS-safelisted headers (Accept: application/json)
+ *   so GitHub Pages doesn't reject with 405 Method Not Allowed on OPTIONS preflights.
+ */
+async function fetchManifestJson(url: string): Promise<VersionManifest> {
+  const cacheBustedUrl = `${url}?_t=${Date.now()}`;
+
+  if (Capacitor.isNativePlatform()) {
+    const res = await CapacitorHttp.get({
+      url: cacheBustedUrl,
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+    if (res.status !== 200 || !res.data) {
+      throw new Error(`HTTP status: ${res.status}`);
+    }
+    return typeof res.data === 'string' ? JSON.parse(res.data) : (res.data as VersionManifest);
+  }
+
+  const res = await fetch(cacheBustedUrl, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`HTTP status: ${res.status}`);
+  }
+  return await res.json();
+}
 
 /**
  * Initializes OTA Updater on application startup.
@@ -69,40 +103,15 @@ export async function checkForLiveUpdate(options?: {
   }
 
   try {
-    let response: Response;
+    let manifest: VersionManifest;
     try {
-      const primaryUrl = `${UPDATE_MANIFEST_URL}?_t=${Date.now()}`;
-      response = await fetch(primaryUrl, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          'Cache-Control': 'no-cache',
-        },
-      });
-      if (!response.ok) {
-        throw new Error(`Primary status: ${response.status}`);
+      manifest = await fetchManifestJson(UPDATE_MANIFEST_URL);
+    } catch (primaryErr) {
+      if (!options?.silent) {
+        console.warn('Primary manifest check failed, trying fallback:', primaryErr);
       }
-    } catch {
-      const fallbackUrl = `${FALLBACK_MANIFEST_URL}?_t=${Date.now()}`;
-      response = await fetch(fallbackUrl, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          'Cache-Control': 'no-cache',
-        },
-      });
+      manifest = await fetchManifestJson(FALLBACK_MANIFEST_URL);
     }
-
-    if (!response.ok) {
-      return {
-        hasUpdate: false,
-        currentVersion: CURRENT_APP_VERSION,
-        latestVersion: CURRENT_APP_VERSION,
-        error: `Server responded with ${response.status}`,
-      };
-    }
-
-    const manifest: VersionManifest = await response.json();
 
     // Check if remote version is newer or has a higher build number
     const isNewer =
