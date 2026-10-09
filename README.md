@@ -4,7 +4,7 @@
 [![Vibe Coded](https://img.shields.io/badge/Vibe%20Coded-with%20AI%20✨-blueviolet)](https://github.com/yashaswahuh/spirit)
 [![Version](https://img.shields.io/badge/release-v1.0.0-blue)](https://github.com/yashaswahuh/spirit/releases/latest)
 [![Android APK](https://img.shields.io/badge/Download%20APK-spirit--v1.apk-success?logo=android&logoColor=white)](https://github.com/yashaswahuh/spirit/releases/latest)
-[![Live Web App](https://img.shields.io/badge/Live%20Web%20App-Online-emerald)](https://yashaswahuh.github.io/spirit/)
+[![Live Web App](https://img.shields.io/badge/Live%20Web%20App-Online-emerald)](https://yashaswahuh.is-a.dev/spirit/)
 
 > **Fast, private, local-first academic tracker and attendance companion for university students.**
 
@@ -12,7 +12,7 @@ Spirit runs entirely on your device. Zero accounts, no tracking, no external dat
 
 | Quick Links | |
 | :--- | :--- |
-| 🌐 **Live Web App** | [yashaswahuh.github.io/spirit/](https://yashaswahuh.github.io/spirit/) |
+| 🌐 **Live Web App** | [yashaswahuh.is-a.dev/spirit/](https://yashaswahuh.is-a.dev/spirit/) |
 | 📱 **Download Android APK** | [`spirit-v1.apk` on GitHub Releases](https://github.com/yashaswahuh/spirit/releases/latest) |
 | 📖 **User Manual** | [Complete How-To-Use Guide & Manual](docs/USER_GUIDE.md) |
 | 📄 **Open Source License** | [MIT License](LICENSE) |
@@ -137,7 +137,7 @@ Spirit includes a fully automated GitHub Actions CI/CD workflow (`.github/workfl
      1. All unit tests & axe-core accessibility checks
      2. Production Vite PWA build with service worker generation
      3. Direct deployment to GitHub Pages via `actions/deploy-pages`
-   - Your app will be live at: `https://<username>.github.io/spirit/`
+   - Your app will be live at: `https://yashaswahuh.is-a.dev/spirit/` (or `https://<username>.github.io/spirit/`)
 4. **Manual Dispatch (Optional):**
    - You can also manually trigger a deployment from the **Actions** tab in GitHub by selecting **"Build and Deploy Spirit via GitHub Actions"** and clicking **Run workflow**.
 

@@ -4,7 +4,8 @@ import { CapacitorUpdater, type BundleInfo } from '@capgo/capacitor-updater';
 export const CURRENT_APP_VERSION = '1.0.0';
 export const CURRENT_BUILD_NUMBER = 1000;
 
-export const UPDATE_MANIFEST_URL = 'https://yashaswahuh.github.io/spirit/version.json';
+export const UPDATE_MANIFEST_URL = 'https://yashaswahuh.is-a.dev/spirit/version.json';
+export const FALLBACK_MANIFEST_URL = 'https://yashaswahuh.github.io/spirit/version.json';
 
 export interface VersionManifest {
   version: string;
@@ -51,7 +52,9 @@ export async function initAppUpdater(): Promise<void> {
 }
 
 /**
- * Checks GitHub Pages for an updated version manifest and downloads the bundle.
+ * Checks for an updated version manifest and downloads the bundle.
+ * Tries the custom domain https://yashaswahuh.is-a.dev/spirit/ first,
+ * falling back to GitHub Pages if needed.
  */
 export async function checkForLiveUpdate(options?: {
   silent?: boolean;
@@ -65,14 +68,29 @@ export async function checkForLiveUpdate(options?: {
   }
 
   try {
-    const url = `${UPDATE_MANIFEST_URL}?_t=${Date.now()}`;
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json',
-        'Cache-Control': 'no-cache',
-      },
-    });
+    let response: Response;
+    try {
+      const primaryUrl = `${UPDATE_MANIFEST_URL}?_t=${Date.now()}`;
+      response = await fetch(primaryUrl, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          'Cache-Control': 'no-cache',
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`Primary status: ${response.status}`);
+      }
+    } catch {
+      const fallbackUrl = `${FALLBACK_MANIFEST_URL}?_t=${Date.now()}`;
+      response = await fetch(fallbackUrl, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          'Cache-Control': 'no-cache',
+        },
+      });
+    }
 
     if (!response.ok) {
       return {
