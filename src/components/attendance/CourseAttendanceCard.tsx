@@ -7,6 +7,9 @@ interface CourseAttendanceCardProps {
   course: Course;
   stats: AttendanceStats;
   todayRecords?: AttendanceRecord[];
+  todaySlotsCount?: number;
+  maxConductedTillToday?: number;
+  hasTimetable?: boolean;
   onMark: (status: AttendanceStatus, componentType?: 'theory' | 'lab') => void;
   onUndo?: () => void;
   onEdit?: () => void;
@@ -26,6 +29,9 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
   course,
   stats,
   todayRecords = [],
+  todaySlotsCount,
+  maxConductedTillToday,
+  hasTimetable = false,
   onMark,
   onUndo,
   onEdit,
@@ -301,79 +307,108 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
         const isTodayPresent = singleTodayRecord?.status === 'present';
         const isTodayAbsent = singleTodayRecord?.status === 'absent';
         const isTodayCancelled = singleTodayRecord?.status === 'cancelled';
+        const isScheduledToday = hasTimetable ? (todaySlotsCount || 0) > 0 : true;
+        const maxLimit = maxConductedTillToday ?? stats.conducted;
+        const isFullyLoggedToday = hasTimetable && isScheduledToday
+          ? todayRecords.length >= (todaySlotsCount || 1)
+          : todayRecords.length > 0;
 
         return (
-          <div className={`${isIntegrated ? 'mt-2' : 'mt-3'} grid grid-cols-3 gap-2`}>
-            <button
-              type="button"
-              onClick={() =>
-                onMark(
-                  'present',
-                  isIntegrated ? selectedComponent : (course.type === 'lab' ? 'lab' : 'theory')
-                )
-              }
-              className={`flex items-center justify-center gap-1 py-2 px-2 rounded-xl text-xs transition-all min-h-[40px] focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none cursor-pointer ${
-                isTodayPresent
-                  ? 'bg-emerald-600 text-white shadow-md font-bold ring-2 ring-emerald-500 dark:ring-emerald-400'
-                  : 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-semibold'
-              }`}
-              title={
-                isTodayPresent
-                  ? 'Today marked Present (Tap to log extra makeup class)'
-                  : `Mark Present (+${effectivePoints} Attended, +${effectivePoints} Conducted)`
-              }
-            >
-              {isTodayPresent ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : <Plus className="w-3.5 h-3.5" />}
-              <span>Present</span>
-              {effectivePoints > 1 && <span className="text-[10px] font-bold opacity-80">(+{effectivePoints})</span>}
-            </button>
+          <div className="space-y-1.5">
+            <div className={`${isIntegrated ? 'mt-2' : 'mt-3'} grid grid-cols-3 gap-2`}>
+              <button
+                type="button"
+                onClick={() =>
+                  onMark(
+                    'present',
+                    isIntegrated ? selectedComponent : (course.type === 'lab' ? 'lab' : 'theory')
+                  )
+                }
+                className={`flex items-center justify-center gap-1 py-2 px-2 rounded-xl text-xs transition-all min-h-[40px] focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:outline-none cursor-pointer ${
+                  isTodayPresent
+                    ? 'bg-emerald-600 text-white shadow-md font-bold ring-2 ring-emerald-500 dark:ring-emerald-400'
+                    : 'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 font-semibold'
+                }`}
+                title={
+                  isTodayPresent
+                    ? `Today marked Present (${stats.conducted} of ${maxLimit} lectures conducted)`
+                    : !isScheduledToday
+                    ? `No lecture scheduled today for ${course.name} (${stats.conducted} conducted till today)`
+                    : isTodayAbsent
+                    ? `Switch today's mark to Present`
+                    : `Mark Present (+${effectivePoints} Attended, +${effectivePoints} Conducted)`
+                }
+              >
+                {isTodayPresent ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : <Plus className="w-3.5 h-3.5" />}
+                <span>Present</span>
+                {effectivePoints > 1 && <span className="text-[10px] font-bold opacity-80">(+{effectivePoints})</span>}
+              </button>
 
-            <button
-              type="button"
-              onClick={() =>
-                onMark(
-                  'absent',
-                  isIntegrated ? selectedComponent : (course.type === 'lab' ? 'lab' : 'theory')
-                )
-              }
-              className={`flex items-center justify-center gap-1 py-2 px-2 rounded-xl text-xs transition-all min-h-[40px] focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none cursor-pointer ${
-                isTodayAbsent
-                  ? 'bg-rose-600 text-white shadow-md font-bold ring-2 ring-rose-500 dark:ring-rose-400'
-                  : 'bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 font-semibold'
-              }`}
-              title={
-                isTodayAbsent
-                  ? 'Today marked Absent (Tap to log extra makeup class)'
-                  : `Mark Absent (+0 Attended, +${effectivePoints} Conducted)`
-              }
-            >
-              {isTodayAbsent ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : <Minus className="w-3.5 h-3.5" />}
-              <span>Absent</span>
-              {effectivePoints > 1 && <span className="text-[10px] font-bold opacity-80">(-{effectivePoints})</span>}
-            </button>
+              <button
+                type="button"
+                onClick={() =>
+                  onMark(
+                    'absent',
+                    isIntegrated ? selectedComponent : (course.type === 'lab' ? 'lab' : 'theory')
+                  )
+                }
+                className={`flex items-center justify-center gap-1 py-2 px-2 rounded-xl text-xs transition-all min-h-[40px] focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:outline-none cursor-pointer ${
+                  isTodayAbsent
+                    ? 'bg-rose-600 text-white shadow-md font-bold ring-2 ring-rose-500 dark:ring-rose-400'
+                    : 'bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/50 text-rose-700 dark:text-rose-300 font-semibold'
+                }`}
+                title={
+                  isTodayAbsent
+                    ? `Today marked Absent (${stats.conducted} of ${maxLimit} lectures conducted)`
+                    : !isScheduledToday
+                    ? `No lecture scheduled today for ${course.name} (${stats.conducted} conducted till today)`
+                    : isTodayPresent
+                    ? `Switch today's mark to Absent`
+                    : `Mark Absent (+0 Attended, +${effectivePoints} Conducted)`
+                }
+              >
+                {isTodayAbsent ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : <Minus className="w-3.5 h-3.5" />}
+                <span>Absent</span>
+                {effectivePoints > 1 && <span className="text-[10px] font-bold opacity-80">(-{effectivePoints})</span>}
+              </button>
 
-            <button
-              type="button"
-              onClick={() =>
-                onMark(
-                  'cancelled',
-                  isIntegrated ? selectedComponent : (course.type === 'lab' ? 'lab' : 'theory')
-                )
-              }
-              className={`flex items-center justify-center gap-1 py-2 px-2 rounded-xl text-xs transition-all min-h-[40px] focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:outline-none cursor-pointer ${
-                isTodayCancelled
-                  ? 'bg-amber-600 text-white shadow-md font-bold ring-2 ring-amber-500 dark:ring-amber-400'
-                  : 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium'
-              }`}
-              title={
-                isTodayCancelled
-                  ? 'Today marked Cancelled (Tap to log extra makeup class)'
-                  : 'Mark Cancelled (Excluded from totals)'
-              }
-            >
-              {isTodayCancelled ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : <X className="w-3.5 h-3.5" />}
-              <span>Cancelled</span>
-            </button>
+              <button
+                type="button"
+                onClick={() =>
+                  onMark(
+                    'cancelled',
+                    isIntegrated ? selectedComponent : (course.type === 'lab' ? 'lab' : 'theory')
+                  )
+                }
+                className={`flex items-center justify-center gap-1 py-2 px-2 rounded-xl text-xs transition-all min-h-[40px] focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:outline-none cursor-pointer ${
+                  isTodayCancelled
+                    ? 'bg-amber-600 text-white shadow-md font-bold ring-2 ring-amber-500 dark:ring-amber-400'
+                    : 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium'
+                }`}
+                title={
+                  isTodayCancelled
+                    ? `Today marked Cancelled (${stats.conducted} lectures conducted)`
+                    : !isScheduledToday
+                    ? `No lecture scheduled today for ${course.name}`
+                    : 'Mark Cancelled (Excluded from totals)'
+                }
+              >
+                {isTodayCancelled ? <Check className="w-3.5 h-3.5 stroke-[2.5]" /> : <X className="w-3.5 h-3.5" />}
+                <span>Cancelled</span>
+              </button>
+            </div>
+
+            {/* Informative status footnote */}
+            {hasTimetable && !isScheduledToday && (
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 text-center font-medium pt-0.5">
+                📅 No lecture scheduled today • {stats.conducted} conducted till today
+              </p>
+            )}
+            {hasTimetable && isScheduledToday && isFullyLoggedToday && (
+              <p className="text-[10px] text-emerald-600 dark:text-emerald-400 text-center font-medium pt-0.5">
+                ✓ All scheduled lectures for today are logged ({stats.conducted} of {maxLimit})
+              </p>
+            )}
           </div>
         );
       })()}

@@ -10,6 +10,7 @@ import {
   calculateEndTimeForPeriod,
   findNextAvailablePeriodTiming,
   resolveSlotAttendanceWeight,
+  calculateCourseMaxConductedTillDate,
 } from '../timetable';
 import {
   TimetableSlot,
@@ -815,6 +816,174 @@ describe('Timetable Engine Unit Tests', () => {
       expect(resolvedPerHour.slots).toHaveLength(1);
       expect(resolvedPerHour.slots[0].weight).toBe(2);
       expect(resolvedPerHour.slots[0].attendance_weight).toBe(2);
+    });
+  });
+
+  describe('calculateCourseMaxConductedTillDate (Airtight Attendance Limits)', () => {
+    const dummyUUID = (n: number) => `00000000-0000-0000-0000-00000000000${n}`;
+
+    it('accurately caps NSS at 8 total conducted lectures when 8 classes were scheduled till date', () => {
+      // NSS course with 2 classes per week: Tuesday (weekday 2) and Thursday (weekday 4)
+      const nssCourse: Course = {
+        id: dummyUUID(10),
+        user_id: 'user1',
+        term_id: 'term1',
+        name: 'NSS',
+        code: 'NSS101',
+        credits: 2,
+        type: 'elective',
+        counts_toward_gpa: true,
+        attendance_threshold_override: null,
+        color: '#10b981',
+        medical_counts_as_present: false,
+        duty_leave_counts_as_present: true,
+        initial_attended: 0,
+        initial_conducted: 0,
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+
+      // 4 weeks: 2026-09-01 (Tuesday) to 2026-09-25 (Friday).
+      // Tuesdays: Sept 1, 8, 15, 22 (4 classes)
+      // Thursdays: Sept 3, 10, 17, 24 (4 classes)
+      // Total = 8 classes.
+      const slots: TimetableSlot[] = [
+        {
+          id: dummyUUID(1),
+          user_id: 'user1',
+          course_id: nssCourse.id,
+          weekday: 2, // Tuesday
+          start_time: '10:00',
+          end_time: '11:00',
+          room: 'Hall A',
+          component_type: 'theory',
+          created_at: '',
+          updated_at: '',
+          deleted_at: null,
+        },
+        {
+          id: dummyUUID(2),
+          user_id: 'user1',
+          course_id: nssCourse.id,
+          weekday: 4, // Thursday
+          start_time: '10:00',
+          end_time: '11:00',
+          room: 'Hall A',
+          component_type: 'theory',
+          created_at: '',
+          updated_at: '',
+          deleted_at: null,
+        },
+      ];
+
+      const maxConducted = calculateCourseMaxConductedTillDate({
+        course: nssCourse,
+        dateStr: '2026-09-25', // Friday (after 4 weeks)
+        termStartDate: '2026-09-01',
+        slots,
+        existingConducted: 8,
+      });
+
+      // Exactly 8 lectures were scheduled till today; max conducted can NEVER exceed 8
+      expect(maxConducted).toBe(8);
+    });
+
+    it('caps total conducted at initial balance plus timetable occurrences (e.g. 6 portal + 2 scheduled = 8)', () => {
+      const courseWithBalance: Course = {
+        id: dummyUUID(20),
+        user_id: 'user1',
+        term_id: 'term1',
+        name: 'NSS',
+        code: 'NSS101',
+        credits: 2,
+        type: 'elective',
+        counts_toward_gpa: true,
+        attendance_threshold_override: null,
+        color: '#10b981',
+        medical_counts_as_present: false,
+        duty_leave_counts_as_present: true,
+        initial_attended: 5,
+        initial_conducted: 6, // 6 classes already conducted from portal
+        tracking_start_date: '2026-10-05', // Monday
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+
+      // Tuesday and Thursday slots this week
+      const slots: TimetableSlot[] = [
+        {
+          id: dummyUUID(3),
+          user_id: 'user1',
+          course_id: courseWithBalance.id,
+          weekday: 2, // Tuesday (Oct 6)
+          start_time: '10:00',
+          end_time: '11:00',
+          room: 'Hall A',
+          component_type: 'theory',
+          created_at: '',
+          updated_at: '',
+          deleted_at: null,
+        },
+        {
+          id: dummyUUID(4),
+          user_id: 'user1',
+          course_id: courseWithBalance.id,
+          weekday: 4, // Thursday (Oct 8)
+          start_time: '10:00',
+          end_time: '11:00',
+          room: 'Hall A',
+          component_type: 'theory',
+          created_at: '',
+          updated_at: '',
+          deleted_at: null,
+        },
+      ];
+
+      // On Friday Oct 9:
+      const maxConducted = calculateCourseMaxConductedTillDate({
+        course: courseWithBalance,
+        dateStr: '2026-10-09',
+        termStartDate: '2026-09-01',
+        slots,
+        existingConducted: 8,
+      });
+
+      // 6 initial + 2 scheduled = 8 classes total
+      expect(maxConducted).toBe(8);
+    });
+
+    it('enforces total conducted limit for non-timetable courses based on established balance', () => {
+      const manualCourse: Course = {
+        id: dummyUUID(30),
+        user_id: 'user1',
+        term_id: 'term1',
+        name: 'NSS',
+        code: 'NSS101',
+        credits: 2,
+        type: 'elective',
+        counts_toward_gpa: true,
+        attendance_threshold_override: null,
+        color: '#10b981',
+        medical_counts_as_present: false,
+        duty_leave_counts_as_present: true,
+        initial_attended: 13,
+        initial_conducted: 14,
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+
+      const maxConducted = calculateCourseMaxConductedTillDate({
+        course: manualCourse,
+        dateStr: '2026-10-09',
+        termStartDate: '2026-09-01',
+        slots: [], // No timetable
+        existingConducted: 14,
+      });
+
+      expect(maxConducted).toBe(14);
     });
   });
 });
