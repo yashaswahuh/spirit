@@ -5,7 +5,7 @@ import { Capacitor } from '@capacitor/core';
 import { db } from '../../db/dexie';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import { computeCourseAttendanceStats } from '../../engine/attendance';
-import { getLabAttendanceRule } from '../../utils/preferences';
+import { getLabAttendanceRule, useDateFormat, formatDate } from '../../utils/preferences';
 import { exportAttendancePdf } from '../../utils/pdfExport';
 
 interface AttendanceReportModalProps {
@@ -17,6 +17,7 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const dateFormat = useDateFormat();
   const profile = useLiveQuery(() => db.profile.filter(p => p.deleted_at === null).first());
   const program = useLiveQuery(() => db.program.filter(p => p.deleted_at === null).first());
   const activeTerm = useLiveQuery(() => db.term.filter(t => t.deleted_at === null && t.status === 'ongoing').first());
@@ -261,8 +262,8 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
     const studentName = profile?.name || 'Student';
     const batchStr = program?.start_year ? `Batch ${program.start_year}–${program.start_year + (program.duration_years || 4)}` : '';
     const programStr = `${program?.degree_type || 'Degree'} (${program?.branch_department || 'Branch'})${batchStr ? ` • ${batchStr}` : ''}`;
-    const termStr = `${activeTerm?.name || 'Current Term'} | ${startDate} to ${endDate}`;
-    const generatedDate = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const termStr = `${activeTerm?.name || 'Current Term'} | ${formatDate(startDate, dateFormat)} to ${formatDate(endDate, dateFormat)}`;
+    const generatedDate = formatDate(new Date(), dateFormat);
 
     const rowsHtml = reportData.subjectReports.length === 0
       ? `<tr><td colspan="9" style="text-align:center; padding: 24px; color: #6b7280;">No subjects selected or no records found in the specified date range.</td></tr>`
@@ -703,7 +704,7 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
             <div className="text-left sm:text-right text-xs text-gray-600 dark:text-gray-400 print:text-gray-700 space-y-0.5">
               <p><span className="font-semibold">Student:</span> {profile?.name || 'Student'}</p>
               <p><span className="font-semibold">Program:</span> {program?.degree_type || 'Degree'} ({program?.branch_department || 'Branch'}){program?.start_year ? ` • Batch ${program.start_year}–${program.start_year + (program.duration_years || 4)}` : ''}</p>
-              <p><span className="font-semibold">Term:</span> {activeTerm?.name || 'Current Term'} | {startDate} to {endDate}</p>
+              <p><span className="font-semibold">Term:</span> {activeTerm?.name || 'Current Term'} | {formatDate(startDate, dateFormat)} to {formatDate(endDate, dateFormat)}</p>
             </div>
           </div>
 
@@ -851,7 +852,7 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
           {/* Footer Notes for Print */}
           <div className="pt-4 border-t border-gray-200 dark:border-gray-800 text-[10px] text-gray-500 print:text-gray-600 flex justify-between items-center">
             <span>Calculated using university-compliant attendance formulas (Opening Balances + Weight-adjusted Periods).</span>
-            <span>Generated on {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+            <span>Generated on {formatDate(new Date(), dateFormat)}</span>
           </div>
         </div>
       </div>

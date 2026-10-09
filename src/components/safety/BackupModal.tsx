@@ -21,6 +21,7 @@ import {
   BackupPayload,
 } from '../../utils/backup';
 import { getLastBackupTimestamp } from '../../utils/storage';
+import { useDateFormat, formatDateTime } from '../../utils/preferences';
 
 interface BackupModalProps {
   isOpen: boolean;
@@ -33,6 +34,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
   onClose,
   onDataRestored,
 }) => {
+  const dateFormat = useDateFormat();
   const [activeTab, setActiveTab] = useState<'export' | 'import'>('export');
   const [isExporting, setIsExporting] = useState(false);
   const [exportSuccessMsg, setExportSuccessMsg] = useState<string | null>(null);
@@ -218,7 +220,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                 <div className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/60 p-3 rounded-xl flex items-center justify-between">
                   <span>Last backed up:</span>
                   <span className="font-semibold text-gray-800 dark:text-gray-200">
-                    {new Date(lastBackupAt).toLocaleString()}
+                    {formatDateTime(lastBackupAt, dateFormat)}
                   </span>
                 </div>
               ) : (

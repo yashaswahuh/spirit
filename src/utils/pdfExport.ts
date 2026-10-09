@@ -4,6 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import { requestStoragePermissions } from './storagePermissions';
+import { formatDate } from './preferences';
 
 export interface SubjectPdfReport {
   name: string;
@@ -68,11 +69,7 @@ export async function exportAttendancePdf(data: AttendancePdfData): Promise<'sha
   doc.setFont('helvetica', 'normal');
   doc.text('Local-First Academic Record • University-Compliant Weighting', margin, 18);
 
-  const generatedDate = new Date().toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  const generatedDate = formatDate(new Date());
   doc.text(`Generated: ${generatedDate}`, pageWidth - margin, 18, { align: 'right' });
 
   // Student & Term Info Grid
@@ -99,7 +96,7 @@ export async function exportAttendancePdf(data: AttendancePdfData): Promise<'sha
   doc.setFont('helvetica', 'bold');
   doc.text('Date Range:', rightMetaX, metaTop + 6);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${data.startDate} to ${data.endDate}`, rightMetaX + 18, metaTop + 6);
+  doc.text(`${formatDate(data.startDate)} to ${formatDate(data.endDate)}`, rightMetaX + 18, metaTop + 6);
 
   // Summary Metrics Cards
   const cardsTop = 46;

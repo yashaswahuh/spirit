@@ -5,6 +5,7 @@ import { db } from '../../db/dexie';
 import { Course } from '../../types';
 import { toggleTaskDone } from '../../db/repositories/task.repo';
 import { TasksTrackerModal } from '../tasks/TasksTrackerModal';
+import { useDateFormat, formatDate } from '../../utils/preferences';
 
 interface UpcomingTasksWidgetProps {
   courses: Course[];
@@ -12,6 +13,7 @@ interface UpcomingTasksWidgetProps {
 
 export const UpcomingTasksWidget: React.FC<UpcomingTasksWidgetProps> = ({ courses }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const dateFormat = useDateFormat();
   const tasks = useLiveQuery(() => db.task.filter(t => t.deleted_at === null).toArray()) || [];
 
   // Sort pending tasks by due date
@@ -101,6 +103,7 @@ export const UpcomingTasksWidget: React.FC<UpcomingTasksWidgetProps> = ({ course
                         </span>
                         <span className="text-[10px] text-gray-400 uppercase font-mono">
                           • {task.type.replace('_', ' ')}
+                          {task.due_at && ` • ${formatDate(task.due_at, dateFormat)}`}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-[10px] text-gray-400 font-medium">

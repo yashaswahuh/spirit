@@ -7,7 +7,7 @@ import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import { resolveDaySchedule, EffectiveSlot, resolveSlotAttendanceWeight } from '../../engine/timetable';
 import { markAttendance } from '../../db/repositories/attendance.repo';
 import { createCalendarEvent } from '../../db/repositories/calendar.repo';
-import { getLabAttendanceRule } from '../../utils/preferences';
+import { getLabAttendanceRule, useDateFormat, formatDate } from '../../utils/preferences';
 
 interface CatchUpModalProps {
   isOpen: boolean;
@@ -25,6 +25,7 @@ export const CatchUpModal: React.FC<CatchUpModalProps> = ({
   onClose,
   onCatchUpDone,
 }) => {
+  const dateFormat = useDateFormat();
   const [processingDate, setProcessingDate] = useState<string | null>(null);
 
   // Queries
@@ -182,7 +183,7 @@ export const CatchUpModal: React.FC<CatchUpModalProps> = ({
                     <div className="flex items-center gap-2">
                       <Calendar className="w-3.5 h-3.5 text-indigo-500" />
                       <span className="text-xs font-mono font-bold text-gray-900 dark:text-white">
-                        {item.date}
+                        {formatDate(item.date, dateFormat, { includeWeekday: true })}
                       </span>
                       <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
                         {item.unmarkedSlots.length} classes

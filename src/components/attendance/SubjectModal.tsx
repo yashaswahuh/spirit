@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Course, CourseType, LabAttendanceRule } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import { CourseColorPicker } from '../common/CourseColorPicker';
+import { useDateFormat, formatDate } from '../../utils/preferences';
 
 interface SubjectModalProps {
   isOpen: boolean;
@@ -30,6 +31,7 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
   onSave,
   initialCourse,
 }) => {
+  const dateFormat = useDateFormat();
   const [name, setName] = useState(initialCourse?.name || '');
   const [code, setCode] = useState(initialCourse?.code || '');
   const [faculty, setFaculty] = useState(initialCourse?.faculty || '');
@@ -331,6 +333,11 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
               onChange={e => setTrackingStartDate(e.target.value)}
               className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono"
             />
+            {trackingStartDate && (
+              <span className="text-[10px] text-indigo-600 dark:text-indigo-400 mt-1 block">
+                Classes from {formatDate(trackingStartDate, dateFormat)} onwards will be recorded.
+              </span>
+            )}
           </div>
         </div>
 

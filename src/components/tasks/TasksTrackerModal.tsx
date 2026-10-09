@@ -8,11 +8,13 @@ import {
   MapPin,
   CheckCircle2,
   FileText,
+  Calendar,
 } from 'lucide-react';
 import { db } from '../../db/dexie';
 import { TaskType, Course, Task } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import { createTask, updateTask, toggleTaskDone, deleteTask } from '../../db/repositories/task.repo';
+import { useDateFormat, formatDateTime } from '../../utils/preferences';
 
 interface TasksTrackerModalProps {
   isOpen: boolean;
@@ -25,6 +27,7 @@ export const TasksTrackerModal: React.FC<TasksTrackerModalProps> = ({
   onClose,
   courses,
 }) => {
+  const dateFormat = useDateFormat();
   const tasks = useLiveQuery(() => db.task.filter(t => t.deleted_at === null).toArray()) || [];
 
   const [activeFilter, setActiveFilter] = useState<'all' | 'exams' | 'assignments' | 'pending' | 'completed'>('all');
@@ -429,6 +432,13 @@ export const TasksTrackerModal: React.FC<TasksTrackerModalProps> = ({
                           <span className="flex items-center gap-1 text-gray-500">
                             <FileText className="w-3 h-3 text-gray-400" />
                             {task.syllabus}
+                          </span>
+                        )}
+
+                        {task.due_at && (
+                          <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-medium">
+                            <Calendar className="w-3 h-3 text-indigo-500" />
+                            {formatDateTime(task.due_at, dateFormat)}
                           </span>
                         )}
                       </div>

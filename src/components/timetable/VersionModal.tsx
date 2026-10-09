@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { History, Plus, CheckCircle2, Calendar } from 'lucide-react';
 import { TimetableVersion } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
+import { useDateFormat, formatDate } from '../../utils/preferences';
 
 interface VersionModalProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ export const VersionModal: React.FC<VersionModalProps> = ({
   onSelectVersion,
   onCreateVersion,
 }) => {
+  const dateFormat = useDateFormat();
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [name, setName] = useState('');
   const [effectiveFrom, setEffectiveFrom] = useState(new Date().toISOString().slice(0, 10));
@@ -83,7 +85,7 @@ export const VersionModal: React.FC<VersionModalProps> = ({
                     </h4>
                     <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-0.5 font-mono">
                       <Calendar className="w-3 h-3 text-gray-400" />
-                      Effective from: {v.effective_from}
+                      Effective from: {formatDate(v.effective_from, dateFormat)}
                     </p>
                   </div>
                 </div>

@@ -43,6 +43,7 @@ import { CalendarEventModal } from '../components/timetable/CalendarEventModal';
 import { PasteHolidaysModal } from '../components/timetable/PasteHolidaysModal';
 import { TermSettingsModal } from '../components/timetable/TermSettingsModal';
 import { TimetableUploadModal } from '../components/timetable/TimetableUploadModal';
+import { useDateFormat, formatDate } from '../utils/preferences';
 import { SemesterSwitcherModal } from '../components/timetable/SemesterSwitcherModal';
 
 const ALL_DAYS: { day: Weekday; label: string; full: string }[] = [
@@ -56,6 +57,7 @@ const ALL_DAYS: { day: Weekday; label: string; full: string }[] = [
 ];
 
 export const TimetableScreen: React.FC = () => {
+  const dateFormat = useDateFormat();
   const [activeTab, setActiveTab] = useState<'schedule' | 'overrides' | 'calendar'>('schedule');
 
   // Queries
@@ -488,7 +490,7 @@ export const TimetableScreen: React.FC = () => {
                           >
                             {ov.action}
                           </span>
-                          <span className="text-xs font-mono text-gray-400 font-bold">{ov.date}</span>
+                          <span className="text-xs font-mono text-gray-400 font-bold">{formatDate(ov.date, dateFormat)}</span>
                         </div>
                         <h4 className="text-sm font-bold text-gray-900 dark:text-white mt-1 truncate">
                           {course?.name || 'Class'} ({ov.start_time} - {ov.end_time})
@@ -582,7 +584,7 @@ export const TimetableScreen: React.FC = () => {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-mono font-bold text-gray-900 dark:text-white">
-                          {ev.date} {ev.end_date ? `to ${ev.end_date}` : ''}
+                          {formatDate(ev.date, dateFormat)} {ev.end_date ? `to ${formatDate(ev.end_date, dateFormat)}` : ''}
                         </span>
                         <span
                           className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded-md ${

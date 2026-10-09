@@ -59,6 +59,7 @@ import {
   DateFormatPattern,
   getDateFormat,
   setDateFormat,
+  formatDate,
   LabAttendanceRule,
   getLabAttendanceRule,
   setLabAttendanceRule,
@@ -840,7 +841,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                     <Calendar className="w-3 h-3" />
-                    {new Date(lastBackupAt).toLocaleDateString()}
+                    {formatDate(lastBackupAt, dateFormat)}
                   </span>
                   {changesCount > 0 && (
                     <span className="text-[10px] bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 font-semibold px-1.5 py-0.5 rounded">

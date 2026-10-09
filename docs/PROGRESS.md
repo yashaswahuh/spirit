@@ -370,6 +370,25 @@
       - **Profile & Settings Customization (`ProfileEditModal.tsx`)**: Students can edit degree name, choose custom degree program, adjust start year and course duration years at any time with instant live reactivity via Dexie.
       - **Metadata Display**: Displays Batch, duration in years, and estimated completion year in `MoreScreen.tsx` Student Profile card, `GradesScreen.tsx` header subtitle, and `AttendanceReportModal.tsx` print and screen views.
       - **Testing & Verification**: Added validation tests for custom degree names and duration boundary checks in `schemas.test.ts`. All 173 unit tests passing.
+    - **Sitewide Dynamic Date Format Selection (`DD/MM/YYYY`, `YYYY-MM-DD`, `MM/DD/YYYY`)**:
+      - **Reactive Utilities (`preferences.ts`)**: Built `formatDate`, `formatTime`, and `formatDateTime` with safe fallback storage guards (supporting Node.js, SSR, and browser execution without `localStorage` crashes). Dispatches custom `spirit_date_format_changed` window events upon setting changes.
+      - **Reactive React Hook (`useDateFormat`)**: Subscribes components across the app to date format adjustments so the UI updates instantly without requiring a page refresh.
+      - **Sitewide Adoption**: Integrated across:
+        - Home Screen greeting banner (`HomeScreen.tsx`)
+        - Upcoming deadlines and exam countdowns (`UpcomingTasksWidget.tsx`, `TasksTrackerModal.tsx`)
+        - Day-Picker Attendance date view, date pill, and undo toasts (`DayPickerView.tsx`)
+        - Catch-Up Unmarked Classes date list (`CatchUpModal.tsx`)
+        - Subject Calendar quick-log editor (`CourseCalendarModal.tsx`)
+        - Official Attendance Reports on-screen and print documents (`AttendanceReportModal.tsx`, `pdfExport.ts`)
+        - Timetable One-Off Changes & Calendar Events / Holidays (`TimetableScreen.tsx`, `PasteHolidaysModal.tsx`)
+        - Semesters & Versions switcher displays (`SemesterSwitcherModal.tsx`, `VersionModal.tsx`, `TermSettingsModal.tsx`)
+        - Subject tracking start date hints (`SubjectModal.tsx`)
+        - Backup status timestamps and evaluate reminder logic (`MoreScreen.tsx`, `BackupModal.tsx`, `storage.ts`)
+      - **Testing**: Added unit tests verifying format outputs, weekday formatting, and boundary cases in `preferences.test.ts`. All 18 test files and 175 tests passing.
+    - **V1.0.0 Release Readiness Verification**:
+      - Hardened `.gitignore`, verified MIT License, and cleaned build artifacts.
+      - Tested Android production packaging workflows and OTA zip bundle generator (`package-ota.js`).
+      - Dual-domain live updater verified with zero errors.
 
 ## Remaining
 - All planned phases, user features, attendance clear options, APK build workflows, and multi-hour attendance counting rules fully implemented, tested, and verified.
