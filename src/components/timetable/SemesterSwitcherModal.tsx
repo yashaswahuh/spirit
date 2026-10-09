@@ -14,6 +14,7 @@ import { db } from '../../db/dexie';
 import { Term, SaturdayRule, Weekday } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import { setActiveTerm, updateTerm, createTerm } from '../../db/repositories/term.repo';
+import { useDateFormat, formatDate } from '../../utils/preferences';
 
 interface SemesterSwitcherModalProps {
   isOpen: boolean;
@@ -57,6 +58,7 @@ export const SemesterSwitcherModal: React.FC<SemesterSwitcherModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const dateFormat = useDateFormat();
   const terms = useLiveQuery(() => db.term.filter(t => t.deleted_at === null).sortBy('number')) || [];
   const program = useLiveQuery(() => db.program.filter(p => p.deleted_at === null).first());
 
@@ -413,7 +415,7 @@ export const SemesterSwitcherModal: React.FC<SemesterSwitcherModalProps> = ({
                   <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 flex-wrap">
                     <span className="flex items-center gap-1">
                       <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                      {term.start_date} to {term.end_date}
+                      {formatDate(term.start_date, dateFormat)} to {formatDate(term.end_date, dateFormat)}
                     </span>
                     <span>•</span>
                     <span>Target: {term.attendance_threshold || 75}%</span>

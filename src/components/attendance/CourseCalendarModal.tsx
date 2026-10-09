@@ -16,7 +16,7 @@ import { db } from '../../db/dexie';
 import { Course, AttendanceRecord, AttendanceStatus } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import { markAttendance, deleteAttendanceRecord } from '../../db/repositories/attendance.repo';
-import { getLabAttendanceRule } from '../../utils/preferences';
+import { getLabAttendanceRule, useDateFormat, formatDate } from '../../utils/preferences';
 
 interface CourseCalendarModalProps {
   isOpen: boolean;
@@ -36,6 +36,7 @@ export const CourseCalendarModal: React.FC<CourseCalendarModalProps> = ({
   onClose,
   course,
 }) => {
+  const dateFormat = useDateFormat();
   const today = new Date();
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [currentMonth, setCurrentMonth] = useState(today.getMonth()); // 0-indexed
@@ -294,7 +295,7 @@ export const CourseCalendarModal: React.FC<CourseCalendarModalProps> = ({
               <div className="flex items-center justify-between">
                 <h4 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
                   <CheckCircle2 className="w-4 h-4 text-indigo-500" />
-                  <span>Edit Attendance for {selectedRecordDate}</span>
+                  <span>Edit Attendance for {formatDate(selectedRecordDate, dateFormat, { includeWeekday: true })}</span>
                   {currentStatus && (
                     <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded-md">
                       Currently: {currentStatus}

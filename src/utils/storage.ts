@@ -16,6 +16,8 @@ const STORAGE_KEYS = {
 export const DEFAULT_BACKUP_DAYS_THRESHOLD = 7;
 export const DEFAULT_BACKUP_CHANGES_THRESHOLD = 20;
 
+import { formatDate } from './preferences';
+
 /**
  * Checks if the browser has granted persistent storage to this origin.
  */
@@ -250,7 +252,7 @@ export function evaluateBackupReminder(params: {
       reason: 'days',
       daysSince,
       changesCount,
-      lastBackupFormatted: new Date(lastBackupTime).toLocaleDateString(),
+      lastBackupFormatted: formatDate(lastBackupTime),
     };
   }
 
@@ -260,7 +262,7 @@ export function evaluateBackupReminder(params: {
       reason: 'changes',
       daysSince,
       changesCount,
-      lastBackupFormatted: new Date(lastBackupTime).toLocaleDateString(),
+      lastBackupFormatted: formatDate(lastBackupTime),
     };
   }
 

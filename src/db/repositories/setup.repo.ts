@@ -32,6 +32,7 @@ export interface OnboardingData {
   degreeType: string;
   branchName: string;
   startYear: number;
+  durationYears?: number;
   entryType: 'regular' | 'lateral';
   termNumber: number;
   termName: string;
@@ -114,7 +115,7 @@ export async function saveOnboardingSetup(data: OnboardingData, isDemo = false):
     degree_type: data.degreeType as any,
     branch_department: data.branchName.trim() || 'Engineering',
     start_year: data.startYear,
-    duration_years: 4,
+    duration_years: data.durationYears || 4,
     entry_type: data.entryType,
     term_system: 'semester',
     grading_scheme_id: gradingSchemeId,

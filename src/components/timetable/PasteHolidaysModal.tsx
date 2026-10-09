@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Clipboard, Check } from 'lucide-react';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import { parsePastedHolidays, ParsedHoliday } from '../../engine/timetable';
+import { useDateFormat, formatDate } from '../../utils/preferences';
 
 interface PasteHolidaysModalProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ export const PasteHolidaysModal: React.FC<PasteHolidaysModalProps> = ({
   onClose,
   onSaveHolidays,
 }) => {
+  const dateFormat = useDateFormat();
   const [inputText, setInputText] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -95,7 +97,7 @@ export const PasteHolidaysModal: React.FC<PasteHolidaysModalProps> = ({
                     {item.name}
                   </div>
                   <div className="font-mono text-indigo-600 dark:text-indigo-400 font-bold whitespace-nowrap ml-2">
-                    {item.date} {item.endDate ? `to ${item.endDate}` : ''}
+                    {formatDate(item.date, dateFormat)} {item.endDate ? `to ${formatDate(item.endDate, dateFormat)}` : ''}
                   </div>
                 </div>
               ))}

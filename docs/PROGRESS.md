@@ -325,6 +325,71 @@
     - **Version Tagging**: Upgraded app version to `0.5.5` (versionCode: `505`) across `package.json`, Gradle configuration, and UI footers (`MoreScreen.tsx`, `UserGuideModal.tsx`).
     - **Artifact Naming**: Configured Gradle `applicationVariants` output naming to `spirit-alpha.apk` and updated CI workflow (`.github/workflows/build-android.yml`) to verify and upload `spirit-alpha.apk` as artifact `spirit-alpha`.
 
+  - **Android Native Icon & Splash Screen Branding Replacement**:
+    - **Asset Generator (`scripts/generate-android-assets.js`)**: Built an automated generator using pure Node.js buffer rasterization and zlib PNG compression to render supersampled, anti-aliased Spirit brand icons across all Android screen densities.
+    - **Adaptive Launcher Icons**:
+      - Generated full launcher icons (`ic_launcher.png`), circular launcher icons (`ic_launcher_round.png`), and adaptive transparent foregrounds (`ic_launcher_foreground.png`) across all 5 mipmap densities: `mdpi`, `hdpi`, `xhdpi`, `xxhdpi`, and `xxxhdpi`.
+      - Replaced `ic_launcher_background.xml` with Spirit Indigo `#4F46E5`.
+      - Created vector drawable `ic_launcher_foreground.xml` in `drawable/` and `drawable-v24/` rendering the crisp Spirit mortarboard cap and golden amber tassel.
+      - Updated `mipmap-anydpi-v26/ic_launcher.xml` and `ic_launcher_round.xml` to link to the brand vector drawable.
+    - **Native Splash Screens**: Generated custom Spirit splash screens across all portrait and landscape density variants (`drawable/`, `drawable-port-*/`, `drawable-land-*/`).
+  - **Android Native Permissions, Local Notifications, Calendar Sync & Backup Export**:
+    - **Capacitor Plugins**: Integrated `@capacitor/local-notifications`, `@capacitor/filesystem`, and `@capacitor/share` to provide full native Android device integration.
+    - **Android Permissions**: Added `POST_NOTIFICATIONS`, `SCHEDULE_EXACT_ALARM`, `USE_EXACT_ALARM`, `WAKE_LOCK`, `VIBRATE`, `RECEIVE_BOOT_COMPLETED`, `READ_EXTERNAL_STORAGE`, and `WRITE_EXTERNAL_STORAGE` into `AndroidManifest.xml` with `requestLegacyExternalStorage="true"`. Configured `FileProvider` paths for cache, documents, and external storage in `file_paths.xml`.
+    - **Native Notifications**: Replaced browser-only `Notification` checks with Capacitor `LocalNotifications` checks and permission requests. On Android 13+, tapping "Enable Alerts" prompts the native Android OS permission modal. Added native system notification dispatch for test alerts, class reminders, and backup warnings.
+    - **Timetable & Exam Calendar Export**: Replaced web `<a>` blob download fallback with native `Filesystem` caching and `Share.share()` intent. On Android, tapping "Timetable (.ics)" or "Exams (.ics)" opens Android's system share sheet directly displaying Google Calendar, Samsung Calendar, and file save options.
+  - **Spirit v1.0.0 Official Release — Live OTA Auto-Updates, Native PDF Export & Storage Permissions**:
+    - **Over-The-Air (OTA) Live Auto-Updates**:
+      - Integrated `@capgo/capacitor-updater` in self-hosted zero-cloud mode (`autoUpdate: false`).
+      - Created `scripts/package-ota.js` to compile the mobile bundle (`base="/"`) into `dist/dist-ota.zip` and generate `dist/version.json`.
+      - Built `src/utils/updater.ts`: automatically confirms bundle boot with `notifyAppReady()` on startup, checks GitHub Pages for updates in the background, downloads new bundles, and primes them for activation on next launch or restart.
+      - Added "Live Web App Auto-Updates" controls and status in `MoreScreen.tsx`, including manual "Check Updates" and immediate "Restart App" action.
+      - Updated `.github/workflows/deploy.yml` and `.github/workflows/build-android.yml` to automatically build, package, and publish `dist-ota.zip` and `version.json` with every GitHub release and Pages deployment.
+    - **Native & Web PDF Attendance Reports**:
+      - Implemented `src/utils/pdfExport.ts` using `jspdf` and `jspdf-autotable` to generate professional, university-compliant attendance report documents with metrics cards, color-coded percentages, and course status breakdown.
+      - Fixed mobile export in `AttendanceReportModal.tsx`: replaced failing `iframe.print()` with a primary "Export PDF" action that uses Capacitor `Filesystem` and `Share.share()` intent on Android and `doc.save()` on desktop browsers.
+    - **Android Storage Permissions**:
+      - Updated `AndroidManifest.xml` to declare `READ_EXTERNAL_STORAGE`, `WRITE_EXTERNAL_STORAGE`, `READ_MEDIA_IMAGES`, and `MANAGE_EXTERNAL_STORAGE` without restrictive `maxSdkVersion` constraints.
+      - Added `src/utils/storagePermissions.ts` to check and request Android runtime storage permissions.
+      - Integrated automatic storage permission requests into PDF export, JSON backup, CSV export, and calendar `.ics` download flows, plus an explicit permission control in `MoreScreen.tsx`.
+    - **APK Binary Naming (`spirit-v1.apk`)**:
+      - Updated Gradle `applicationVariants` in `android/app/build.gradle` so generated APK binary outputs as `spirit-v1.apk`.
+      - Updated `.github/workflows/build-android.yml` CI release pipeline to upload artifact `spirit-v1` and attach `spirit-v1.apk` to GitHub Releases.
+    - **Version Upgrade**:
+  - **Open Source & Public Repository Readiness**:
+    - **Open Source Licensing**: Created permissive [`LICENSE`](file:///d:/spirit/LICENSE) (MIT License) with full user permissions.
+    - **Repository Hardening**: Hardened [`.gitignore`](file:///d:/spirit/.gitignore) to exclude Android Studio `local.properties`, keystores (`*.keystore`, `*.jks`), temporary OTA dists (`dist-ota/`), and local IDE settings (`.idea/`, `.vscode/`).
+    - **Package Metadata**: Updated `package.json` with repository URL, description, and `"license": "MIT"`.
+    - **Hybrid Course Type in Grades Screen Rules (`CourseRulesModal.tsx`)**:
+      - Added `theory_and_lab` ("Theory + Practical / Lab (Integrated / Hybrid)") option to the Course Rules modal in Grades, matching the Attendance screen options.
+      - Added attendance counting rule selector (`lab_attendance_rule`) to `CourseRulesModal.tsx` so students can set custom 1 per session vs 1 per hour rules directly from Grades.
+      - Added dynamic `Theory + Lab` indicator badge on `GradesScreen.tsx` course cards.
+    - **Custom Degree Program Entry & Dynamic Course Duration (Years)**:
+      - **Custom Program Onboarding (`OnboardingWizard.tsx`)**: Added quick-access "Custom Program" option for degrees not in preset list. Prompts student for custom degree name (e.g. B.Des, BSc Nursing, BS-MS, PhD, BMS) and course duration in years (1 to 10 years).
+      - **Live Estimated Program Completion**: Automatically calculates and renders live estimated graduation year badge (`start_year + duration_years`) across onboarding and profile editing.
+      - **Profile & Settings Customization (`ProfileEditModal.tsx`)**: Students can edit degree name, choose custom degree program, adjust start year and course duration years at any time with instant live reactivity via Dexie.
+      - **Metadata Display**: Displays Batch, duration in years, and estimated completion year in `MoreScreen.tsx` Student Profile card, `GradesScreen.tsx` header subtitle, and `AttendanceReportModal.tsx` print and screen views.
+      - **Testing & Verification**: Added validation tests for custom degree names and duration boundary checks in `schemas.test.ts`. All 173 unit tests passing.
+    - **Sitewide Dynamic Date Format Selection (`DD/MM/YYYY`, `YYYY-MM-DD`, `MM/DD/YYYY`)**:
+      - **Reactive Utilities (`preferences.ts`)**: Built `formatDate`, `formatTime`, and `formatDateTime` with safe fallback storage guards (supporting Node.js, SSR, and browser execution without `localStorage` crashes). Dispatches custom `spirit_date_format_changed` window events upon setting changes.
+      - **Reactive React Hook (`useDateFormat`)**: Subscribes components across the app to date format adjustments so the UI updates instantly without requiring a page refresh.
+      - **Sitewide Adoption**: Integrated across:
+        - Home Screen greeting banner (`HomeScreen.tsx`)
+        - Upcoming deadlines and exam countdowns (`UpcomingTasksWidget.tsx`, `TasksTrackerModal.tsx`)
+        - Day-Picker Attendance date view, date pill, and undo toasts (`DayPickerView.tsx`)
+        - Catch-Up Unmarked Classes date list (`CatchUpModal.tsx`)
+        - Subject Calendar quick-log editor (`CourseCalendarModal.tsx`)
+        - Official Attendance Reports on-screen and print documents (`AttendanceReportModal.tsx`, `pdfExport.ts`)
+        - Timetable One-Off Changes & Calendar Events / Holidays (`TimetableScreen.tsx`, `PasteHolidaysModal.tsx`)
+        - Semesters & Versions switcher displays (`SemesterSwitcherModal.tsx`, `VersionModal.tsx`, `TermSettingsModal.tsx`)
+        - Subject tracking start date hints (`SubjectModal.tsx`)
+        - Backup status timestamps and evaluate reminder logic (`MoreScreen.tsx`, `BackupModal.tsx`, `storage.ts`)
+      - **Testing**: Added unit tests verifying format outputs, weekday formatting, and boundary cases in `preferences.test.ts`. All 18 test files and 175 tests passing.
+    - **V1.0.0 Release Readiness Verification**:
+      - Hardened `.gitignore`, verified MIT License, and cleaned build artifacts.
+      - Tested Android production packaging workflows and OTA zip bundle generator (`package-ota.js`).
+      - Dual-domain live updater verified with zero errors.
+
 ## Remaining
 - All planned phases, user features, attendance clear options, APK build workflows, and multi-hour attendance counting rules fully implemented, tested, and verified.
 

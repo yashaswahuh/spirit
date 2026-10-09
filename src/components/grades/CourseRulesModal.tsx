@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Course, CourseType } from '../../types';
+import { Course, CourseType, LabAttendanceRule } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import { updateCourse } from '../../db/repositories/course.repo';
 import { ShieldCheck, Info } from 'lucide-react';
@@ -19,6 +19,9 @@ export const CourseRulesModal: React.FC<CourseRulesModalProps> = ({
 }) => {
   const [credits, setCredits] = useState<number>(course?.credits || 3);
   const [type, setType] = useState<CourseType>(course?.type || 'theory');
+  const [labAttendanceRule, setLabAttendanceRule] = useState<LabAttendanceRule | null>(
+    course?.lab_attendance_rule ?? null
+  );
   const [countsTowardGpa, setCountsTowardGpa] = useState<boolean>(course?.counts_toward_gpa ?? true);
   const [minInternalMarks, setMinInternalMarks] = useState<string>(
     course?.min_internal_marks !== null && course?.min_internal_marks !== undefined
@@ -40,6 +43,7 @@ export const CourseRulesModal: React.FC<CourseRulesModalProps> = ({
     if (!course) return;
     setCredits(course.credits);
     setType(course.type);
+    setLabAttendanceRule(course.lab_attendance_rule ?? null);
     setCountsTowardGpa(course.type === 'audit' ? false : course.counts_toward_gpa);
     setMinInternalMarks(
       course.min_internal_marks !== null && course.min_internal_marks !== undefined
@@ -76,6 +80,7 @@ export const CourseRulesModal: React.FC<CourseRulesModalProps> = ({
       min_internal_marks: minInternalMarks.trim() !== '' ? parseFloat(minInternalMarks) : null,
       min_end_sem_marks: minEndSemMarks.trim() !== '' ? parseFloat(minEndSemMarks) : null,
       pass_marks: passMarks.trim() !== '' ? parseFloat(passMarks) : null,
+      lab_attendance_rule: labAttendanceRule,
     });
     if (onSaved) onSaved();
     onClose();
@@ -118,13 +123,46 @@ export const CourseRulesModal: React.FC<CourseRulesModalProps> = ({
               className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-bold text-gray-900 dark:text-white"
             >
               <option value="theory">Theory Lecture</option>
+              <option value="theory_and_lab">Theory + Practical / Lab (Integrated / Hybrid)</option>
               <option value="lab">Laboratory / Practical</option>
               <option value="tutorial">Tutorial</option>
               <option value="project">Project / Dissertation</option>
               <option value="elective">Elective</option>
               <option value="audit">Audit / Non-Credit</option>
             </select>
+            {type === 'theory_and_lab' && (
+              <p className="text-[11px] text-indigo-600 dark:text-indigo-400 mt-1 font-medium leading-tight">
+                💡 Unified subject for lectures & practicals. Tracks both theory and lab components under one course!
+              </p>
+            )}
           </div>
+        </div>
+
+        {/* Attendance Counting Rule (Available for multi-period, lab, and hybrid courses) */}
+        <div className="p-3.5 rounded-2xl bg-sky-50/70 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/50 space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold text-sky-900 dark:text-sky-200">
+              Attendance Counting Rule
+            </label>
+            <span className="text-[10px] font-bold text-sky-600 dark:text-sky-400 bg-sky-100 dark:bg-sky-900/60 px-2 py-0.5 rounded-full">
+              {labAttendanceRule === null ? 'Default from Settings' : labAttendanceRule === 'single_session' ? '1 per Session' : '1 per Hour / Period'}
+            </span>
+          </div>
+          <p className="text-[11px] text-sky-700 dark:text-sky-400">
+            Configure how multi-hour periods, practicals, or electives (e.g. 2-hour labs or hybrid lectures) count toward attendance.
+          </p>
+          <select
+            value={labAttendanceRule ?? ''}
+            onChange={e => {
+              const val = e.target.value;
+              setLabAttendanceRule(val === 'per_hour' || val === 'single_session' ? val : null);
+            }}
+            className="w-full px-3 py-2 text-xs rounded-xl border border-sky-200 dark:border-sky-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-sky-500 min-h-[40px]"
+          >
+            <option value="">⚙️ Default (Follow App Settings)</option>
+            <option value="per_hour">⏱️ 1 attendance per hour / period (e.g. 2hr session = 2 attendance points)</option>
+            <option value="single_session">🎯 1 attendance per session (e.g. 2hr session = 1 attendance point)</option>
+          </select>
         </div>
 
         {/* Counts toward GPA Toggle */}

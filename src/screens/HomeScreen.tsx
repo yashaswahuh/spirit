@@ -8,7 +8,7 @@ import { canISkipTomorrow } from '../engine/whatif';
 import { getTodayTimetableSlots } from '../db/repositories/timetable.repo';
 import { markAttendance, deleteAttendanceRecord } from '../db/repositories/attendance.repo';
 import { resolveSlotAttendanceWeight } from '../engine/timetable';
-import { getLabAttendanceRule } from '../utils/preferences';
+import { getLabAttendanceRule, useDateFormat, formatDate } from '../utils/preferences';
 import { hasDemoData, clearDemoData, seedDemoData } from '../db/repositories/setup.repo';
 import { TodayClassesSection } from '../components/home/TodayClassesSection';
 import { CanISkipTomorrowCard } from '../components/home/CanISkipTomorrowCard';
@@ -182,11 +182,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
     }
   };
 
-  const formattedDate = new Date().toLocaleDateString('en-IN', {
-    weekday: 'long',
-    month: 'short',
-    day: 'numeric',
-  });
+  const dateFormat = useDateFormat();
+  const formattedDate = formatDate(new Date(), dateFormat, { includeWeekday: true });
 
   return (
     <PageContainer maxWidth="xl" className="space-y-6 animate-fade-in">

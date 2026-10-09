@@ -6,6 +6,10 @@ on:
       - main
       - master
       - phase-6
+    tags:
+      - 'v*'
+  release:
+    types: [published]
   pull_request:
     branches:
       - main
@@ -14,7 +18,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-apk:
@@ -54,17 +58,28 @@ jobs:
           cd android
           ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Verify and ensure spirit-alpha.apk
+      - name: Verify and ensure spirit-v1.apk
         run: |
           ls -la android/app/build/outputs/apk/debug/
-          if [ ! -f android/app/build/outputs/apk/debug/spirit-alpha.apk ]; then
-            cp android/app/build/outputs/apk/debug/*.apk android/app/build/outputs/apk/debug/spirit-alpha.apk
+          if [ ! -f android/app/build/outputs/apk/debug/spirit-v1.apk ]; then
+            cp android/app/build/outputs/apk/debug/*.apk android/app/build/outputs/apk/debug/spirit-v1.apk
           fi
 
       - name: Upload Android Debug APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: spirit-alpha
-          path: android/app/build/outputs/apk/debug/spirit-alpha.apk
+          name: spirit-v1
+          path: android/app/build/outputs/apk/debug/spirit-v1.apk
           retention-days: 30
+
+      - name: Attach APK and OTA Bundle to GitHub Release
+        if: (startsWith(github.ref, 'refs/tags/') || github.event_name == 'release') && !cancelled()
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            android/app/build/outputs/apk/debug/spirit-v1.apk
+            dist/dist-ota.zip
+            dist/version.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

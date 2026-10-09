@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Printer, CheckCircle2, AlertTriangle, Filter } from 'lucide-react';
+import { Printer, CheckCircle2, AlertTriangle, Filter, FileDown, Loader2 } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { db } from '../../db/dexie';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import { computeCourseAttendanceStats } from '../../engine/attendance';
-import { getLabAttendanceRule } from '../../utils/preferences';
+import { getLabAttendanceRule, useDateFormat, formatDate } from '../../utils/preferences';
+import { exportAttendancePdf } from '../../utils/pdfExport';
 
 interface AttendanceReportModalProps {
   isOpen: boolean;
@@ -15,6 +17,7 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const dateFormat = useDateFormat();
   const profile = useLiveQuery(() => db.profile.filter(p => p.deleted_at === null).first());
   const program = useLiveQuery(() => db.program.filter(p => p.deleted_at === null).first());
   const activeTerm = useLiveQuery(() => db.term.filter(t => t.deleted_at === null && t.status === 'ongoing').first());
@@ -190,7 +193,58 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
     };
   }, [courses, selectedCourseIds, filteredRecords, defaultThreshold, shouldIncludeInitialBalance, startDate, slots]);
 
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+
+  const handleExportPdf = async () => {
+    try {
+      setIsExportingPdf(true);
+      await exportAttendancePdf({
+        studentName: profile?.name || 'Student',
+        degreeType: program?.degree_type || 'Degree',
+        branch: program?.branch_department || 'Branch',
+        termName: activeTerm?.name || 'Current Term',
+        startDate,
+        endDate,
+        grandConducted: reportData.grandConducted,
+        grandAttended: reportData.grandAttended,
+        grandAbsent: reportData.grandAbsent,
+        grandMedical: reportData.grandMedical,
+        grandDutyLeave: reportData.grandDutyLeave,
+        grandPercentage: reportData.grandPercentage,
+        isOverallSafe: reportData.isOverallSafe,
+        inDangerCount: reportData.inDangerCount,
+        subjects: reportData.subjectReports.map(sr => ({
+          name: sr.course.name,
+          code: sr.course.code,
+          credits: sr.course.credits,
+          type: sr.course.type,
+          conducted: sr.stats.conducted,
+          attended: sr.stats.attended,
+          absent: sr.absentCount,
+          medical: sr.medicalCount,
+          dutyLeave: sr.dutyLeaveCount,
+          percentage: sr.stats.percentage,
+          targetThreshold: sr.course.attendance_threshold_override || defaultThreshold,
+          isInDanger: sr.stats.is_in_danger,
+          safeBunks: sr.stats.safe_bunks,
+          mustAttend: sr.stats.must_attend,
+        })),
+      });
+    } catch (err: any) {
+      alert(`PDF export failed: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
+
   const handlePrint = () => {
+    // On native mobile platforms, window.print() is unsupported by Android WebView.
+    // Seamlessly forward to the native PDF generator and share sheet.
+    if (Capacitor.isNativePlatform()) {
+      handleExportPdf();
+      return;
+    }
+
     // Generate isolated print document in hidden iframe to guarantee no viewport clipping, no scrollbars, and full table visibility
     const printFrame = document.createElement('iframe');
     printFrame.setAttribute('aria-hidden', 'true');
@@ -206,9 +260,10 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
     if (!doc) return;
 
     const studentName = profile?.name || 'Student';
-    const programStr = `${program?.degree_type || 'Degree'} (${program?.branch_department || 'Branch'})`;
-    const termStr = `${activeTerm?.name || 'Current Term'} | ${startDate} to ${endDate}`;
-    const generatedDate = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const batchStr = program?.start_year ? `Batch ${program.start_year}–${program.start_year + (program.duration_years || 4)}` : '';
+    const programStr = `${program?.degree_type || 'Degree'} (${program?.branch_department || 'Branch'})${batchStr ? ` • ${batchStr}` : ''}`;
+    const termStr = `${activeTerm?.name || 'Current Term'} | ${formatDate(startDate, dateFormat)} to ${formatDate(endDate, dateFormat)}`;
+    const generatedDate = formatDate(new Date(), dateFormat);
 
     const rowsHtml = reportData.subjectReports.length === 0
       ? `<tr><td colspan="9" style="text-align:center; padding: 24px; color: #6b7280;">No subjects selected or no records found in the specified date range.</td></tr>`
@@ -506,10 +561,26 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={handlePrint}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-indigo-500"
+                onClick={handleExportPdf}
+                disabled={isExportingPdf}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white font-bold rounded-xl text-xs flex items-center gap-2 shadow-sm transition-all focus-visible:ring-2 focus-visible:ring-indigo-500"
               >
-                <Printer className="w-4 h-4" /> Print / Save as PDF
+                {isExportingPdf ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Exporting PDF...
+                  </>
+                ) : (
+                  <>
+                    <FileDown className="w-4 h-4" /> Export PDF
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="hidden sm:inline-flex px-3.5 py-2 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 font-semibold rounded-xl text-xs items-center gap-1.5 shadow-xs transition-all"
+              >
+                <Printer className="w-3.5 h-3.5" /> Print
               </button>
             </div>
           </div>
@@ -632,8 +703,8 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
             </div>
             <div className="text-left sm:text-right text-xs text-gray-600 dark:text-gray-400 print:text-gray-700 space-y-0.5">
               <p><span className="font-semibold">Student:</span> {profile?.name || 'Student'}</p>
-              <p><span className="font-semibold">Program:</span> {program?.degree_type || 'Degree'} ({program?.branch_department || 'Branch'})</p>
-              <p><span className="font-semibold">Term:</span> {activeTerm?.name || 'Current Term'} | {startDate} to {endDate}</p>
+              <p><span className="font-semibold">Program:</span> {program?.degree_type || 'Degree'} ({program?.branch_department || 'Branch'}){program?.start_year ? ` • Batch ${program.start_year}–${program.start_year + (program.duration_years || 4)}` : ''}</p>
+              <p><span className="font-semibold">Term:</span> {activeTerm?.name || 'Current Term'} | {formatDate(startDate, dateFormat)} to {formatDate(endDate, dateFormat)}</p>
             </div>
           </div>
 
@@ -781,7 +852,7 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
           {/* Footer Notes for Print */}
           <div className="pt-4 border-t border-gray-200 dark:border-gray-800 text-[10px] text-gray-500 print:text-gray-600 flex justify-between items-center">
             <span>Calculated using university-compliant attendance formulas (Opening Balances + Weight-adjusted Periods).</span>
-            <span>Generated on {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+            <span>Generated on {formatDate(new Date(), dateFormat)}</span>
           </div>
         </div>
       </div>

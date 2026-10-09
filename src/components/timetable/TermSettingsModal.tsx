@@ -7,6 +7,8 @@ import {
   PeriodTimingConfig,
   getLabAttendanceRule,
   setLabAttendanceRule as setGlobalLabRule,
+  useDateFormat,
+  formatDate,
 } from '../../utils/preferences';
 
 interface TermSettingsModalProps {
@@ -51,6 +53,7 @@ export const TermSettingsModal: React.FC<TermSettingsModalProps> = ({
   onSaveTerm,
   onUpdateCourseThreshold,
 }) => {
+  const dateFormat = useDateFormat();
   const [startDate, setStartDate] = useState(term.start_date);
   const [endDate, setEndDate] = useState(term.end_date);
   const [attendanceThreshold, setAttendanceThreshold] = useState(term.attendance_threshold || 75);
@@ -199,6 +202,10 @@ export const TermSettingsModal: React.FC<TermSettingsModalProps> = ({
                 <span className="text-xs text-gray-500 font-bold">%</span>
               </div>
             </div>
+          </div>
+
+          <div className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+            Active semester span: {formatDate(startDate, dateFormat)} to {formatDate(endDate, dateFormat)}
           </div>
         </div>
 

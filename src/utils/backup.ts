@@ -13,6 +13,10 @@ import {
 import {
   recordBackupExported,
 } from './storage';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
+import { requestStoragePermissions } from './storagePermissions';
 
 export type { BackupPayload };
 
@@ -254,6 +258,60 @@ export async function downloadOrShareFile(options: {
   preferShare?: boolean;
 }): Promise<'shared' | 'downloaded' | 'cancelled'> {
   const { filename, content, mimeType, title, preferShare = true } = options;
+
+  // Native Android/iOS handling
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await requestStoragePermissions();
+
+      // 1. Write file to Cache directory for Android FileProvider sharing
+      const writeResult = await Filesystem.writeFile({
+        path: filename,
+        data: content,
+        directory: Directory.Cache,
+        encoding: Encoding.UTF8,
+      });
+
+      // 2. Also write to Documents if user preferred direct saving
+      if (!preferShare) {
+        try {
+          await Filesystem.writeFile({
+            path: filename,
+            data: content,
+            directory: Directory.Documents,
+            encoding: Encoding.UTF8,
+          });
+        } catch (docErr) {
+          console.warn('Filesystem write to Documents failed:', docErr);
+        }
+      }
+
+      // 3. Open Android system share sheet (lets user save to Drive, Downloads, WhatsApp, etc.)
+      await Share.share({
+        title,
+        text: `Spirit file: ${filename}`,
+        url: writeResult.uri,
+        dialogTitle: title,
+      });
+      return preferShare ? 'shared' : 'downloaded';
+    } catch (err: any) {
+      if (err?.message?.includes('canceled') || err?.message?.includes('cancelled')) {
+        return 'cancelled';
+      }
+      console.warn('Native Capacitor share failed, falling back to direct Documents write:', err);
+      try {
+        await Filesystem.writeFile({
+          path: filename,
+          data: content,
+          directory: Directory.Documents,
+          encoding: Encoding.UTF8,
+        });
+        return 'downloaded';
+      } catch (writeErr) {
+        console.error('Filesystem write fallback failed:', writeErr);
+      }
+    }
+  }
 
   if (
     preferShare &&

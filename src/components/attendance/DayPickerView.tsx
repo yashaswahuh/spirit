@@ -22,7 +22,7 @@ import { AttendanceStatus, Course, AttendanceRecord } from '../../types';
 import { resolveDaySchedule, DayScheduleResolution, timeToMinutes } from '../../engine/timetable';
 import { markAttendance, deleteAttendanceRecord } from '../../db/repositories/attendance.repo';
 import { createCalendarEvent, revertHolidayForDate } from '../../db/repositories/calendar.repo';
-import { getLabAttendanceRule } from '../../utils/preferences';
+import { getLabAttendanceRule, useDateFormat, formatDate } from '../../utils/preferences';
 
 interface DayPickerViewProps {
   onRecordChanged?: () => void;
@@ -126,6 +126,7 @@ const STATUS_BUTTONS: {
 ];
 
 export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged }) => {
+  const dateFormat = useDateFormat();
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().slice(0, 10)
   );
@@ -414,6 +415,9 @@ export const DayPickerView: React.FC<DayPickerViewProps> = ({ onRecordChanged })
               onChange={e => setSelectedDate(e.target.value)}
               className="px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs sm:text-sm font-mono font-bold text-gray-900 dark:text-white"
             />
+            <span className="hidden md:inline-block text-xs font-bold text-gray-500 dark:text-gray-400">
+              ({formatDate(selectedDate, dateFormat, { includeWeekday: true })})
+            </span>
           </div>
 
           <button
