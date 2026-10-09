@@ -356,8 +356,11 @@
       - Updated Gradle `applicationVariants` in `android/app/build.gradle` so generated APK binary outputs as `spirit-v1.apk`.
       - Updated `.github/workflows/build-android.yml` CI release pipeline to upload artifact `spirit-v1` and attach `spirit-v1.apk` to GitHub Releases.
     - **Version Upgrade**:
-      - Bumped version to `1.0.0` (versionCode `1000`) across `package.json`, `android/app/build.gradle`, `UserGuideModal.tsx`, `MoreScreen.tsx`, and CI workflows.
-      - All 170 unit tests pass across 18 test files.
+  - **Open Source & Public Repository Readiness**:
+    - **Open Source Licensing**: Created permissive [`LICENSE`](file:///d:/spirit/LICENSE) (MIT License) with full user permissions.
+    - **Repository Hardening**: Hardened [`.gitignore`](file:///d:/spirit/.gitignore) to exclude Android Studio `local.properties`, keystores (`*.keystore`, `*.jks`), temporary OTA dists (`dist-ota/`), and local IDE settings (`.idea/`, `.vscode/`).
+    - **Package Metadata**: Updated `package.json` with repository URL, description, and `"license": "MIT"`.
+    - **README Branding & Vibe Coded Showcase**: Added open source badges, quick links to live web app and `spirit-v1.apk` GitHub release download, and a dedicated **"Proudly Vibe Coded"** recognition section highlighting iterative human-AI development with Google DeepMind Antigravity.
 
 ## Remaining
 - All planned phases, user features, attendance clear options, APK build workflows, and multi-hour attendance counting rules fully implemented, tested, and verified.

@@ -1,10 +1,21 @@
 # Spirit 🎓
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Vibe Coded](https://img.shields.io/badge/Vibe%20Coded-with%20AI%20✨-blueviolet)](https://github.com/yashaswahuh/spirit)
+[![Version](https://img.shields.io/badge/release-v1.0.0-blue)](https://github.com/yashaswahuh/spirit/releases/latest)
+[![Android APK](https://img.shields.io/badge/Download%20APK-spirit--v1.apk-success?logo=android&logoColor=white)](https://github.com/yashaswahuh/spirit/releases/latest)
+[![Live Web App](https://img.shields.io/badge/Live%20Web%20App-Online-emerald)](https://yashaswahuh.github.io/spirit/)
+
 > **Fast, private, local-first academic tracker and attendance companion for university students.**
 
 Spirit runs entirely on your device. Zero accounts, no tracking, no external database, and zero latency. Built for students who want a reliable, offline-capable dashboard for attendance tracking, weekly timetables, exam deadlines, and grade calculation.
 
-📖 **Looking for instructions? Read the [Complete How-To-Use Guide & Manual](docs/USER_GUIDE.md)** or open the interactive **How to Use Spirit Guide** directly within the app under **Settings & More**.
+| Quick Links | |
+| :--- | :--- |
+| 🌐 **Live Web App** | [yashaswahuh.github.io/spirit/](https://yashaswahuh.github.io/spirit/) |
+| 📱 **Download Android APK** | [`spirit-v1.apk` on GitHub Releases](https://github.com/yashaswahuh/spirit/releases/latest) |
+| 📖 **User Manual** | [Complete How-To-Use Guide & Manual](docs/USER_GUIDE.md) |
+| 📄 **Open Source License** | [MIT License](LICENSE) |
 
 ---
 
@@ -135,4 +146,26 @@ Spirit includes a fully automated GitHub Actions CI/CD workflow (`.github/workfl
 ## 🔒 Privacy & Safety Guarantee
 
 Spirit does not transmit any student data. There are no tracking scripts, cookies, analytics, or third-party telemetries. All student records remain exclusively on the user's local device. To protect against browser eviction, enable **Persistent Storage** in Settings and periodically export a JSON backup.
+
+---
+
+## 🤖 Proudly Vibe Coded
+
+> **Spirit is vibe coded with AI** ✨
+> Built through pair programming with Google DeepMind's agentic AI coding assistant (Antigravity).
+
+Every layer of this application was designed and crafted iteratively:
+- Pure TypeScript calculation engines and mathematical formula solvers
+- 100% local-first IndexedDB storage architecture with Dexie.js
+- Accessible, responsive UI accommodating 320px mobile screens through 1920px desktops
+- Native Android Capacitor plugins for local notifications, calendar sharing, and storage permissions
+- Over-the-air (OTA) live auto-updates and automated GitHub Actions CI/CD release pipelines
+- Comprehensive automated test suite with 170+ vitest and axe-core accessibility tests
+
+---
+
+## 📄 License
+
+Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for details.
+
 
