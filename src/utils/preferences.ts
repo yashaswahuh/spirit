@@ -319,3 +319,99 @@ export const setLabAttendanceRule = (rule: LabAttendanceRule): void => {
   setStorageItem('spirit_lab_attendance_rule', rule);
 };
 
+export interface AppPreferencesSnapshot {
+  [key: string]: any;
+  theme?: ThemePreference;
+  accent?: AccentPreference;
+  weekStart?: WeekStartDay;
+  timeFormat?: TimeFormat;
+  dateFormat?: DateFormatPattern;
+  periodTimings?: PeriodTimingConfig[];
+  labAttendanceRule?: LabAttendanceRule;
+  locale?: string;
+  backupDaysThreshold?: number;
+  backupChangesThreshold?: number;
+}
+
+/**
+ * Creates a complete snapshot of user preferences and application settings from localStorage.
+ */
+export const exportPreferencesSnapshot = (): AppPreferencesSnapshot => {
+  let daysThresh: number | undefined;
+  let changesThresh: number | undefined;
+  const daysRaw = getStorageItem('spirit_backup_days_threshold');
+  const changesRaw = getStorageItem('spirit_backup_changes_threshold');
+  if (daysRaw) {
+    const parsed = parseInt(daysRaw, 10);
+    if (!isNaN(parsed)) daysThresh = parsed;
+  }
+  if (changesRaw) {
+    const parsed = parseInt(changesRaw, 10);
+    if (!isNaN(parsed)) changesThresh = parsed;
+  }
+
+  return {
+    theme: getThemePreference(),
+    accent: getAccentPreference(),
+    weekStart: getWeekStartDay(),
+    timeFormat: getTimeFormat(),
+    dateFormat: getDateFormat(),
+    periodTimings: getPeriodTimings(),
+    labAttendanceRule: getLabAttendanceRule(),
+    locale: getStorageItem('spirit_locale') || undefined,
+    backupDaysThreshold: daysThresh,
+    backupChangesThreshold: changesThresh,
+  };
+};
+
+/**
+ * Restores a snapshot of user preferences and application settings back into localStorage and DOM.
+ */
+export const restorePreferencesSnapshot = (snapshot: AppPreferencesSnapshot): void => {
+  if (!snapshot || typeof snapshot !== 'object') return;
+
+  if (snapshot.theme) {
+    setThemePreference(snapshot.theme);
+  }
+  if (snapshot.accent) {
+    setAccentPreference(snapshot.accent);
+  }
+  if (snapshot.weekStart !== undefined && snapshot.weekStart !== null) {
+    setWeekStartDay(snapshot.weekStart);
+  }
+  if (snapshot.timeFormat) {
+    setTimeFormat(snapshot.timeFormat);
+  }
+  if (snapshot.dateFormat) {
+    setDateFormat(snapshot.dateFormat);
+  }
+  if (snapshot.periodTimings && Array.isArray(snapshot.periodTimings) && snapshot.periodTimings.length > 0) {
+    setPeriodTimings(snapshot.periodTimings);
+  }
+  if (snapshot.labAttendanceRule) {
+    setLabAttendanceRule(snapshot.labAttendanceRule);
+  }
+  if (snapshot.locale) {
+    setStorageItem('spirit_locale', snapshot.locale);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('spirit_locale_changed', { detail: snapshot.locale }));
+    }
+  }
+  if (typeof snapshot.backupDaysThreshold === 'number') {
+    setStorageItem('spirit_backup_days_threshold', String(Math.max(1, snapshot.backupDaysThreshold)));
+  }
+  if (typeof snapshot.backupChangesThreshold === 'number') {
+    setStorageItem('spirit_backup_changes_threshold', String(Math.max(1, snapshot.backupChangesThreshold)));
+  }
+
+  // Broadcast storage change so all open windows/components reactively update
+  if (typeof window !== 'undefined') {
+    try {
+      window.dispatchEvent(new Event('storage'));
+    } catch {
+      // Safe guard for headless environments
+    }
+  }
+};
+
+

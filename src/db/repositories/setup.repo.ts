@@ -149,6 +149,7 @@ export async function saveOnboardingSetup(data: OnboardingData, isDemo = false):
     status: 'ongoing',
     attendance_threshold: data.attendanceThreshold,
     working_days: [1, 2, 3, 4, 5, 6], // Monday to Saturday
+    saturday_rule: 'second_saturday_off',
     period_timings: defaultPeriodTimings,
     lab_attendance_rule: data.labAttendanceRule || 'single_session',
     created_at: now,

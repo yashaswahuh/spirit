@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Share2,
   RefreshCw,
+  Settings,
 } from 'lucide-react';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import {
@@ -48,6 +49,7 @@ export const BackupModal: React.FC<BackupModalProps> = ({
   const [importError, setImportError] = useState<string | null>(null);
   const [errorDetails, setErrorDetails] = useState<string[]>([]);
   const [importMode, setImportMode] = useState<'merge' | 'replace'>('merge');
+  const [restoreSettings, setRestoreSettings] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [restoreSuccessMsg, setRestoreSuccessMsg] = useState<string | null>(null);
@@ -159,12 +161,16 @@ export const BackupModal: React.FC<BackupModalProps> = ({
     if (!parsedPayload) return;
     try {
       setIsRestoring(true);
-      const { importedCount } = await restoreBackup(parsedPayload, importMode);
+      const { importedCount, restoredSettings } = await restoreBackup(
+        parsedPayload,
+        importMode,
+        { restoreSettings }
+      );
       setShowConfirmModal(false);
       setRestoreSuccessMsg(
         `Successfully restored ${importedCount} records using ${
           importMode === 'replace' ? 'Replace' : 'Merge'
-        } mode!`
+        } mode${restoredSettings ? ' (and updated app settings)' : ''}!`
       );
       setParsedPayload(null);
       setPreviewCounts(null);
@@ -459,6 +465,27 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                     </div>
                   </div>
 
+                  {/* Settings Restoration Option */}
+                  <div className="p-3.5 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-200 dark:border-gray-700/80">
+                    <label className="flex items-start gap-3 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={restoreSettings}
+                        onChange={e => setRestoreSettings(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900"
+                      />
+                      <div className="flex-1">
+                        <span className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white flex items-center gap-1.5">
+                          <Settings className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                          Restore Previous Settings & Preferences
+                        </span>
+                        <span className="text-[11px] text-gray-500 dark:text-gray-400 block mt-0.5 leading-tight">
+                          Applies theme, accent color, period timings, date/time format, and lab attendance rules from the backup.
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+
                   {/* Trigger Confirmation */}
                   <button
                     onClick={() => setShowConfirmModal(true)}
@@ -516,6 +543,12 @@ export const BackupModal: React.FC<BackupModalProps> = ({
                 <span>Records to process:</span>
                 <span className="font-bold text-gray-900 dark:text-white">
                   {previewCounts.totalRecords}
+                </span>
+              </div>
+              <div className="flex justify-between text-gray-600 dark:text-gray-300">
+                <span>Restore settings:</span>
+                <span className="font-bold text-gray-900 dark:text-white">
+                  {restoreSettings ? 'Yes (theme, timings, formats)' : 'No (data only)'}
                 </span>
               </div>
             </div>

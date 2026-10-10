@@ -19,6 +19,10 @@ import {
   getPeriodTimings,
   setPeriodTimings,
   DEFAULT_PERIOD_TIMINGS,
+  getLabAttendanceRule,
+  setLabAttendanceRule,
+  exportPreferencesSnapshot,
+  restorePreferencesSnapshot,
 } from '../preferences';
 import { COURSE_COLOR_PRESETS } from '../../components/common/CourseColorPicker';
 
@@ -139,5 +143,65 @@ describe('User Preferences & Accent Customization', () => {
     for (const hex of COURSE_COLOR_PRESETS) {
       expect(hex).toMatch(/^#[0-9a-fA-F]{6}$/);
     }
+  });
+
+  it('exports and restores preferences snapshot correctly', () => {
+    // 1. Configure custom settings
+    setThemePreference('dark');
+    setAccentPreference('violet');
+    setWeekStartDay(0);
+    setTimeFormat('24h');
+    setDateFormat('YYYY-MM-DD');
+    setLabAttendanceRule('single_session');
+    const customTimings = [
+      { period: 1, name: 'P1', startTime: '08:00', endTime: '09:00' },
+    ];
+    setPeriodTimings(customTimings);
+    localStorage.setItem('spirit_locale', 'hi');
+    localStorage.setItem('spirit_backup_days_threshold', '14');
+    localStorage.setItem('spirit_backup_changes_threshold', '50');
+
+    // 2. Export snapshot
+    const snapshot = exportPreferencesSnapshot();
+    expect(snapshot.theme).toBe('dark');
+    expect(snapshot.accent).toBe('violet');
+    expect(snapshot.weekStart).toBe(0);
+    expect(snapshot.timeFormat).toBe('24h');
+    expect(snapshot.dateFormat).toBe('YYYY-MM-DD');
+    expect(snapshot.labAttendanceRule).toBe('single_session');
+    expect(snapshot.periodTimings).toEqual(customTimings);
+    expect(snapshot.locale).toBe('hi');
+    expect(snapshot.backupDaysThreshold).toBe(14);
+    expect(snapshot.backupChangesThreshold).toBe(50);
+
+    // 3. Reset / clear localStorage
+    localStorage.clear();
+    document.documentElement.className = '';
+    delete document.documentElement.dataset.accent;
+
+    // Verify reset state
+    expect(getThemePreference()).toBe('system');
+    expect(getAccentPreference()).toBe('indigo');
+    expect(getWeekStartDay()).toBe(1);
+    expect(getTimeFormat()).toBe('12h');
+    expect(getDateFormat()).toBe('DD/MM/YYYY');
+    expect(getLabAttendanceRule()).toBe('per_hour');
+
+    // 4. Restore snapshot
+    restorePreferencesSnapshot(snapshot);
+
+    // Verify restored state
+    expect(getThemePreference()).toBe('dark');
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+    expect(getAccentPreference()).toBe('violet');
+    expect(document.documentElement.dataset.accent).toBe('violet');
+    expect(getWeekStartDay()).toBe(0);
+    expect(getTimeFormat()).toBe('24h');
+    expect(getDateFormat()).toBe('YYYY-MM-DD');
+    expect(getLabAttendanceRule()).toBe('single_session');
+    expect(getPeriodTimings()).toEqual(customTimings);
+    expect(localStorage.getItem('spirit_locale')).toBe('hi');
+    expect(localStorage.getItem('spirit_backup_days_threshold')).toBe('14');
+    expect(localStorage.getItem('spirit_backup_changes_threshold')).toBe('50');
   });
 });

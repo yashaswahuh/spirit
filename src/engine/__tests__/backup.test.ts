@@ -1,12 +1,55 @@
-import { describe, it, expect } from 'vitest';
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   escapeCsvCell,
   shouldIncomingEntityWin,
   parseAndValidateBackup,
+  restoreBackup,
   BACKUP_SCHEMA_VERSION,
   BACKUP_APP_ID,
 } from '../../utils/backup';
+import {
+  getThemePreference,
+  setThemePreference,
+  getAccentPreference,
+  setAccentPreference,
+  getDateFormat,
+  setDateFormat,
+} from '../../utils/preferences';
 import type { BackupPayload } from '../../db/schemas';
+
+vi.mock('../../db/dexie', () => {
+  const createMockTable = () => ({
+    bulkPut: vi.fn().mockResolvedValue(undefined),
+    put: vi.fn().mockResolvedValue(undefined),
+    get: vi.fn().mockResolvedValue(undefined),
+    clear: vi.fn().mockResolvedValue(undefined),
+    toArray: vi.fn().mockResolvedValue([]),
+  });
+
+  return {
+    LOCAL_USER_ID: '00000000-0000-0000-0000-000000000001',
+    db: {
+      profile: createMockTable(),
+      program: createMockTable(),
+      grading_scheme: createMockTable(),
+      term: createMockTable(),
+      course: createMockTable(),
+      timetable_version: createMockTable(),
+      timetable_slot: createMockTable(),
+      timetable_override: createMockTable(),
+      calendar_event: createMockTable(),
+      attendance_record: createMockTable(),
+      assessment_component: createMockTable(),
+      mark: createMockTable(),
+      grade_result: createMockTable(),
+      task: createMockTable(),
+      transaction: vi.fn(async (_mode, _tables, callback) => {
+        return await callback();
+      }),
+    },
+  };
+});
 
 describe('Backup and Restore Engine', () => {
   describe('escapeCsvCell', () => {
@@ -201,6 +244,126 @@ describe('Backup and Restore Engine', () => {
         expect(res.error).toContain('Backup validation failed');
         expect(res.details?.length).toBeGreaterThan(0);
       }
+    });
+
+    it('parses and validates backup with optional settings payload', () => {
+      const withSettings: BackupPayload = {
+        ...validMinimalPayload,
+        settings: {
+          theme: 'dark',
+          accent: 'emerald',
+          timeFormat: '24h',
+          dateFormat: 'YYYY-MM-DD',
+        },
+      };
+      const res = parseAndValidateBackup(JSON.stringify(withSettings));
+      expect(res.success).toBe(true);
+      if (res.success) {
+        expect(res.payload.settings?.theme).toBe('dark');
+        expect(res.payload.settings?.accent).toBe('emerald');
+      }
+    });
+  });
+
+  describe('restoreBackup settings restoration', () => {
+    beforeEach(() => {
+      localStorage.clear();
+    });
+
+    const samplePayloadWithSettings: BackupPayload = {
+      app: BACKUP_APP_ID,
+      version: BACKUP_SCHEMA_VERSION,
+      exported_at: '2026-10-07T10:00:00.000Z',
+      settings: {
+        theme: 'dark',
+        accent: 'cyan',
+        dateFormat: 'MM/DD/YYYY',
+      },
+      data: {
+        profile: [],
+        program: [],
+        grading_scheme: [],
+        term: [],
+        course: [],
+        timetable_version: [],
+        timetable_slot: [],
+        timetable_override: [],
+        calendar_event: [],
+        attendance_record: [],
+        assessment_component: [],
+        mark: [],
+        grade_result: [],
+        task: [],
+      },
+    };
+
+    it('restores settings when restoreSettings option is true', async () => {
+      setThemePreference('light');
+      setAccentPreference('indigo');
+      setDateFormat('DD/MM/YYYY');
+
+      const result = await restoreBackup(samplePayloadWithSettings, 'merge', { restoreSettings: true });
+      expect(result.restoredSettings).toBe(true);
+      expect(getThemePreference()).toBe('dark');
+      expect(getAccentPreference()).toBe('cyan');
+      expect(getDateFormat()).toBe('MM/DD/YYYY');
+    });
+
+    it('leaves settings unchanged when restoreSettings option is false', async () => {
+      setThemePreference('light');
+      setAccentPreference('indigo');
+      setDateFormat('DD/MM/YYYY');
+
+      const result = await restoreBackup(samplePayloadWithSettings, 'merge', { restoreSettings: false });
+      expect(result.restoredSettings).toBe(false);
+      expect(getThemePreference()).toBe('light');
+      expect(getAccentPreference()).toBe('indigo');
+      expect(getDateFormat()).toBe('DD/MM/YYYY');
+    });
+
+    it('falls back to restoring profile theme and accent for legacy backups without settings', async () => {
+      setThemePreference('light');
+      setAccentPreference('indigo');
+
+      const legacyPayload: BackupPayload = {
+        app: BACKUP_APP_ID,
+        version: BACKUP_SCHEMA_VERSION,
+        exported_at: '2026-10-07T10:00:00.000Z',
+        data: {
+          profile: [
+            {
+              id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+              user_id: '00000000-0000-0000-0000-000000000001',
+              name: 'Aarav Sharma',
+              region: 'IN',
+              theme: 'dark',
+              accent: 'rose',
+              default_attendance_threshold: 75,
+              created_at: '2026-10-01T10:00:00.000Z',
+              updated_at: '2026-10-01T10:00:00.000Z',
+              deleted_at: null,
+            },
+          ],
+          program: [],
+          grading_scheme: [],
+          term: [],
+          course: [],
+          timetable_version: [],
+          timetable_slot: [],
+          timetable_override: [],
+          calendar_event: [],
+          attendance_record: [],
+          assessment_component: [],
+          mark: [],
+          grade_result: [],
+          task: [],
+        },
+      };
+
+      const result = await restoreBackup(legacyPayload, 'replace', { restoreSettings: true });
+      expect(result.restoredSettings).toBe(true);
+      expect(getThemePreference()).toBe('dark');
+      expect(getAccentPreference()).toBe('rose');
     });
   });
 });

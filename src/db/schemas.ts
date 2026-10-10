@@ -101,6 +101,7 @@ export const termSchema = baseEntitySchema.extend({
     z.literal(6),
   ])).optional(),
   period_timings: z.array(periodTimingSchema).optional(),
+  saturday_rule: z.enum(['all_working', 'second_saturday_off', 'second_fourth_saturday_off', 'all_saturdays_off']).default('second_saturday_off').optional(),
   lab_attendance_rule: z.enum(['per_hour', 'single_session']).optional(),
 });
 
@@ -244,6 +245,7 @@ export const backupPayloadSchema = z.object({
   }),
   version: z.number().int().positive(),
   exported_at: z.string(),
+  settings: z.record(z.string(), z.any()).optional(),
   data: z.object({
     profile: z.array(profileSchema).default([]),
     program: z.array(programSchema).default([]),

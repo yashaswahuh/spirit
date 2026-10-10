@@ -17,6 +17,7 @@ export async function createTerm(
 ): Promise<Term> {
   const now = new Date().toISOString();
   const term: Term = {
+    saturday_rule: 'second_saturday_off',
     ...data,
     id: crypto.randomUUID(),
     user_id: LOCAL_USER_ID,
