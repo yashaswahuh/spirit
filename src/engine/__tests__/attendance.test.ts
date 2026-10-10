@@ -6,6 +6,8 @@ import {
   computeCourseAttendanceStats,
   normalizeThreshold,
   countUnmarkedClasses,
+  shouldDeactivateSaturdayRecord,
+  shouldRestoreSaturdayRecord,
 } from '../attendance';
 import { AttendanceRecord, CourseAttendanceRules } from '../../types';
 
@@ -464,6 +466,66 @@ describe('Attendance Engine', () => {
       expect(stats.attended).toBe(9);
       expect(stats.conducted).toBe(11);
       expect(stats.percentage).toBeCloseTo((9 / 11) * 100, 1);
+    });
+
+    it('automatically excludes records on off Saturdays when switching saturdayRule (e.g. 2nd and 4th Saturday off)', () => {
+      // 2026-10-07: Wednesday (Regular class - Present)
+      // 2026-10-10: 2nd Saturday (Present)
+      // 2026-10-24: 4th Saturday (Present - previously logged when only 2nd Saturday was off)
+      const recordsWithSaturdays: AttendanceRecord[] = [
+        { id: '1', user_id: 'u1', course_id: 'c1', slot_id: null, note: null, date: '2026-10-07', status: 'present', weight: 1, created_at: '', updated_at: '', deleted_at: null },
+        { id: '2', user_id: 'u1', course_id: 'c1', slot_id: null, note: null, date: '2026-10-10', status: 'present', weight: 1, created_at: '', updated_at: '', deleted_at: null },
+        { id: '3', user_id: 'u1', course_id: 'c1', slot_id: null, note: null, date: '2026-10-24', status: 'present', weight: 1, created_at: '', updated_at: '', deleted_at: null },
+      ];
+
+      const rules: CourseAttendanceRules = { medical_counts_as_present: false, duty_leave_counts_as_present: false };
+
+      // When only 2nd Saturday is off: 10-10 is excluded, 10-24 is INCLUDED -> 2 classes
+      const stats2ndSat = computeCourseAttendanceStats(recordsWithSaturdays, rules, 75, {
+        saturdayRule: 'second_saturday_off',
+      });
+      expect(stats2ndSat.conducted).toBe(2);
+      expect(stats2ndSat.attended).toBe(2);
+
+      // When user switches to 2nd AND 4th Saturday off: BOTH 10-10 and 10-24 are excluded! -> 1 class
+      const stats2nd4thSat = computeCourseAttendanceStats(recordsWithSaturdays, rules, 75, {
+        saturdayRule: 'second_fourth_saturday_off',
+      });
+      expect(stats2nd4thSat.conducted).toBe(1);
+      expect(stats2nd4thSat.attended).toBe(1);
+
+      // If 4th Saturday was a designated swap day, it remains included
+      const statsWithSwap = computeCourseAttendanceStats(recordsWithSaturdays, rules, 75, {
+        saturdayRule: 'second_fourth_saturday_off',
+        swapDates: new Set(['2026-10-24']),
+      });
+      expect(statsWithSwap.conducted).toBe(2);
+      expect(statsWithSwap.attended).toBe(2);
+    });
+
+    it('evaluates shouldDeactivateSaturdayRecord and shouldRestoreSaturdayRecord correctly for alternate Saturdays', () => {
+      const rec4thSat = { date: '2026-10-24', deleted_at: null, note: null };
+      const rec2ndSat = { date: '2026-10-10', deleted_at: null, note: null };
+      const recFriday = { date: '2026-10-23', deleted_at: null, note: null };
+
+      // Under second_saturday_off:
+      expect(shouldDeactivateSaturdayRecord(rec2ndSat, 'second_saturday_off')).toBe(true);
+      expect(shouldDeactivateSaturdayRecord(rec4thSat, 'second_saturday_off')).toBe(false);
+      expect(shouldDeactivateSaturdayRecord(recFriday, 'second_saturday_off')).toBe(false);
+
+      // When switched to second_fourth_saturday_off:
+      expect(shouldDeactivateSaturdayRecord(rec4thSat, 'second_fourth_saturday_off')).toBe(true);
+
+      // Restoration: If a 4th Saturday was auto-deactivated and rule reverts back to second_saturday_off:
+      const deactivated4thSat = { date: '2026-10-24', deleted_at: '2026-10-25T00:00:00.000Z', note: 'Lab [auto_saturday_off]' };
+      expect(shouldRestoreSaturdayRecord(deactivated4thSat, 'second_saturday_off')).toBe(true);
+
+      // But under second_fourth_saturday_off, it stays deactivated:
+      expect(shouldRestoreSaturdayRecord(deactivated4thSat, 'second_fourth_saturday_off')).toBe(false);
+
+      // Manually deleted records without [auto_saturday_off] are NEVER restored:
+      const manuallyDeleted = { date: '2026-10-24', deleted_at: '2026-10-25T00:00:00.000Z', note: 'Deleted by user' };
+      expect(shouldRestoreSaturdayRecord(manuallyDeleted, 'second_saturday_off')).toBe(false);
     });
   });
 });

@@ -3,8 +3,8 @@
  * Zero React dependencies.
  */
 
-import { AttendanceRecord, CourseAttendanceRules, AttendanceStats, CourseType, LabAttendanceRule, TimetableSlot } from '../types';
-import { timeToMinutes } from './timetable';
+import { AttendanceRecord, CourseAttendanceRules, AttendanceStats, CourseType, LabAttendanceRule, TimetableSlot, SaturdayRule } from '../types';
+import { timeToMinutes, isSaturdayOff } from './timetable';
 
 /**
  * Normalizes threshold input to a decimal fraction in (0, 1].
@@ -81,6 +81,8 @@ export interface CourseAttendanceCalculationOptions {
   courseType?: CourseType;
   labAttendanceRule?: LabAttendanceRule | null;
   globalLabRule?: LabAttendanceRule;
+  saturdayRule?: SaturdayRule;
+  swapDates?: Set<string>;
 }
 
 /**
@@ -95,6 +97,7 @@ export interface CourseAttendanceCalculationOptions {
  * - 'medical' counts as present if rules.medical_counts_as_present is true.
  * - 'duty_leave' counts as present if rules.duty_leave_counts_as_present is true.
  * - If slots or slotsMap provided, computes separate theory and lab breakdowns for integrated courses.
+ * - Automatically discounts attendance records logged on designated off-Saturdays when saturdayRule is active.
  */
 export function computeCourseAttendanceStats(
   records: AttendanceRecord[],
@@ -114,10 +117,22 @@ export function computeCourseAttendanceStats(
   // Build slot lookup if slots array is provided
   const slotLookup = options?.slotsMap || (options?.slots ? new Map(options.slots.map(s => [s.id, s])) : undefined);
   const effectiveRule = options?.labAttendanceRule || options?.globalLabRule;
+  const effectiveSaturdayRule = options?.saturdayRule;
 
   for (const record of records) {
     if (record.deleted_at) continue;
     if (trackingStart && record.date < trackingStart) continue;
+
+    // Filter out attendance records on off Saturdays if semester saturdayRule designates this day as off
+    if (effectiveSaturdayRule && effectiveSaturdayRule !== 'all_working') {
+      const d = new Date(record.date + 'T00:00:00Z');
+      if (d.getUTCDay() === 6) {
+        const isSwapDay = options?.swapDates?.has(record.date) ?? false;
+        if (!isSwapDay && isSaturdayOff(record.date, effectiveSaturdayRule)) {
+          continue;
+        }
+      }
+    }
 
     let weight = record.weight && record.weight > 0 ? record.weight : 1;
 
@@ -251,7 +266,7 @@ export function computeCourseAttendanceStats(
   };
 }
 
-import { CalendarEvent, TimetableVersion, TimetableOverride, Weekday, SaturdayRule } from '../types';
+import { CalendarEvent, TimetableVersion, TimetableOverride, Weekday } from '../types';
 import { resolveDaySchedule } from './timetable';
 
 export interface UnmarkedCountParams {
@@ -347,4 +362,48 @@ export function shouldClearAttendanceRecord(
   if (options.endDate && record.date > options.endDate) return false;
   return true;
 }
+
+/**
+ * Evaluates whether an active attendance record should be deactivated because its date
+ * is designated as an off Saturday under the semester's Saturday rule.
+ */
+export function shouldDeactivateSaturdayRecord(
+  record: { date: string; deleted_at?: string | null },
+  saturdayRule: SaturdayRule,
+  swapDates?: Set<string>
+): boolean {
+  if (record.deleted_at !== null && record.deleted_at !== undefined) return false;
+  if (saturdayRule === 'all_working') return false;
+
+  const d = new Date(record.date + 'T00:00:00Z');
+  if (d.getUTCDay() !== 6) return false;
+
+  if (swapDates?.has(record.date)) return false;
+
+  return isSaturdayOff(record.date, saturdayRule);
+}
+
+/**
+ * Evaluates whether a previously auto-deactivated Saturday attendance record should be restored
+ * because the semester's Saturday rule was updated back to a working day on that Saturday.
+ */
+export function shouldRestoreSaturdayRecord(
+  record: { date: string; deleted_at?: string | null; note?: string | null },
+  saturdayRule: SaturdayRule,
+  swapDates?: Set<string>
+): boolean {
+  if (record.deleted_at === null || record.deleted_at === undefined) return false;
+
+  const d = new Date(record.date + 'T00:00:00Z');
+  if (d.getUTCDay() !== 6) return false;
+
+  // Only restore records that were automatically tagged by Saturday reconciliation
+  if (!record.note?.includes('[auto_saturday_off]')) return false;
+
+  if (swapDates?.has(record.date)) return true;
+  if (saturdayRule === 'all_working') return true;
+
+  return !isSaturdayOff(record.date, saturdayRule);
+}
+
 

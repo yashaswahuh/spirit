@@ -4,12 +4,13 @@
  */
 
 import { db, LOCAL_USER_ID } from '../dexie';
-import { AttendanceRecord, AttendanceStatus, LabAttendanceRule } from '../../types';
+import { AttendanceRecord, AttendanceStatus, LabAttendanceRule, Term } from '../../types';
 import { attendanceRecordSchema, validateEntity } from '../schemas';
 import { generateUUID } from '../../utils/uuid';
 import { recordDataChange } from '../../utils/storage';
 import { getLabAttendanceRule } from '../../utils/preferences';
 import { resolveSlotAttendanceWeight, timeToMinutes } from '../../engine/timetable';
+import { shouldDeactivateSaturdayRecord, shouldRestoreSaturdayRecord } from '../../engine/attendance';
 
 export async function getAttendanceRecordsForCourse(courseId: string): Promise<AttendanceRecord[]> {
   return db.attendance_record
@@ -319,3 +320,109 @@ export async function syncAllCoursesAttendanceWeights(newGlobalRule?: LabAttenda
 
   return totalUpdated;
 }
+
+export interface SaturdayReconciliationResult {
+  deactivated: number;
+  restored: number;
+}
+
+/**
+ * Automatically adjusts attendance records when a semester's Saturday working rule changes
+ * (e.g. from 'second_saturday_off' to 'second_fourth_saturday_off' or 'all_saturdays_off').
+ *
+ * - When a Saturday becomes OFF: Any active attendance records logged on that Saturday
+ *   (and not overridden by a swap day event) are soft-deleted and tagged with `[auto_saturday_off]`,
+ *   so they immediately stop inflating or penalizing the student's attendance stats.
+ * - When a Saturday becomes WORKING again: Any previously auto-deactivated records tagged with
+ *   `[auto_saturday_off]` on that Saturday are safely restored without data loss.
+ */
+export async function reconcileSaturdayAttendanceRecords(termId?: string): Promise<SaturdayReconciliationResult> {
+  let term: Term | undefined;
+  if (termId) {
+    term = await db.term.get(termId);
+  } else {
+    term = await db.term.filter(t => t.deleted_at === null && t.status === 'ongoing').first();
+    if (!term) {
+      term = await db.term.filter(t => t.deleted_at === null).first();
+    }
+  }
+
+  if (!term || term.deleted_at) {
+    return { deactivated: 0, restored: 0 };
+  }
+
+  const saturdayRule = term.saturday_rule || 'second_saturday_off';
+
+  // Find courses belonging to this term
+  const termCourses = await db.course
+    .where('term_id')
+    .equals(term.id)
+    .filter(c => c.deleted_at === null)
+    .toArray();
+
+  if (termCourses.length === 0) {
+    return { deactivated: 0, restored: 0 };
+  }
+  const courseIds = new Set(termCourses.map(c => c.id));
+
+  // Find swap day calendar events (swap days turn an off-Saturday into a working day)
+  const swapEvents = await db.calendar_event
+    .filter(e => e.deleted_at === null && e.type === 'swap_day')
+    .toArray();
+  const swapDates = new Set(swapEvents.map(e => e.date));
+
+  // Fetch all attendance records for these courses
+  const allRecords = await db.attendance_record
+    .filter(r => courseIds.has(r.course_id))
+    .toArray();
+
+  const now = new Date().toISOString();
+  let deactivatedCount = 0;
+  let restoredCount = 0;
+
+  const toUpdate: Array<{ id: string; deleted_at: string | null; note: string | null }> = [];
+
+  for (const record of allRecords) {
+    // Only process records within the semester bounds if set
+    if (term.start_date && record.date < term.start_date) continue;
+    if (term.end_date && record.date > term.end_date) continue;
+
+    if (shouldDeactivateSaturdayRecord(record, saturdayRule, swapDates)) {
+      const noteTag = '[auto_saturday_off]';
+      const newNote = record.note
+        ? (record.note.includes(noteTag) ? record.note : `${record.note} ${noteTag}`)
+        : noteTag;
+
+      toUpdate.push({
+        id: record.id,
+        deleted_at: now,
+        note: newNote,
+      });
+      deactivatedCount++;
+    } else if (shouldRestoreSaturdayRecord(record, saturdayRule, swapDates)) {
+      const cleanNote = record.note ? record.note.replace('[auto_saturday_off]', '').trim() || null : null;
+      toUpdate.push({
+        id: record.id,
+        deleted_at: null,
+        note: cleanNote,
+      });
+      restoredCount++;
+    }
+  }
+
+  if (toUpdate.length > 0) {
+    await db.transaction('rw', db.attendance_record, async () => {
+      for (const item of toUpdate) {
+        await db.attendance_record.update(item.id, {
+          deleted_at: item.deleted_at,
+          note: item.note,
+          updated_at: now,
+        });
+      }
+    });
+    recordDataChange();
+  }
+
+  return { deactivated: deactivatedCount, restored: restoredCount };
+}
+

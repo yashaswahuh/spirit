@@ -152,6 +152,7 @@ export const AttendanceReportModal: React.FC<AttendanceReportModalProps> = ({
           courseType: course.type,
           labAttendanceRule: course.lab_attendance_rule,
           globalLabRule: getLabAttendanceRule(),
+          saturdayRule: activeTerm?.saturday_rule,
         }
       );
 

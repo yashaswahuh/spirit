@@ -7,6 +7,7 @@
 import { db, LOCAL_USER_ID } from '../dexie';
 import { Term, Course, TimetableVersion } from '../../types';
 import { calculateSgpa } from '../../engine/gpa';
+import { reconcileSaturdayAttendanceRecords } from './attendance.repo';
 
 export async function listTerms(): Promise<Term[]> {
   return db.term.filter(t => t.deleted_at === null).sortBy('number');
@@ -38,6 +39,9 @@ export async function updateTerm(
     ...data,
     updated_at: new Date().toISOString(),
   });
+  if (data.saturday_rule !== undefined) {
+    await reconcileSaturdayAttendanceRecords(id).catch(() => {});
+  }
 }
 
 export const updateTermSettings = updateTerm;
