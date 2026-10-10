@@ -82,6 +82,7 @@ export const WhatIfModal: React.FC<WhatIfModalProps> = ({
         labAttendanceRule: c.lab_attendance_rule,
         globalLabRule: getLabAttendanceRule(),
         slots,
+        saturdayRule: term?.saturday_rule,
       }
     );
 

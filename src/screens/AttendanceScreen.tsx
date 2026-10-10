@@ -14,7 +14,7 @@ import { CourseCalendarModal } from '../components/attendance/CourseCalendarModa
 import { AttendanceReportModal } from '../components/attendance/AttendanceReportModal';
 import { ClearAttendanceModal } from '../components/attendance/ClearAttendanceModal';
 import { createCourse, updateCourse, deleteCourse } from '../db/repositories/course.repo';
-import { markAttendance, deleteAttendanceRecord, syncAllCoursesAttendanceWeights } from '../db/repositories/attendance.repo';
+import { markAttendance, deleteAttendanceRecord, syncAllCoursesAttendanceWeights, reconcileSaturdayAttendanceRecords } from '../db/repositories/attendance.repo';
 import { PageContainer } from '../components/layout/PageContainer';
 import { getLabAttendanceRule } from '../utils/preferences';
 import { timeToMinutes, resolveDaySchedule, resolveSlotAttendanceWeight, calculateCourseMaxConductedTillDate } from '../engine/timetable';
@@ -97,6 +97,7 @@ export const AttendanceScreen: React.FC = () => {
         courseType: course.type,
         labAttendanceRule: course.lab_attendance_rule,
         globalLabRule: getLabAttendanceRule(),
+        saturdayRule: activeTerm?.saturday_rule,
       }
     );
 
@@ -161,10 +162,11 @@ export const AttendanceScreen: React.FC = () => {
     setEditingCourse(undefined);
   };
 
-  // Sync existing attendance weights across all courses on mount to fix any past inconsistent records
+  // Sync existing attendance weights and reconcile Saturday rules across all courses on mount
   useEffect(() => {
     syncAllCoursesAttendanceWeights().catch(() => {});
-  }, []);
+    reconcileSaturdayAttendanceRecords(activeTerm?.id).catch(() => {});
+  }, [activeTerm?.id]);
 
   const handleMarkCourse = async (
     courseId: string,
@@ -242,6 +244,7 @@ export const AttendanceScreen: React.FC = () => {
         courseType: course.type,
         labAttendanceRule: course.lab_attendance_rule,
         globalLabRule,
+        saturdayRule: activeTerm?.saturday_rule,
       }
     );
 

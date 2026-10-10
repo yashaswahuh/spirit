@@ -91,6 +91,7 @@ export const GradesScreen: React.FC = () => {
         courseType: c.type,
         labAttendanceRule: c.lab_attendance_rule,
         globalLabRule: getLabAttendanceRule(),
+        saturdayRule: currentTerm?.saturday_rule,
       }
     );
     courseAttendanceMap.set(c.id, stats.percentage);

@@ -6,7 +6,7 @@ import type { TimetableSlot, Course } from '../types';
 import { computeCourseAttendanceStats, countUnmarkedClasses } from '../engine/attendance';
 import { canISkipTomorrow } from '../engine/whatif';
 import { getTodayTimetableSlots } from '../db/repositories/timetable.repo';
-import { markAttendance, deleteAttendanceRecord } from '../db/repositories/attendance.repo';
+import { markAttendance, deleteAttendanceRecord, reconcileSaturdayAttendanceRecords } from '../db/repositories/attendance.repo';
 import { resolveSlotAttendanceWeight } from '../engine/timetable';
 import { getLabAttendanceRule, useDateFormat, formatDate } from '../utils/preferences';
 import { hasDemoData, clearDemoData, seedDemoData } from '../db/repositories/setup.repo';
@@ -84,6 +84,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
         courseType: c.type,
         labAttendanceRule: c.lab_attendance_rule,
         globalLabRule: getLabAttendanceRule(),
+        saturdayRule: activeTerm?.saturday_rule,
       }
     );
 
@@ -93,6 +94,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
 
     return { course: c, stats };
   });
+
+  useEffect(() => {
+    reconcileSaturdayAttendanceRecords(activeTerm?.id).catch(() => {});
+  }, [activeTerm?.id]);
 
   const overallPercentage = totalConducted > 0 ? (totalAttended / totalConducted) * 100 : 100.0;
   const isOverallSafe = totalConducted === 0 || overallPercentage >= threshold;
