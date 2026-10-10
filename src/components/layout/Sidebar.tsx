@@ -9,7 +9,7 @@ import {
   Moon,
 } from 'lucide-react';
 import { NavTab } from './BottomNav';
-import { CURRENT_APP_VERSION } from '../../utils/updater';
+import { CURRENT_APP_VERSION, CURRENT_SITE_VERSION } from '../../utils/updater';
 
 export interface SidebarProps {
   activeTab: NavTab;
@@ -49,10 +49,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               S
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="text-lg font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-1.5">
+              <h1 className="text-lg font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-1.5 flex-wrap">
                 Spirit
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 font-mono">
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 font-mono" title="Native Android APK Version">
                   v{CURRENT_APP_VERSION}
+                </span>
+                <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/80 text-emerald-600 dark:text-emerald-400 font-mono" title="Live Site / Web Bundle Version">
+                  site v{CURRENT_SITE_VERSION}
                 </span>
               </h1>
               {onOpenSemesterSwitcher ? (

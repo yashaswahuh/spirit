@@ -91,6 +91,7 @@ import {
   applyUpdateNow,
   isUpdatePendingRestart,
   CURRENT_APP_VERSION,
+  CURRENT_SITE_VERSION,
   CURRENT_BUILD_NUMBER,
 } from '../utils/updater';
 
@@ -279,16 +280,16 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
 
   const handleCheckForUpdates = async () => {
     setIsCheckingUpdate(true);
-    setUpdateStatusMsg('Checking for updates...');
+    setUpdateStatusMsg('Checking GitHub Pages / site for live updates...');
     try {
       const res = await checkForLiveUpdate();
       if (res.hasUpdate) {
         setIsUpdatePending(true);
-        setUpdateStatusMsg(`v${res.latestVersion} downloaded! Ready to restart.`);
+        setUpdateStatusMsg(`Site v${res.latestSiteVersion} downloaded! Ready to restart.`);
       } else if (res.error) {
         setUpdateStatusMsg(`Check failed: ${res.error}`);
       } else {
-        setUpdateStatusMsg(`Up to date! Running latest v${res.currentVersion}`);
+        setUpdateStatusMsg(`Up to date! App: v${CURRENT_APP_VERSION} • Site: v${CURRENT_SITE_VERSION}`);
       }
     } finally {
       setIsCheckingUpdate(false);
@@ -737,8 +738,8 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
                     </span>
                     <span className="text-[11px] text-gray-400">
                       {isUpdatePending
-                        ? 'New version downloaded! Ready to restart.'
-                        : updateStatusMsg || `Active Version: v${CURRENT_APP_VERSION} (Build ${CURRENT_BUILD_NUMBER})`}
+                        ? 'New site version downloaded! Ready to restart.'
+                        : updateStatusMsg || `App: v${CURRENT_APP_VERSION} • Site: v${CURRENT_SITE_VERSION} (Build ${CURRENT_BUILD_NUMBER})`}
                     </span>
                   </div>
                   {isUpdatePending ? (
@@ -1035,7 +1036,9 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
 
           {/* About / Version Footer */}
           <div className="text-center text-[11px] text-gray-400 dark:text-gray-500 space-y-1">
-            <p className="font-semibold text-gray-600 dark:text-gray-400">Spirit v{CURRENT_APP_VERSION} • Offline-First Academic Tracker</p>
+            <p className="font-semibold text-gray-600 dark:text-gray-400">
+              Spirit App v{CURRENT_APP_VERSION} • Site v{CURRENT_SITE_VERSION} • Offline-First Academic Tracker
+            </p>
             <p>Built with Vite, React, TypeScript, Tailwind CSS, vitest & Dexie</p>
           </div>
         </div>
