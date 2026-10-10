@@ -56,6 +56,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        navigateFallbackDenylist: [/dist-ota\.zip$/, /version\.json$/, /\.zip$/],
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.destination === 'image',
