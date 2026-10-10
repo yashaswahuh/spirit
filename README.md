@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Vibe Coded](https://img.shields.io/badge/Vibe%20Coded-with%20AI%20✨-blueviolet)](https://github.com/yashaswahuh/spirit)
-[![Version](https://img.shields.io/badge/release-v1.0.0-blue)](https://github.com/yashaswahuh/spirit/releases/latest)
+[![Version](https://img.shields.io/badge/release-v1.0.1-blue)](https://github.com/yashaswahuh/spirit/releases/latest)
 [![Android APK](https://img.shields.io/badge/Download%20APK-spirit--v1.apk-success?logo=android&logoColor=white)](https://github.com/yashaswahuh/spirit/releases/latest)
 [![Live Web App](https://img.shields.io/badge/Live%20Web%20App-Online-emerald)](https://yashaswahuh.is-a.dev/spirit/)
 [![Mirror Web App](https://img.shields.io/badge/Backup%20Mirror-GitHub%20Pages-blue)](https://yashaswahuh.github.io/spirit/)
