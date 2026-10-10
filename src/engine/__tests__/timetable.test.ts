@@ -623,6 +623,71 @@ describe('Timetable Engine Unit Tests', () => {
         expect(result1stSat.is_working_day).toBe(true);
         expect(result1stSat.slots).toHaveLength(1);
       });
+
+      it('defaults to 2nd Saturday off when saturdayRule is completely undefined or omitted', () => {
+        const saturdaySlot: TimetableSlot = {
+          id: 'sat-slot-default',
+          user_id: 'u1',
+          version_id: null,
+          course_id: 'c1',
+          weekday: 6,
+          start_time: '09:00',
+          end_time: '09:55',
+          room: '101',
+          faculty: null,
+          component_type: 'theory',
+          created_at: '',
+          updated_at: '',
+          deleted_at: null,
+        };
+
+        // 2nd Saturday (2026-10-10) with saturdayRule omitted / undefined
+        const result2ndSatDefault = resolveDaySchedule({
+          date: '2026-10-10',
+          versions: [],
+          slots: [saturdaySlot],
+          calendarEvents: [],
+          // saturdayRule intentionally omitted
+        });
+
+        expect(result2ndSatDefault.is_holiday).toBe(true);
+        expect(result2ndSatDefault.is_working_day).toBe(false);
+        expect(result2ndSatDefault.holiday_note).toBe('2nd Saturday Off');
+        expect(result2ndSatDefault.slots).toHaveLength(0);
+
+        // 1st Saturday (2026-10-03) with saturdayRule omitted
+        const result1stSatDefault = resolveDaySchedule({
+          date: '2026-10-03',
+          versions: [],
+          slots: [saturdaySlot],
+          calendarEvents: [],
+        });
+        expect(result1stSatDefault.is_holiday).toBe(false);
+        expect(result1stSatDefault.is_working_day).toBe(true);
+        expect(result1stSatDefault.slots).toHaveLength(1);
+
+        // 4th Saturday (2026-10-24) with 2nd and 4th rule vs only 2nd rule
+        const result4thSatWith2ndAnd4th = resolveDaySchedule({
+          date: '2026-10-24',
+          versions: [],
+          slots: [saturdaySlot],
+          calendarEvents: [],
+          saturdayRule: 'second_fourth_saturday_off',
+        });
+        expect(result4thSatWith2ndAnd4th.is_holiday).toBe(true);
+        expect(result4thSatWith2ndAnd4th.holiday_note).toBe('4th Saturday Off');
+
+        // Switching back to 2nd Saturday off
+        const result4thSatSwitchedBack = resolveDaySchedule({
+          date: '2026-10-24',
+          versions: [],
+          slots: [saturdaySlot],
+          calendarEvents: [],
+          saturdayRule: 'second_saturday_off',
+        });
+        expect(result4thSatSwitchedBack.is_holiday).toBe(false);
+        expect(result4thSatSwitchedBack.is_working_day).toBe(true);
+      });
     });
 
     describe('calculateEndTimeForPeriod', () => {

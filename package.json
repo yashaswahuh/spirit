@@ -1,7 +1,9 @@
 {
   "name": "spirit",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
+  "siteVersion": "1.0.2",
+  "build": 1002,
   "description": "Fast, private, local-first academic tracker and attendance companion for university students.",
   "license": "MIT",
   "repository": {

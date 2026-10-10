@@ -1,14 +1,24 @@
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { CapacitorUpdater, type BundleInfo } from '@capgo/capacitor-updater';
+import {
+  CURRENT_APP_VERSION,
+  CURRENT_SITE_VERSION,
+  CURRENT_BUILD_NUMBER,
+} from '../version';
 
-export const CURRENT_APP_VERSION = '1.0.0';
-export const CURRENT_BUILD_NUMBER = 1000;
+export {
+  CURRENT_APP_VERSION,
+  CURRENT_SITE_VERSION,
+  CURRENT_BUILD_NUMBER,
+};
 
 export const UPDATE_MANIFEST_URL = 'https://yashaswahuh.is-a.dev/spirit/version.json';
 export const FALLBACK_MANIFEST_URL = 'https://yashaswahuh.github.io/spirit/version.json';
 
 export interface VersionManifest {
   version: string;
+  appVersion?: string;
+  siteVersion?: string;
   build: number;
   bundleUrl: string;
   fallbackBundleUrl?: string;
@@ -18,6 +28,9 @@ export interface VersionManifest {
 
 export interface UpdateCheckResult {
   hasUpdate: boolean;
+  currentAppVersion: string;
+  currentSiteVersion: string;
+  latestSiteVersion: string;
   currentVersion: string;
   latestVersion: string;
   downloadedBundle?: BundleInfo;
@@ -100,8 +113,11 @@ export async function checkForLiveUpdate(options?: {
   if (!Capacitor.isNativePlatform()) {
     return {
       hasUpdate: false,
+      currentAppVersion: CURRENT_APP_VERSION,
+      currentSiteVersion: CURRENT_SITE_VERSION,
+      latestSiteVersion: CURRENT_SITE_VERSION,
       currentVersion: CURRENT_APP_VERSION,
-      latestVersion: CURRENT_APP_VERSION,
+      latestVersion: CURRENT_SITE_VERSION,
     };
   }
 
@@ -116,16 +132,20 @@ export async function checkForLiveUpdate(options?: {
       manifest = await fetchManifestJson(FALLBACK_MANIFEST_URL);
     }
 
-    // Check if remote version is newer or has a higher build number
+    // Check if remote site version is newer or has a higher build number
+    const remoteSiteVersion = manifest.siteVersion || manifest.version;
     const isNewer =
       manifest.build > CURRENT_BUILD_NUMBER ||
-      (manifest.version !== CURRENT_APP_VERSION && compareSemver(manifest.version, CURRENT_APP_VERSION) > 0);
+      (remoteSiteVersion !== CURRENT_SITE_VERSION && compareSemver(remoteSiteVersion, CURRENT_SITE_VERSION) > 0);
 
     if (!isNewer || !manifest.bundleUrl) {
       return {
         hasUpdate: false,
+        currentAppVersion: CURRENT_APP_VERSION,
+        currentSiteVersion: CURRENT_SITE_VERSION,
+        latestSiteVersion: remoteSiteVersion || CURRENT_SITE_VERSION,
         currentVersion: CURRENT_APP_VERSION,
-        latestVersion: manifest.version || CURRENT_APP_VERSION,
+        latestVersion: remoteSiteVersion || CURRENT_SITE_VERSION,
       };
     }
 
@@ -134,7 +154,7 @@ export async function checkForLiveUpdate(options?: {
     try {
       downloaded = await CapacitorUpdater.download({
         url: manifest.bundleUrl,
-        version: manifest.version,
+        version: remoteSiteVersion,
       });
     } catch (primaryErr) {
       const fallbackUrl =
@@ -146,7 +166,7 @@ export async function checkForLiveUpdate(options?: {
         }
         downloaded = await CapacitorUpdater.download({
           url: fallbackUrl,
-          version: manifest.version,
+          version: remoteSiteVersion,
         });
       } else {
         throw primaryErr;
@@ -159,8 +179,11 @@ export async function checkForLiveUpdate(options?: {
 
     return {
       hasUpdate: true,
+      currentAppVersion: CURRENT_APP_VERSION,
+      currentSiteVersion: CURRENT_SITE_VERSION,
+      latestSiteVersion: remoteSiteVersion,
       currentVersion: CURRENT_APP_VERSION,
-      latestVersion: manifest.version,
+      latestVersion: remoteSiteVersion,
       downloadedBundle: downloaded,
     };
   } catch (err: any) {
@@ -169,6 +192,9 @@ export async function checkForLiveUpdate(options?: {
     }
     return {
       hasUpdate: false,
+      currentAppVersion: CURRENT_APP_VERSION,
+      currentSiteVersion: CURRENT_SITE_VERSION,
+      latestSiteVersion: CURRENT_SITE_VERSION,
       currentVersion: CURRENT_APP_VERSION,
       latestVersion: CURRENT_APP_VERSION,
       error: err?.message || 'Network error while checking updates',

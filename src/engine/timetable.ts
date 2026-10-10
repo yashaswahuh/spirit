@@ -77,19 +77,20 @@ export function resolveSlotAttendanceWeight(
  * 2nd Saturday of any month falls on days 8 through 14.
  * 4th Saturday of any month falls on days 22 through 28.
  */
-export function isSaturdayOff(dateStr: string, rule?: SaturdayRule): boolean {
-  if (!rule || rule === 'all_working') return false;
+export function isSaturdayOff(dateStr: string, rule: SaturdayRule = 'second_saturday_off'): boolean {
+  const effectiveRule = rule || 'second_saturday_off';
+  if (effectiveRule === 'all_working') return false;
   const d = new Date(dateStr + 'T00:00:00Z');
   if (d.getUTCDay() !== 6) return false;
 
   const dayOfMonth = d.getUTCDate();
-  if (rule === 'all_saturdays_off') return true;
+  if (effectiveRule === 'all_saturdays_off') return true;
 
   const is2nd = dayOfMonth >= 8 && dayOfMonth <= 14;
-  if (rule === 'second_saturday_off') return is2nd;
+  if (effectiveRule === 'second_saturday_off') return is2nd;
 
   const is4th = dayOfMonth >= 22 && dayOfMonth <= 28;
-  if (rule === 'second_fourth_saturday_off') return is2nd || is4th;
+  if (effectiveRule === 'second_fourth_saturday_off') return is2nd || is4th;
 
   return false;
 }
@@ -352,10 +353,21 @@ export function resolveDaySchedule(params: ResolveDayScheduleParams): DaySchedul
     };
   }
 
-  // Check Saturday working rule (e.g. 2nd Saturday off)
-  if (saturdayRule && isSaturdayOff(date, saturdayRule)) {
+  // Check swap day event (explicit timetable swap day event overrides recurring Saturday off)
+  const swapEvent = calendarEvents.find(
+    e => !e.deleted_at && e.type === 'swap_day' && e.date === date
+  );
+
+  // Check Saturday working rule (defaults to 2nd Saturday off if not specified)
+  const effectiveSaturdayRule: SaturdayRule = saturdayRule ?? 'second_saturday_off';
+  if (!swapEvent && effectiveSaturdayRule !== 'all_working' && isSaturdayOff(date, effectiveSaturdayRule)) {
     const dayOfMonth = dateObj.getUTCDate();
-    const note = dayOfMonth >= 22 ? '4th Saturday Off' : '2nd Saturday Off';
+    let note = '2nd Saturday Off';
+    if (effectiveSaturdayRule === 'second_fourth_saturday_off') {
+      note = dayOfMonth >= 22 ? '4th Saturday Off' : '2nd Saturday Off';
+    } else if (effectiveSaturdayRule === 'all_saturdays_off') {
+      note = 'Saturday Off';
+    }
     return {
       date,
       weekday: regularWeekday,
@@ -370,11 +382,6 @@ export function resolveDaySchedule(params: ResolveDayScheduleParams): DaySchedul
       total_periods: 0,
     };
   }
-
-  // Check swap day event
-  const swapEvent = calendarEvents.find(
-    e => !e.deleted_at && e.type === 'swap_day' && e.date === date
-  );
 
   let effectiveWeekday = regularWeekday;
   let isSwapDay = false;

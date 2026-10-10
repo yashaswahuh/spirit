@@ -13,6 +13,11 @@ import {
 import {
   recordBackupExported,
 } from './storage';
+import {
+  exportPreferencesSnapshot,
+  restorePreferencesSnapshot,
+  type AppPreferencesSnapshot,
+} from './preferences';
 import { Capacitor } from '@capacitor/core';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
@@ -115,6 +120,7 @@ export async function createBackupPayload(): Promise<BackupPayload> {
     app: BACKUP_APP_ID,
     version: BACKUP_SCHEMA_VERSION,
     exported_at: new Date().toISOString(),
+    settings: exportPreferencesSnapshot(),
     data: {
       profile,
       program,
@@ -449,17 +455,23 @@ export function parseAndValidateBackup(fileText: string): BackupValidationResult
   };
 }
 
+export interface RestoreBackupOptions {
+  restoreSettings?: boolean;
+}
+
 /**
- * Restores a validated backup payload into Dexie.
+ * Restores a validated backup payload into Dexie, optionally restoring app settings.
  * Mode 'replace': Clears all tables and writes new records.
  * Mode 'merge': Keeps newer updated_at timestamp per record.
  */
 export async function restoreBackup(
   payload: BackupPayload,
-  mode: 'merge' | 'replace'
-): Promise<{ importedCount: number }> {
+  mode: 'merge' | 'replace',
+  options: RestoreBackupOptions = { restoreSettings: true }
+): Promise<{ importedCount: number; restoredSettings: boolean }> {
   const d = payload.data;
   let importedCount = 0;
+  let restoredSettings = false;
 
   const tables = [
     db.profile,
@@ -548,7 +560,41 @@ export async function restoreBackup(
     }
   });
 
+  // Restore settings if requested
+  if (options.restoreSettings) {
+    if (payload.settings && typeof payload.settings === 'object' && Object.keys(payload.settings).length > 0) {
+      restorePreferencesSnapshot(payload.settings as AppPreferencesSnapshot);
+      restoredSettings = true;
+    } else {
+      // Legacy backup fallback: restore available preferences from profile and term
+      const legacySnapshot: AppPreferencesSnapshot = {};
+      if (d.profile && d.profile.length > 0) {
+        const prof = d.profile[0];
+        if (prof.theme) legacySnapshot.theme = prof.theme;
+        if (prof.accent) legacySnapshot.accent = prof.accent as any;
+      }
+      if (d.term && d.term.length > 0) {
+        const firstTerm = d.term[0];
+        if (firstTerm.period_timings && Array.isArray(firstTerm.period_timings) && firstTerm.period_timings.length > 0) {
+          legacySnapshot.periodTimings = firstTerm.period_timings.map((p, idx) => ({
+            period: idx + 1,
+            name: p.name,
+            startTime: p.start_time,
+            endTime: p.end_time,
+          }));
+        }
+        if (firstTerm.lab_attendance_rule) {
+          legacySnapshot.labAttendanceRule = firstTerm.lab_attendance_rule;
+        }
+      }
+      if (Object.keys(legacySnapshot).length > 0) {
+        restorePreferencesSnapshot(legacySnapshot);
+        restoredSettings = true;
+      }
+    }
+  }
+
   recordBackupExported();
 
-  return { importedCount };
+  return { importedCount, restoredSettings };
 }
