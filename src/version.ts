@@ -7,5 +7,5 @@
  * - CURRENT_BUILD_NUMBER: Incremental build sequence number.
  */
 export const CURRENT_APP_VERSION = '1.0.1';
-export const CURRENT_SITE_VERSION = '1.0.2';
-export const CURRENT_BUILD_NUMBER = 1002;
+export const CURRENT_SITE_VERSION = '1.0.4';
+export const CURRENT_BUILD_NUMBER = 1004;
