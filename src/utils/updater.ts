@@ -22,6 +22,7 @@ export interface VersionManifest {
   build: number;
   bundleUrl: string;
   fallbackBundleUrl?: string;
+  checksum?: string;
   releaseNotes?: string;
   minNativeVersion?: string;
 }
@@ -155,6 +156,7 @@ export async function checkForLiveUpdate(options?: {
       downloaded = await CapacitorUpdater.download({
         url: manifest.bundleUrl,
         version: remoteSiteVersion,
+        checksum: manifest.checksum,
       });
     } catch (primaryErr) {
       const fallbackUrl =
@@ -167,6 +169,7 @@ export async function checkForLiveUpdate(options?: {
         downloaded = await CapacitorUpdater.download({
           url: fallbackUrl,
           version: remoteSiteVersion,
+          checksum: manifest.checksum,
         });
       } else {
         throw primaryErr;

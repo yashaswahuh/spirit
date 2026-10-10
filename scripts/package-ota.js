@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { execSync } from 'child_process';
 import AdmZip from 'adm-zip';
@@ -116,8 +117,11 @@ for (const file of files) {
 
 const zipPath = path.join(distDir, 'dist-ota.zip');
 zip.writeZip(zipPath);
+const zipBuffer = fs.readFileSync(zipPath);
+const checksum = crypto.createHash('sha256').update(zipBuffer).digest('hex');
 const zipSizeKb = (fs.statSync(zipPath).size / 1024).toFixed(1);
 console.log(`Created OTA zip archive: ${zipPath} (${zipSizeKb} KB)`);
+console.log(`Bundle SHA-256 Checksum: ${checksum}`);
 
 // 5. Generate version.json manifest in dist/
 const manifest = {
@@ -127,6 +131,7 @@ const manifest = {
   build: newBuild,
   bundleUrl: 'https://yashaswahuh.is-a.dev/spirit/dist-ota.zip',
   fallbackBundleUrl: 'https://yashaswahuh.github.io/spirit/dist-ota.zip',
+  checksum,
   releaseNotes: `Spirit Site v${newSiteVersion} (App v${appVersion}) - Official live OTA release with automated version tracking, PDF attendance reports, and native storage integration.`,
   updatedAt: new Date().toISOString(),
 };
