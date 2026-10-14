@@ -21,6 +21,8 @@ import {
   DEFAULT_PERIOD_TIMINGS,
   getLabAttendanceRule,
   setLabAttendanceRule,
+  getDefaultSplitAttendance,
+  setDefaultSplitAttendance,
   exportPreferencesSnapshot,
   restorePreferencesSnapshot,
 } from '../preferences';
@@ -153,6 +155,7 @@ describe('User Preferences & Accent Customization', () => {
     setTimeFormat('24h');
     setDateFormat('YYYY-MM-DD');
     setLabAttendanceRule('single_session');
+    setDefaultSplitAttendance(false);
     const customTimings = [
       { period: 1, name: 'P1', startTime: '08:00', endTime: '09:00' },
     ];
@@ -169,6 +172,7 @@ describe('User Preferences & Accent Customization', () => {
     expect(snapshot.timeFormat).toBe('24h');
     expect(snapshot.dateFormat).toBe('YYYY-MM-DD');
     expect(snapshot.labAttendanceRule).toBe('single_session');
+    expect(snapshot.defaultSplitAttendance).toBe(false);
     expect(snapshot.periodTimings).toEqual(customTimings);
     expect(snapshot.locale).toBe('hi');
     expect(snapshot.backupDaysThreshold).toBe(14);
@@ -186,6 +190,7 @@ describe('User Preferences & Accent Customization', () => {
     expect(getTimeFormat()).toBe('12h');
     expect(getDateFormat()).toBe('DD/MM/YYYY');
     expect(getLabAttendanceRule()).toBe('per_hour');
+    expect(getDefaultSplitAttendance()).toBe(true);
 
     // 4. Restore snapshot
     restorePreferencesSnapshot(snapshot);
@@ -199,9 +204,25 @@ describe('User Preferences & Accent Customization', () => {
     expect(getTimeFormat()).toBe('24h');
     expect(getDateFormat()).toBe('YYYY-MM-DD');
     expect(getLabAttendanceRule()).toBe('single_session');
+    expect(getDefaultSplitAttendance()).toBe(false);
     expect(getPeriodTimings()).toEqual(customTimings);
     expect(localStorage.getItem('spirit_locale')).toBe('hi');
     expect(localStorage.getItem('spirit_backup_days_threshold')).toBe('14');
     expect(localStorage.getItem('spirit_backup_changes_threshold')).toBe('50');
+  });
+
+  it('manages defaultSplitAttendance preference correctly', () => {
+    // Defaults to true when no preference set
+    expect(getDefaultSplitAttendance()).toBe(true);
+
+    // Can be set to false
+    setDefaultSplitAttendance(false);
+    expect(getDefaultSplitAttendance()).toBe(false);
+    expect(localStorage.getItem('spirit_default_split_attendance')).toBe('false');
+
+    // Can be set to true
+    setDefaultSplitAttendance(true);
+    expect(getDefaultSplitAttendance()).toBe(true);
+    expect(localStorage.getItem('spirit_default_split_attendance')).toBe('true');
   });
 });

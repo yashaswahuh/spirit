@@ -118,3 +118,26 @@ export async function updateCourseFaculty(courseId: string, faculty?: string | n
     }
   }
 }
+
+/**
+ * Synchronizes the split_attendance setting across all active theory_and_lab courses.
+ * Returns the number of courses modified.
+ */
+export async function syncAllIntegratedCoursesSplitAttendance(split: boolean): Promise<number> {
+  const courses = await db.course
+    .filter(c => c.deleted_at === null && c.type === 'theory_and_lab')
+    .toArray();
+
+  const now = new Date().toISOString();
+  let count = 0;
+  for (const c of courses) {
+    if (c.split_attendance !== split) {
+      await db.course.update(c.id, {
+        split_attendance: split,
+        updated_at: now,
+      });
+      count++;
+    }
+  }
+  return count;
+}

@@ -7,6 +7,8 @@ import {
   Calculator,
   Clock,
   UserX,
+  BookOpen,
+  FlaskConical,
 } from 'lucide-react';
 import { db } from '../../db/dexie';
 import { Course, AssessmentComponent, Mark, AssessmentRuleType } from '../../types';
@@ -64,6 +66,7 @@ export const CourseMarksModal: React.FC<CourseMarksModalProps> = ({
   const [ruleParamN, setRuleParamN] = useState<number>(1);
   const [isEndSem, setIsEndSem] = useState<boolean>(false);
   const [minPassMarks, setMinPassMarks] = useState<string>('');
+  const [componentType, setComponentType] = useState<'theory' | 'lab'>('theory');
 
   // Live evaluation
   const evaluatedItems: EvaluatedComponent[] = components.map(c => {
@@ -80,6 +83,7 @@ export const CourseMarksModal: React.FC<CourseMarksModalProps> = ({
       status: mark?.status || (mark?.obtained_marks !== null && mark?.obtained_marks !== undefined ? 'entered' : 'not_held'),
       is_end_sem: c.is_end_sem,
       min_pass_marks: c.min_pass_marks,
+      component_type: c.component_type || (course.type === 'lab' ? 'lab' : 'theory'),
     };
   });
 
@@ -94,6 +98,7 @@ export const CourseMarksModal: React.FC<CourseMarksModalProps> = ({
     setRuleParamN(1);
     setIsEndSem(false);
     setMinPassMarks('');
+    setComponentType('theory');
     setIsAddingComponent(false);
     setEditingComponentId(null);
   };
@@ -108,6 +113,7 @@ export const CourseMarksModal: React.FC<CourseMarksModalProps> = ({
     setRuleParamN(c.rule_params?.n || c.rule_params?.count || 1);
     setIsEndSem(c.is_end_sem);
     setMinPassMarks(c.min_pass_marks !== null && c.min_pass_marks !== undefined ? c.min_pass_marks.toString() : '');
+    setComponentType(c.component_type || 'theory');
     setIsAddingComponent(true);
   };
 
@@ -120,6 +126,8 @@ export const CourseMarksModal: React.FC<CourseMarksModalProps> = ({
         ? { count: ruleParamN }
         : null;
 
+    const assignedType = course.type === 'theory_and_lab' ? componentType : (course.type === 'lab' ? 'lab' : 'theory');
+
     if (editingComponentId) {
       await updateAssessmentComponent(editingComponentId, {
         name,
@@ -130,6 +138,7 @@ export const CourseMarksModal: React.FC<CourseMarksModalProps> = ({
         rule_params: ruleParams,
         is_end_sem: isEndSem,
         min_pass_marks: minPassMarks ? parseFloat(minPassMarks) : null,
+        component_type: assignedType,
       });
     } else {
       await createAssessmentComponent({
@@ -142,6 +151,7 @@ export const CourseMarksModal: React.FC<CourseMarksModalProps> = ({
         rule_params: ruleParams,
         is_end_sem: isEndSem,
         min_pass_marks: minPassMarks ? parseFloat(minPassMarks) : null,
+        component_type: assignedType,
       });
     }
     resetForm();
@@ -219,6 +229,35 @@ export const CourseMarksModal: React.FC<CourseMarksModalProps> = ({
           </div>
         </div>
 
+        {/* Partitioned Theory & Lab Marks Standing */}
+        {course.type === 'theory_and_lab' && (summary.theory || summary.lab) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-3 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 text-xs">
+            <div className="flex items-center justify-between p-2 rounded-xl bg-white/80 dark:bg-gray-800/80 border border-indigo-100 dark:border-indigo-800/40">
+              <span className="font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1">
+                <BookOpen className="w-3.5 h-3.5 text-blue-600" /> Theory Internal:
+              </span>
+              <span className="font-mono font-bold text-gray-900 dark:text-white">
+                {summary.theory ? summary.theory.total_weighted_marks_obtained.toFixed(1) : '0.0'} / {summary.theory ? summary.theory.total_weightage_evaluated : 0}{' '}
+                <span className="text-blue-600 dark:text-blue-400 font-semibold">
+                  ({summary.theory && summary.theory.total_weightage_evaluated > 0 ? `${summary.theory.scaled_percentage.toFixed(1)}%` : '0%'})
+                </span>
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between p-2 rounded-xl bg-white/80 dark:bg-gray-800/80 border border-indigo-100 dark:border-indigo-800/40">
+              <span className="font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1">
+                <FlaskConical className="w-3.5 h-3.5 text-emerald-600" /> Lab Continuous:
+              </span>
+              <span className="font-mono font-bold text-gray-900 dark:text-white">
+                {summary.lab ? summary.lab.total_weighted_marks_obtained.toFixed(1) : '0.0'} / {summary.lab ? summary.lab.total_weightage_evaluated : 0}{' '}
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                  ({summary.lab && summary.lab.total_weightage_evaluated > 0 ? `${summary.lab.scaled_percentage.toFixed(1)}%` : '0%'})
+                </span>
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Quick Templates Strip */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -294,6 +333,18 @@ export const CourseMarksModal: React.FC<CourseMarksModalProps> = ({
                         <span className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate">
                           {comp.name}
                         </span>
+
+                        {course.type === 'theory_and_lab' && comp.component_type && (
+                          <span
+                            className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                              comp.component_type === 'lab'
+                                ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                : 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                            }`}
+                          >
+                            {comp.component_type === 'lab' ? '🧪 Lab' : '📘 Theory'}
+                          </span>
+                        )}
 
                         {comp.is_end_sem && (
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
@@ -420,6 +471,38 @@ export const CourseMarksModal: React.FC<CourseMarksModalProps> = ({
             <h5 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">
               {editingComponentId ? 'Edit Assessment Component' : 'Add New Component'}
             </h5>
+
+            {course.type === 'theory_and_lab' && (
+              <div className="p-2.5 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/40">
+                <label className="block text-[11px] font-bold text-indigo-950 dark:text-indigo-200 mb-1.5">
+                  Partition Component Belongs To
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setComponentType('theory')}
+                    className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all border ${
+                      componentType === 'theory'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    📘 Theory Component
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setComponentType('lab')}
+                    className={`py-1.5 px-3 rounded-lg text-xs font-bold transition-all border ${
+                      componentType === 'lab'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    🧪 Lab / Practical Component
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>

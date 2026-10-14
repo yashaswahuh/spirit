@@ -5,6 +5,7 @@
 
 import { AttendanceRecord, CourseAttendanceRules, AttendanceStats, CourseType, LabAttendanceRule, TimetableSlot, SaturdayRule } from '../types';
 import { timeToMinutes, isSaturdayOff } from './timetable';
+import { getDefaultSplitAttendance } from '../utils/preferences';
 
 /**
  * Normalizes threshold input to a decimal fraction in (0, 1].
@@ -83,12 +84,19 @@ export interface CourseAttendanceCalculationOptions {
   globalLabRule?: LabAttendanceRule;
   saturdayRule?: SaturdayRule;
   swapDates?: Set<string>;
+  splitAttendance?: boolean;
+  globalSplitAttendance?: boolean;
+  initialTheoryAttended?: number;
+  initialTheoryConducted?: number;
+  initialLabAttended?: number;
+  initialLabConducted?: number;
+  labThreshold?: number;
 }
 
 /**
  * Computes comprehensive attendance stats for a course given its historical records and opening balance.
  * Follows rules:
- * - Opening balance (initialAttended, initialConducted) included in totals.
+ * - Opening balance (initialAttended, initialConducted or split theory/lab balances) included in totals.
  * - Records prior to trackingStartDate (if set) are skipped to prevent double counting.
  * - Dynamic Attendance Counting Rule awareness:
  *   If rule is 'single_session', multi-period sessions (labs, NSS) count as 1 point.
@@ -98,6 +106,8 @@ export interface CourseAttendanceCalculationOptions {
  * - 'duty_leave' counts as present if rules.duty_leave_counts_as_present is true.
  * - If slots or slotsMap provided, computes separate theory and lab breakdowns for integrated courses.
  * - Automatically discounts attendance records logged on designated off-Saturdays when saturdayRule is active.
+ * - When splitAttendance is active for integrated courses, tracks separate safe bunks, must attend, thresholds,
+ *   and danger statuses for theory and lab partitions.
  */
 export function computeCourseAttendanceStats(
   records: AttendanceRecord[],
@@ -105,14 +115,35 @@ export function computeCourseAttendanceStats(
   threshold: number,
   options?: CourseAttendanceCalculationOptions
 ): AttendanceStats {
-  let attended = Math.max(0, options?.initialAttended || 0);
-  let conducted = Math.max(0, options?.initialConducted || 0);
+  const isSplitExplicit = options?.splitAttendance;
+  const isSplit = options?.courseType === 'theory_and_lab' && (
+    isSplitExplicit !== undefined
+      ? Boolean(isSplitExplicit)
+      : Boolean(options?.globalSplitAttendance ?? getDefaultSplitAttendance())
+  );
+
+  const hasSplitInitial = Boolean(
+    isSplit &&
+    ((options?.initialTheoryConducted && options.initialTheoryConducted > 0) ||
+      (options?.initialLabConducted && options.initialLabConducted > 0))
+  );
+  const initTheoryAttended = options?.initialTheoryAttended || 0;
+  const initTheoryConducted = options?.initialTheoryConducted || 0;
+  const initLabAttended = options?.initialLabAttended || 0;
+  const initLabConducted = options?.initialLabConducted || 0;
+
+  let attended = hasSplitInitial
+    ? Math.max(0, initTheoryAttended + initLabAttended)
+    : Math.max(0, options?.initialAttended || 0);
+  let conducted = hasSplitInitial
+    ? Math.max(0, initTheoryConducted + initLabConducted)
+    : Math.max(0, options?.initialConducted || 0);
   const trackingStart = options?.trackingStartDate;
 
-  let theoryAttended = 0;
-  let theoryConducted = 0;
-  let labAttended = 0;
-  let labConducted = 0;
+  let theoryAttended = initTheoryAttended;
+  let theoryConducted = initTheoryConducted;
+  let labAttended = initLabAttended;
+  let labConducted = initLabConducted;
 
   // Build slot lookup if slots array is provided
   const slotLookup = options?.slotsMap || (options?.slots ? new Map(options.slots.map(s => [s.id, s])) : undefined);
@@ -232,26 +263,58 @@ export function computeCourseAttendanceStats(
       } else if (compType === 'lab') {
         labConducted += weight;
         if (isAttended) labAttended += weight;
+      } else if (options?.courseType === 'theory_and_lab') {
+        if (isMultiPeriodOrLab) {
+          labConducted += weight;
+          if (isAttended) labAttended += weight;
+        } else {
+          theoryConducted += weight;
+          if (isAttended) theoryAttended += weight;
+        }
       }
     }
   }
 
   const percentage = calculateAttendancePercentage(attended, conducted);
   const normThreshold = normalizeThreshold(threshold) * 100;
+  const labNormThreshold = options?.labThreshold ? normalizeThreshold(options.labThreshold) * 100 : normThreshold;
+
   const safe_bunks = calculateSafeBunks(attended, conducted, threshold);
   const must_attend = calculateMustAttend(attended, conducted, threshold);
 
-  const theory = theoryConducted > 0 ? {
+  const theorySafeBunks = calculateSafeBunks(theoryAttended, theoryConducted, normThreshold);
+  const theoryMustAttend = calculateMustAttend(theoryAttended, theoryConducted, normThreshold);
+  const theoryPercentage = calculateAttendancePercentage(theoryAttended, theoryConducted);
+  const theoryInDanger = theoryConducted > 0 && theoryPercentage < normThreshold;
+
+  const labSafeBunks = calculateSafeBunks(labAttended, labConducted, labNormThreshold);
+  const labMustAttend = calculateMustAttend(labAttended, labConducted, labNormThreshold);
+  const labPercentage = calculateAttendancePercentage(labAttended, labConducted);
+  const labInDanger = labConducted > 0 && labPercentage < labNormThreshold;
+
+  const theory = (theoryConducted > 0 || initTheoryConducted > 0 || isSplit) ? {
     attended: theoryAttended,
     conducted: theoryConducted,
-    percentage: calculateAttendancePercentage(theoryAttended, theoryConducted),
+    percentage: theoryPercentage,
+    threshold: normThreshold,
+    safe_bunks: theorySafeBunks,
+    must_attend: theoryMustAttend,
+    is_in_danger: theoryInDanger,
   } : undefined;
 
-  const lab = labConducted > 0 ? {
+  const lab = (labConducted > 0 || initLabConducted > 0 || isSplit) ? {
     attended: labAttended,
     conducted: labConducted,
-    percentage: calculateAttendancePercentage(labAttended, labConducted),
+    percentage: labPercentage,
+    threshold: labNormThreshold,
+    safe_bunks: labSafeBunks,
+    must_attend: labMustAttend,
+    is_in_danger: labInDanger,
   } : undefined;
+
+  const isInDanger = isSplit
+    ? Boolean((theoryConducted > 0 && theoryInDanger) || (labConducted > 0 && labInDanger))
+    : (conducted > 0 && percentage < normThreshold);
 
   return {
     attended,
@@ -260,9 +323,10 @@ export function computeCourseAttendanceStats(
     threshold: normThreshold,
     safe_bunks,
     must_attend,
-    is_in_danger: conducted > 0 && percentage < normThreshold,
+    is_in_danger: isInDanger,
     theory,
     lab,
+    split_attendance: isSplit,
   };
 }
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Course, CourseType, LabAttendanceRule } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import { updateCourse } from '../../db/repositories/course.repo';
-import { ShieldCheck, Info } from 'lucide-react';
+import { ShieldCheck, Info, BookOpen, FlaskConical, Layers } from 'lucide-react';
 
 interface CourseRulesModalProps {
   isOpen: boolean;
@@ -19,6 +19,10 @@ export const CourseRulesModal: React.FC<CourseRulesModalProps> = ({
 }) => {
   const [credits, setCredits] = useState<number>(course?.credits || 3);
   const [type, setType] = useState<CourseType>(course?.type || 'theory');
+  const [splitAttendance, setSplitAttendance] = useState<boolean>(course?.split_attendance ?? false);
+  const [labThresholdOverride, setLabThresholdOverride] = useState<string>(
+    course?.lab_attendance_threshold_override?.toString() || ''
+  );
   const [labAttendanceRule, setLabAttendanceRule] = useState<LabAttendanceRule | null>(
     course?.lab_attendance_rule ?? null
   );
@@ -39,10 +43,45 @@ export const CourseRulesModal: React.FC<CourseRulesModalProps> = ({
       : '40'
   );
 
+  // Partitioned Theory & Lab Passing Rules
+  const [minTheoryInternalMarks, setMinTheoryInternalMarks] = useState<string>(
+    course?.min_theory_internal_marks !== null && course?.min_theory_internal_marks !== undefined
+      ? course.min_theory_internal_marks.toString()
+      : ''
+  );
+  const [minTheoryEndSemMarks, setMinTheoryEndSemMarks] = useState<string>(
+    course?.min_theory_end_sem_marks !== null && course?.min_theory_end_sem_marks !== undefined
+      ? course.min_theory_end_sem_marks.toString()
+      : ''
+  );
+  const [theoryPassMarks, setTheoryPassMarks] = useState<string>(
+    course?.theory_pass_marks !== null && course?.theory_pass_marks !== undefined
+      ? course.theory_pass_marks.toString()
+      : ''
+  );
+
+  const [minLabInternalMarks, setMinLabInternalMarks] = useState<string>(
+    course?.min_lab_internal_marks !== null && course?.min_lab_internal_marks !== undefined
+      ? course.min_lab_internal_marks.toString()
+      : ''
+  );
+  const [minLabEndSemMarks, setMinLabEndSemMarks] = useState<string>(
+    course?.min_lab_end_sem_marks !== null && course?.min_lab_end_sem_marks !== undefined
+      ? course.min_lab_end_sem_marks.toString()
+      : ''
+  );
+  const [labPassMarks, setLabPassMarks] = useState<string>(
+    course?.lab_pass_marks !== null && course?.lab_pass_marks !== undefined
+      ? course.lab_pass_marks.toString()
+      : ''
+  );
+
   useEffect(() => {
     if (!course) return;
     setCredits(course.credits);
     setType(course.type);
+    setSplitAttendance(course.split_attendance ?? false);
+    setLabThresholdOverride(course.lab_attendance_threshold_override?.toString() || '');
     setLabAttendanceRule(course.lab_attendance_rule ?? null);
     setCountsTowardGpa(course.type === 'audit' ? false : course.counts_toward_gpa);
     setMinInternalMarks(
@@ -60,6 +99,36 @@ export const CourseRulesModal: React.FC<CourseRulesModalProps> = ({
         ? course.pass_marks.toString()
         : '40'
     );
+    setMinTheoryInternalMarks(
+      course.min_theory_internal_marks !== null && course.min_theory_internal_marks !== undefined
+        ? course.min_theory_internal_marks.toString()
+        : ''
+    );
+    setMinTheoryEndSemMarks(
+      course.min_theory_end_sem_marks !== null && course.min_theory_end_sem_marks !== undefined
+        ? course.min_theory_end_sem_marks.toString()
+        : ''
+    );
+    setTheoryPassMarks(
+      course.theory_pass_marks !== null && course.theory_pass_marks !== undefined
+        ? course.theory_pass_marks.toString()
+        : ''
+    );
+    setMinLabInternalMarks(
+      course.min_lab_internal_marks !== null && course.min_lab_internal_marks !== undefined
+        ? course.min_lab_internal_marks.toString()
+        : ''
+    );
+    setMinLabEndSemMarks(
+      course.min_lab_end_sem_marks !== null && course.min_lab_end_sem_marks !== undefined
+        ? course.min_lab_end_sem_marks.toString()
+        : ''
+    );
+    setLabPassMarks(
+      course.lab_pass_marks !== null && course.lab_pass_marks !== undefined
+        ? course.lab_pass_marks.toString()
+        : ''
+    );
   }, [course, isOpen]);
 
   if (!course) return null;
@@ -73,6 +142,7 @@ export const CourseRulesModal: React.FC<CourseRulesModalProps> = ({
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    const isSplit = type === 'theory_and_lab' && splitAttendance;
     await updateCourse(course.id, {
       credits,
       type,
@@ -81,6 +151,16 @@ export const CourseRulesModal: React.FC<CourseRulesModalProps> = ({
       min_end_sem_marks: minEndSemMarks.trim() !== '' ? parseFloat(minEndSemMarks) : null,
       pass_marks: passMarks.trim() !== '' ? parseFloat(passMarks) : null,
       lab_attendance_rule: labAttendanceRule,
+      split_attendance: isSplit,
+      lab_attendance_threshold_override: isSplit && labThresholdOverride.trim() !== ''
+        ? parseFloat(labThresholdOverride)
+        : null,
+      min_theory_internal_marks: minTheoryInternalMarks.trim() !== '' ? parseFloat(minTheoryInternalMarks) : null,
+      min_theory_end_sem_marks: minTheoryEndSemMarks.trim() !== '' ? parseFloat(minTheoryEndSemMarks) : null,
+      theory_pass_marks: theoryPassMarks.trim() !== '' ? parseFloat(theoryPassMarks) : null,
+      min_lab_internal_marks: minLabInternalMarks.trim() !== '' ? parseFloat(minLabInternalMarks) : null,
+      min_lab_end_sem_marks: minLabEndSemMarks.trim() !== '' ? parseFloat(minLabEndSemMarks) : null,
+      lab_pass_marks: labPassMarks.trim() !== '' ? parseFloat(labPassMarks) : null,
     });
     if (onSaved) onSaved();
     onClose();
@@ -190,63 +270,253 @@ export const CourseRulesModal: React.FC<CourseRulesModalProps> = ({
           </label>
         </div>
 
+        {/* Attendance Partitioning (Theory + Lab Courses) */}
+        {type === 'theory_and_lab' && (
+          <div className="p-3.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h4 className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                  Split Attendance Tracking
+                </h4>
+                <p className="text-[11px] text-indigo-700/80 dark:text-indigo-300/80 mt-0.5">
+                  Track Theory & Lab attendance partitioned separately (distinct % and safe bunks) within this single course.
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                <input
+                  type="checkbox"
+                  checked={splitAttendance}
+                  onChange={e => setSplitAttendance(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            {splitAttendance && (
+              <div className="pt-2 border-t border-indigo-100/80 dark:border-indigo-900/40">
+                <label className="block text-[11px] font-bold text-indigo-950 dark:text-indigo-200 mb-1">
+                  Lab Attendance Threshold Override (%)
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="1"
+                    placeholder={`Same as Course (${course.attendance_threshold_override || 75}%)`}
+                    value={labThresholdOverride}
+                    onChange={e => setLabThresholdOverride(e.target.value)}
+                    className="w-full sm:w-48 px-3 py-1.5 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-800 text-xs font-bold text-gray-900 dark:text-white"
+                  />
+                  <span className="text-[10px] text-indigo-600 dark:text-indigo-400">
+                    Optional lab requirement (e.g. 80%)
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Passing Thresholds */}
         <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-gray-800">
-          <h4 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
-            Institutional Passing Rules
-          </h4>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">
-                Min. Internal Marks
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.5"
-                placeholder="Optional"
-                value={minInternalMarks}
-                onChange={e => setMinInternalMarks(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-bold text-gray-900 dark:text-white"
-              />
-              <span className="text-[10px] text-gray-400">To sit for end-sem</span>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">
-                Min. End-Sem Marks
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.5"
-                placeholder="Optional"
-                value={minEndSemMarks}
-                onChange={e => setMinEndSemMarks(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-bold text-gray-900 dark:text-white"
-              />
-              <span className="text-[10px] text-gray-400">Separate min cutoff</span>
-            </div>
-
-            <div>
-              <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">
-                Overall Pass %
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                step="1"
-                placeholder="e.g. 40 or 50"
-                value={passMarks}
-                onChange={e => setPassMarks(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-bold text-gray-900 dark:text-white"
-              />
-              <span className="text-[10px] text-gray-400">Total combined cutoff</span>
-            </div>
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
+              Institutional Passing Rules
+            </h4>
+            {type === 'theory_and_lab' && (
+              <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 px-2 py-0.5 rounded-full border border-indigo-100 dark:border-indigo-900">
+                Integrated Subject Rules
+              </span>
+            )}
           </div>
+
+          {type === 'theory_and_lab' ? (
+            <div className="space-y-3">
+              {/* Overall Combined Cutoff */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-700 dark:text-gray-300 mb-1">
+                  Overall Combined Pass %
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  placeholder="e.g. 40 or 50"
+                  value={passMarks}
+                  onChange={e => setPassMarks(e.target.value)}
+                  className="w-full sm:w-48 px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-bold text-gray-900 dark:text-white"
+                />
+                <span className="text-[10px] text-gray-400 block mt-0.5">Total aggregate cutoff across Theory and Lab</span>
+              </div>
+
+              {/* Theory Passing Partition */}
+              <div className="p-3 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-blue-900 dark:text-blue-200">
+                  <BookOpen className="w-3.5 h-3.5 text-blue-600" />
+                  Theory Component Passing Rules
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 dark:text-gray-400 mb-1">
+                      Min. Theory Internal
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      placeholder="Optional"
+                      value={minTheoryInternalMarks}
+                      onChange={e => setMinTheoryInternalMarks(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-bold text-gray-900 dark:text-white"
+                    />
+                    <span className="text-[10px] text-gray-400">Sit for theory exam</span>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 dark:text-gray-400 mb-1">
+                      Min. Theory End-Sem
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      placeholder="Optional"
+                      value={minTheoryEndSemMarks}
+                      onChange={e => setMinTheoryEndSemMarks(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-bold text-gray-900 dark:text-white"
+                    />
+                    <span className="text-[10px] text-gray-400">Written exam cutoff</span>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 dark:text-gray-400 mb-1">
+                      Theory Pass %
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      placeholder="e.g. 40"
+                      value={theoryPassMarks}
+                      onChange={e => setTheoryPassMarks(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-bold text-gray-900 dark:text-white"
+                    />
+                    <span className="text-[10px] text-gray-400">Theory aggregate min</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lab Passing Partition */}
+              <div className="p-3 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                  <FlaskConical className="w-3.5 h-3.5 text-emerald-600" />
+                  Lab / Practical Passing Rules
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 dark:text-gray-400 mb-1">
+                      Min. Lab Continuous
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      placeholder="Optional"
+                      value={minLabInternalMarks}
+                      onChange={e => setMinLabInternalMarks(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-bold text-gray-900 dark:text-white"
+                    />
+                    <span className="text-[10px] text-gray-400">Lab record/viva min</span>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 dark:text-gray-400 mb-1">
+                      Min. Lab Practical End-Sem
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      placeholder="Optional"
+                      value={minLabEndSemMarks}
+                      onChange={e => setMinLabEndSemMarks(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-bold text-gray-900 dark:text-white"
+                    />
+                    <span className="text-[10px] text-gray-400">Practical exam cutoff</span>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-gray-600 dark:text-gray-400 mb-1">
+                      Lab Pass %
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="1"
+                      placeholder="e.g. 50"
+                      value={labPassMarks}
+                      onChange={e => setLabPassMarks(e.target.value)}
+                      className="w-full px-2.5 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-bold text-gray-900 dark:text-white"
+                    />
+                    <span className="text-[10px] text-gray-400">Lab aggregate min</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">
+                  Min. Internal Marks
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  placeholder="Optional"
+                  value={minInternalMarks}
+                  onChange={e => setMinInternalMarks(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-bold text-gray-900 dark:text-white"
+                />
+                <span className="text-[10px] text-gray-400">To sit for end-sem</span>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">
+                  Min. End-Sem Marks
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  placeholder="Optional"
+                  value={minEndSemMarks}
+                  onChange={e => setMinEndSemMarks(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-bold text-gray-900 dark:text-white"
+                />
+                <span className="text-[10px] text-gray-400">Separate min cutoff</span>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-gray-600 dark:text-gray-400 mb-1">
+                  Overall Pass %
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="1"
+                  placeholder="e.g. 40 or 50"
+                  value={passMarks}
+                  onChange={e => setPassMarks(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs font-bold text-gray-900 dark:text-white"
+                />
+                <span className="text-[10px] text-gray-400">Total combined cutoff</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Notice Info */}

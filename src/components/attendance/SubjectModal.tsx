@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Course, CourseType, LabAttendanceRule } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
 import { CourseColorPicker } from '../common/CourseColorPicker';
-import { useDateFormat, formatDate } from '../../utils/preferences';
+import { useDateFormat, formatDate, getDefaultSplitAttendance } from '../../utils/preferences';
 
 interface SubjectModalProps {
   isOpen: boolean;
@@ -21,6 +21,12 @@ interface SubjectModalProps {
     tracking_start_date?: string | null;
     faculty?: string | null;
     lab_attendance_rule?: LabAttendanceRule | null;
+    split_attendance?: boolean;
+    lab_attendance_threshold_override?: number | null;
+    initial_theory_attended?: number;
+    initial_theory_conducted?: number;
+    initial_lab_attended?: number;
+    initial_lab_conducted?: number;
   }) => void;
   initialCourse?: Course;
 }
@@ -37,6 +43,24 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
   const [faculty, setFaculty] = useState(initialCourse?.faculty || '');
   const [credits, setCredits] = useState(initialCourse?.credits ?? 4);
   const [type, setType] = useState<CourseType>(initialCourse?.type || 'theory');
+  const [splitAttendance, setSplitAttendance] = useState<boolean>(
+    initialCourse?.split_attendance ?? getDefaultSplitAttendance()
+  );
+  const [labThresholdOverride, setLabThresholdOverride] = useState<string>(
+    initialCourse?.lab_attendance_threshold_override?.toString() || ''
+  );
+  const [initialTheoryAttended, setInitialTheoryAttended] = useState<number>(
+    initialCourse?.initial_theory_attended ?? 0
+  );
+  const [initialTheoryConducted, setInitialTheoryConducted] = useState<number>(
+    initialCourse?.initial_theory_conducted ?? 0
+  );
+  const [initialLabAttended, setInitialLabAttended] = useState<number>(
+    initialCourse?.initial_lab_attended ?? 0
+  );
+  const [initialLabConducted, setInitialLabConducted] = useState<number>(
+    initialCourse?.initial_lab_conducted ?? 0
+  );
   const [labAttendanceRule, setLabAttendanceRule] = useState<LabAttendanceRule | null>(
     initialCourse?.lab_attendance_rule ?? null
   );
@@ -67,6 +91,12 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
       setFaculty(initialCourse.faculty || '');
       setCredits(initialCourse.credits);
       setType(initialCourse.type);
+      setSplitAttendance(initialCourse.split_attendance ?? getDefaultSplitAttendance());
+      setLabThresholdOverride(initialCourse.lab_attendance_threshold_override?.toString() || '');
+      setInitialTheoryAttended(initialCourse.initial_theory_attended ?? 0);
+      setInitialTheoryConducted(initialCourse.initial_theory_conducted ?? 0);
+      setInitialLabAttended(initialCourse.initial_lab_attended ?? 0);
+      setInitialLabConducted(initialCourse.initial_lab_conducted ?? 0);
       setLabAttendanceRule(initialCourse.lab_attendance_rule ?? null);
       setColor(initialCourse.color);
       setThresholdOverride(initialCourse.attendance_threshold_override?.toString() || '');
@@ -81,6 +111,12 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
       setFaculty('');
       setCredits(4);
       setType('theory');
+      setSplitAttendance(getDefaultSplitAttendance());
+      setLabThresholdOverride('');
+      setInitialTheoryAttended(0);
+      setInitialTheoryConducted(0);
+      setInitialLabAttended(0);
+      setInitialLabConducted(0);
       setLabAttendanceRule(null);
       setColor('#6366f1');
       setThresholdOverride('');
@@ -96,6 +132,14 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
     e.preventDefault();
     if (!name.trim()) return;
 
+    const isSplit = type === 'theory_and_lab' && splitAttendance;
+    const finalInitialAttended = isSplit
+      ? Math.max(0, Number(initialTheoryAttended) + Number(initialLabAttended))
+      : Math.max(0, Number(initialAttended) || 0);
+    const finalInitialConducted = isSplit
+      ? Math.max(0, Number(initialTheoryConducted) + Number(initialLabConducted))
+      : Math.max(0, Number(initialConducted) || 0);
+
     onSave({
       name: name.trim(),
       code: code.trim().toUpperCase(),
@@ -106,10 +150,18 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
       attendance_threshold_override: thresholdOverride ? Number(thresholdOverride) : null,
       medical_counts_as_present: medicalCounts,
       duty_leave_counts_as_present: dutyLeaveCounts,
-      initial_attended: Math.max(0, Number(initialAttended) || 0),
-      initial_conducted: Math.max(0, Number(initialConducted) || 0),
+      initial_attended: finalInitialAttended,
+      initial_conducted: finalInitialConducted,
       tracking_start_date: trackingStartDate ? trackingStartDate : null,
       lab_attendance_rule: labAttendanceRule,
+      split_attendance: isSplit,
+      lab_attendance_threshold_override: isSplit && labThresholdOverride.trim() !== ''
+        ? Number(labThresholdOverride)
+        : null,
+      initial_theory_attended: isSplit ? Math.max(0, Number(initialTheoryAttended) || 0) : 0,
+      initial_theory_conducted: isSplit ? Math.max(0, Number(initialTheoryConducted) || 0) : 0,
+      initial_lab_attended: isSplit ? Math.max(0, Number(initialLabAttended) || 0) : 0,
+      initial_lab_conducted: isSplit ? Math.max(0, Number(initialLabConducted) || 0) : 0,
     });
     onClose();
   };
@@ -223,6 +275,53 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
           </div>
         </div>
 
+        {/* Attendance Partitioning Toggle for Theory + Lab */}
+        {type === 'theory_and_lab' && (
+          <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <label className="text-xs font-bold text-indigo-950 dark:text-indigo-200">
+                  Separate Attendance Tracking
+                </label>
+                <p className="text-[11px] text-indigo-700 dark:text-indigo-400 mt-0.5">
+                  Track Theory lectures and Lab practicals as separate attendance partitions under this same subject.
+                </p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-3">
+                <input
+                  type="checkbox"
+                  checked={splitAttendance}
+                  onChange={e => setSplitAttendance(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+              </label>
+            </div>
+
+            {splitAttendance && (
+              <div className="pt-2 border-t border-indigo-100 dark:border-indigo-900/50 space-y-2">
+                <div>
+                  <label className="block text-xs font-semibold text-indigo-900 dark:text-indigo-300 mb-1">
+                    Lab Attendance Threshold % (Optional Override)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    placeholder={`Default (${thresholdOverride || 'from Settings'}%)`}
+                    value={labThresholdOverride}
+                    onChange={e => setLabThresholdOverride(e.target.value)}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  />
+                  <span className="text-[10px] text-indigo-600 dark:text-indigo-400">
+                    Leave blank to use the same threshold for both Theory and Lab.
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Attendance Counting Rule (Available for all subjects e.g. labs, electives like NSS, multi-period classes) */}
         <div className="p-3.5 rounded-2xl bg-sky-50/70 dark:bg-sky-950/30 border border-sky-100 dark:border-sky-900/50 space-y-2">
           <div className="flex items-center justify-between">
@@ -296,32 +395,102 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
             Enter counts from your college portal to begin tracking mid-semester.
           </p>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">
-                Attended Before Tracking
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={initialAttended}
-                onChange={e => setInitialAttended(Math.max(0, parseInt(e.target.value) || 0))}
-                className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-              />
+          {type === 'theory_and_lab' && splitAttendance ? (
+            <div className="space-y-3">
+              {/* Theory Opening Balance */}
+              <div className="p-3 bg-gray-50 dark:bg-gray-800/60 rounded-xl border border-gray-200 dark:border-gray-700 space-y-2">
+                <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+                  📘 Theory Lectures Opening Balance
+                </span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-500 mb-1">
+                      Attended Theory
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={initialTheoryAttended}
+                      onChange={e => setInitialTheoryAttended(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-full px-3 py-1.5 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-500 mb-1">
+                      Conducted Theory
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={initialTheoryConducted}
+                      onChange={e => setInitialTheoryConducted(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-full px-3 py-1.5 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Lab Opening Balance */}
+              <div className="p-3 bg-gray-50 dark:bg-gray-800/60 rounded-xl border border-gray-200 dark:border-gray-700 space-y-2">
+                <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-1">
+                  🧪 Lab Practicals Opening Balance
+                </span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-500 mb-1">
+                      Attended Lab
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={initialLabAttended}
+                      onChange={e => setInitialLabAttended(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-full px-3 py-1.5 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-500 mb-1">
+                      Conducted Lab
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={initialLabConducted}
+                      onChange={e => setInitialLabConducted(Math.max(0, parseInt(e.target.value) || 0))}
+                      className="w-full px-3 py-1.5 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">
-                Conducted Before Tracking
-              </label>
-              <input
-                type="number"
-                min="0"
-                value={initialConducted}
-                onChange={e => setInitialConducted(Math.max(0, parseInt(e.target.value) || 0))}
-                className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-              />
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                  Attended Before Tracking
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={initialAttended}
+                  onChange={e => setInitialAttended(Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                  Conducted Before Tracking
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={initialConducted}
+                  onChange={e => setInitialConducted(Math.max(0, parseInt(e.target.value) || 0))}
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           <div>
             <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">

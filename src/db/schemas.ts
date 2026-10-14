@@ -125,6 +125,18 @@ export const courseSchema = baseEntitySchema.extend({
   grade_band_override: z.array(gradeScaleEntrySchema).nullable().optional(),
   faculty: z.string().nullable().optional(),
   lab_attendance_rule: z.enum(['per_hour', 'single_session']).nullable().optional(),
+  split_attendance: z.boolean().default(false).optional(),
+  lab_attendance_threshold_override: z.number().min(0).max(100).nullable().optional(),
+  initial_theory_attended: z.number().min(0).default(0).optional(),
+  initial_theory_conducted: z.number().min(0).default(0).optional(),
+  initial_lab_attended: z.number().min(0).default(0).optional(),
+  initial_lab_conducted: z.number().min(0).default(0).optional(),
+  min_theory_internal_marks: z.number().min(0).nullable().optional(),
+  min_theory_end_sem_marks: z.number().min(0).nullable().optional(),
+  theory_pass_marks: z.number().min(0).nullable().optional(),
+  min_lab_internal_marks: z.number().min(0).nullable().optional(),
+  min_lab_end_sem_marks: z.number().min(0).nullable().optional(),
+  lab_pass_marks: z.number().min(0).nullable().optional(),
 });
 
 export const timetableVersionSchema = baseEntitySchema.extend({
@@ -211,6 +223,7 @@ export const assessmentComponentSchema = baseEntitySchema.extend({
   }).nullable().optional(),
   is_end_sem: z.boolean().default(false),
   min_pass_marks: z.number().min(0).nullable().optional(),
+  component_type: z.enum(['theory', 'lab', 'theory_and_lab', 'tutorial', 'project', 'elective', 'audit']).nullable().optional(),
 });
 
 export const markSchema = baseEntitySchema.extend({

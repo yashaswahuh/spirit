@@ -258,6 +258,101 @@ describe('Attendance Engine', () => {
       expect(stats.lab?.percentage).toBe(100.0);
     });
 
+    describe('split attendance tracking for integrated courses', () => {
+      it('computes separate safe bunks, must-attend, and thresholds for theory vs lab when splitAttendance is true', () => {
+        const records: AttendanceRecord[] = [
+          // 8 present theory
+          ...Array.from({ length: 8 }, (_, i) => ({
+            id: `tp${i}`, user_id: 'u1', course_id: 'c1', date: `2026-10-0${i + 1}`, slot_id: null,
+            status: 'present' as const, weight: 1, component_type: 'theory' as const, note: null, created_at: '', updated_at: '', deleted_at: null,
+          })),
+          // 2 absent theory
+          ...Array.from({ length: 2 }, (_, i) => ({
+            id: `ta${i}`, user_id: 'u1', course_id: 'c1', date: `2026-10-1${i + 1}`, slot_id: null,
+            status: 'absent' as const, weight: 1, component_type: 'theory' as const, note: null, created_at: '', updated_at: '', deleted_at: null,
+          })),
+          // 3 present lab (weight 1 each)
+          ...Array.from({ length: 3 }, (_, i) => ({
+            id: `lp${i}`, user_id: 'u1', course_id: 'c1', date: `2026-10-1${i + 5}`, slot_id: null,
+            status: 'present' as const, weight: 1, component_type: 'lab' as const, note: null, created_at: '', updated_at: '', deleted_at: null,
+          })),
+          // 3 absent lab
+          ...Array.from({ length: 3 }, (_, i) => ({
+            id: `la${i}`, user_id: 'u1', course_id: 'c1', date: `2026-10-2${i + 1}`, slot_id: null,
+            status: 'absent' as const, weight: 1, component_type: 'lab' as const, note: null, created_at: '', updated_at: '', deleted_at: null,
+          })),
+        ];
+
+        const stats = computeCourseAttendanceStats(
+          records,
+          rulesStrict,
+          75,
+          {
+            splitAttendance: true,
+            courseType: 'theory_and_lab',
+            labThreshold: 80,
+          }
+        );
+
+        // Overall combined: 11 / 16 = 68.75%
+        expect(stats.attended).toBe(11);
+        expect(stats.conducted).toBe(16);
+        expect(stats.split_attendance).toBe(true);
+
+        // Theory partition
+        expect(stats.theory).toBeDefined();
+        expect(stats.theory?.attended).toBe(8);
+        expect(stats.theory?.conducted).toBe(10);
+        expect(stats.theory?.percentage).toBe(80.0);
+        expect(stats.theory?.threshold).toBe(75);
+        expect(stats.theory?.is_in_danger).toBe(false);
+
+        // Lab partition
+        expect(stats.lab).toBeDefined();
+        expect(stats.lab?.attended).toBe(3);
+        expect(stats.lab?.conducted).toBe(6);
+        expect(stats.lab?.percentage).toBe(50.0);
+        expect(stats.lab?.threshold).toBe(80);
+        expect(stats.lab?.is_in_danger).toBe(true);
+        expect(stats.lab?.must_attend).toBeGreaterThan(0);
+
+        // Overall is_in_danger is true because Lab is in danger even if Theory is safe!
+        expect(stats.is_in_danger).toBe(true);
+      });
+
+      it('supports separate opening balances for theory and lab initial attendance', () => {
+        const stats = computeCourseAttendanceStats(
+          [],
+          rulesStrict,
+          75,
+          {
+            splitAttendance: true,
+            courseType: 'theory_and_lab',
+            initialTheoryAttended: 18,
+            initialTheoryConducted: 20, // 90%
+            initialLabAttended: 4,
+            initialLabConducted: 8, // 50%
+          }
+        );
+
+        expect(stats.attended).toBe(22);
+        expect(stats.conducted).toBe(28);
+
+        expect(stats.theory?.attended).toBe(18);
+        expect(stats.theory?.conducted).toBe(20);
+        expect(stats.theory?.percentage).toBe(90.0);
+        expect(stats.theory?.is_in_danger).toBe(false);
+
+        expect(stats.lab?.attended).toBe(4);
+        expect(stats.lab?.conducted).toBe(8);
+        expect(stats.lab?.percentage).toBe(50.0);
+        expect(stats.lab?.is_in_danger).toBe(true);
+
+        // Because split attendance is true and lab is in danger:
+        expect(stats.is_in_danger).toBe(true);
+      });
+    });
+
     it('instantly and retroactively recalculates 2-hour sessions between 1 pt per session (single_session) and 2 pts per session (per_hour)', () => {
       // 5 sessions of a 2-hour lab or elective (like NSS)
       // Stored records have weight 2 (from a 2-hour slot with weight: 2)

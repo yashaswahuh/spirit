@@ -319,6 +319,19 @@ export const setLabAttendanceRule = (rule: LabAttendanceRule): void => {
   setStorageItem('spirit_lab_attendance_rule', rule);
 };
 
+export const getDefaultSplitAttendance = (): boolean => {
+  const val = getStorageItem('spirit_default_split_attendance');
+  // Default to true for separate tracking unless explicitly configured
+  return val === null ? true : val === 'true';
+};
+
+export const setDefaultSplitAttendance = (split: boolean): void => {
+  setStorageItem('spirit_default_split_attendance', split ? 'true' : 'false');
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('spirit_default_split_attendance_changed', { detail: split }));
+  }
+};
+
 export interface AppPreferencesSnapshot {
   [key: string]: any;
   theme?: ThemePreference;
@@ -328,6 +341,7 @@ export interface AppPreferencesSnapshot {
   dateFormat?: DateFormatPattern;
   periodTimings?: PeriodTimingConfig[];
   labAttendanceRule?: LabAttendanceRule;
+  defaultSplitAttendance?: boolean;
   locale?: string;
   backupDaysThreshold?: number;
   backupChangesThreshold?: number;
@@ -358,6 +372,7 @@ export const exportPreferencesSnapshot = (): AppPreferencesSnapshot => {
     dateFormat: getDateFormat(),
     periodTimings: getPeriodTimings(),
     labAttendanceRule: getLabAttendanceRule(),
+    defaultSplitAttendance: getDefaultSplitAttendance(),
     locale: getStorageItem('spirit_locale') || undefined,
     backupDaysThreshold: daysThresh,
     backupChangesThreshold: changesThresh,
@@ -390,6 +405,9 @@ export const restorePreferencesSnapshot = (snapshot: AppPreferencesSnapshot): vo
   }
   if (snapshot.labAttendanceRule) {
     setLabAttendanceRule(snapshot.labAttendanceRule);
+  }
+  if (typeof snapshot.defaultSplitAttendance === 'boolean') {
+    setDefaultSplitAttendance(snapshot.defaultSplitAttendance);
   }
   if (snapshot.locale) {
     setStorageItem('spirit_locale', snapshot.locale);
