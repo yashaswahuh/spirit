@@ -278,6 +278,42 @@ export class SpiritDatabase extends Dexie {
         }
       });
     });
+
+    this.version(9).stores({
+      profile: '&id, user_id, is_demo, updated_at, deleted_at',
+      grading_scheme: '&id, user_id, is_demo, updated_at, deleted_at',
+      program: '&id, user_id, grading_scheme_id, is_demo, updated_at, deleted_at',
+      term: '&id, user_id, program_id, status, is_demo, updated_at, deleted_at',
+      course: '&id, user_id, term_id, is_demo, updated_at, deleted_at',
+      timetable_version: '&id, user_id, term_id, effective_from, is_demo, updated_at, deleted_at',
+      timetable_slot: '&id, user_id, version_id, course_id, weekday, is_demo, updated_at, deleted_at',
+      timetable_override: '&id, user_id, term_id, date, course_id, is_demo, updated_at, deleted_at',
+      calendar_event: '&id, user_id, date, is_demo, updated_at, deleted_at',
+      attendance_record: '&id, user_id, course_id, date, slot_id, [course_id+date], is_demo, updated_at, deleted_at',
+      assessment_component: '&id, user_id, course_id, is_end_sem, is_demo, updated_at, deleted_at',
+      mark: '&id, user_id, component_id, status, is_demo, updated_at, deleted_at',
+      grade_result: '&id, user_id, course_id, term_id, attempt_number, [course_id+attempt_number], is_demo, updated_at, deleted_at',
+      task: '&id, user_id, course_id, due_at, done, is_demo, updated_at, deleted_at',
+    }).upgrade(async tx => {
+      // Safe upgrade: backfill split_attendance and partitioned fields
+      await tx.table('course').toCollection().modify((c: any) => {
+        if (c.split_attendance === undefined) c.split_attendance = false;
+        if (c.lab_attendance_threshold_override === undefined) c.lab_attendance_threshold_override = null;
+        if (c.initial_theory_attended === undefined) c.initial_theory_attended = 0;
+        if (c.initial_theory_conducted === undefined) c.initial_theory_conducted = 0;
+        if (c.initial_lab_attended === undefined) c.initial_lab_attended = 0;
+        if (c.initial_lab_conducted === undefined) c.initial_lab_conducted = 0;
+        if (c.min_theory_internal_marks === undefined) c.min_theory_internal_marks = null;
+        if (c.min_theory_end_sem_marks === undefined) c.min_theory_end_sem_marks = null;
+        if (c.theory_pass_marks === undefined) c.theory_pass_marks = null;
+        if (c.min_lab_internal_marks === undefined) c.min_lab_internal_marks = null;
+        if (c.min_lab_end_sem_marks === undefined) c.min_lab_end_sem_marks = null;
+        if (c.lab_pass_marks === undefined) c.lab_pass_marks = null;
+      });
+      await tx.table('assessment_component').toCollection().modify((comp: any) => {
+        if (comp.component_type === undefined) comp.component_type = null;
+      });
+    });
   }
 }
 

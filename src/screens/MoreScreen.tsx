@@ -31,6 +31,7 @@ import {
 import { db } from '../db/dexie';
 import { seedDemoData, hasDemoData, clearDemoData, resetDatabase } from '../db/repositories/setup.repo';
 import { syncAllCoursesAttendanceWeights } from '../db/repositories/attendance.repo';
+import { syncAllIntegratedCoursesSplitAttendance } from '../db/repositories/course.repo';
 import { PageContainer } from '../components/layout/PageContainer';
 import { TasksTrackerModal } from '../components/tasks/TasksTrackerModal';
 import { BackupModal } from '../components/safety/BackupModal';
@@ -64,6 +65,8 @@ import {
   LabAttendanceRule,
   getLabAttendanceRule,
   setLabAttendanceRule,
+  getDefaultSplitAttendance,
+  setDefaultSplitAttendance,
 } from '../utils/preferences';
 import {
   getNotificationPermission,
@@ -145,6 +148,9 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   const [timeFormat, setTimeFormatState] = useState<TimeFormat>(getTimeFormat);
   const [dateFormat, setDateFormatState] = useState<DateFormatPattern>(getDateFormat);
   const [labAttendanceRule, setLabAttendanceRuleState] = useState<LabAttendanceRule>(getLabAttendanceRule);
+  const [defaultSplitAttendance, setDefaultSplitAttendanceState] = useState<boolean>(getDefaultSplitAttendance);
+  const [syncingSplitCourses, setSyncingSplitCourses] = useState(false);
+  const [syncSplitSuccessMsg, setSyncSplitSuccessMsg] = useState<string | null>(null);
 
   // Default target threshold state
   const [defaultThreshold, setDefaultThreshold] = useState<number>(profile?.default_attendance_threshold || 75);
@@ -154,6 +160,30 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
     setLabAttendanceRule(rule);
     setLabAttendanceRuleState(rule);
     await syncAllCoursesAttendanceWeights(rule);
+  };
+
+  const handleDefaultSplitAttendanceChange = (split: boolean) => {
+    setDefaultSplitAttendance(split);
+    setDefaultSplitAttendanceState(split);
+  };
+
+  const handleApplySplitToAllCourses = async () => {
+    setSyncingSplitCourses(true);
+    try {
+      const count = await syncAllIntegratedCoursesSplitAttendance(defaultSplitAttendance);
+      setSyncSplitSuccessMsg(
+        count > 0
+          ? `Updated ${count} Theory + Lab subject${count === 1 ? '' : 's'}!`
+          : 'All Theory + Lab subjects are already in sync!'
+      );
+      setTimeout(() => setSyncSplitSuccessMsg(null), 3500);
+    } catch (err) {
+      console.error('Failed to sync theory + lab courses', err);
+      setSyncSplitSuccessMsg('Error updating subjects.');
+      setTimeout(() => setSyncSplitSuccessMsg(null), 3500);
+    } finally {
+      setSyncingSplitCourses(false);
+    }
   };
 
   // Notification status
@@ -593,6 +623,68 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
                     2-hr session = 1 point
                   </span>
                 </button>
+              </div>
+            </div>
+
+            {/* Universal Integrated Course Attendance (Theory + Lab) */}
+            <div className="pt-2.5 border-t border-gray-100 dark:border-gray-800 space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 block">
+                  📊 Integrated Subjects (Theory + Lab)
+                </label>
+                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-mono">
+                  {defaultSplitAttendance ? 'Track Separately' : 'Track in One'}
+                </span>
+              </div>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
+                Universal preference for courses with both Theory and Lab components:
+              </p>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleDefaultSplitAttendanceChange(true)}
+                  className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left flex flex-col justify-between min-h-[52px] ${
+                    defaultSplitAttendance
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  }`}
+                >
+                  <span className="font-bold">Track Separately</span>
+                  <span className={`text-[10px] font-normal ${defaultSplitAttendance ? 'text-indigo-100' : 'text-gray-400'}`}>
+                    Partition Theory & Lab %
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDefaultSplitAttendanceChange(false)}
+                  className={`p-2.5 rounded-xl text-xs font-bold border transition-all text-left flex flex-col justify-between min-h-[52px] ${
+                    !defaultSplitAttendance
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                  }`}
+                >
+                  <span className="font-bold">Combined in One</span>
+                  <span className={`text-[10px] font-normal ${!defaultSplitAttendance ? 'text-indigo-100' : 'text-gray-400'}`}>
+                    Single aggregate %
+                  </span>
+                </button>
+              </div>
+              <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={handleApplySplitToAllCourses}
+                  disabled={syncingSplitCourses}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncingSplitCourses ? 'animate-spin text-indigo-500' : ''}`} />
+                  Apply to all existing Theory + Lab subjects
+                </button>
+                {syncSplitSuccessMsg && (
+                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold animate-fade-in flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {syncSplitSuccessMsg}
+                  </span>
+                )}
               </div>
             </div>
 

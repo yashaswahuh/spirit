@@ -229,6 +229,18 @@ export interface Course extends BaseEntity {
   grade_band_override?: GradeScaleEntry[] | null; // Optional course-specific grade bands
   faculty?: string | null; // e.g. "Dr. Sharma" or "Prof. Rao"
   lab_attendance_rule?: LabAttendanceRule | null; // Optional course-level override for lab attendance counting
+  split_attendance?: boolean; // When true for theory_and_lab, track theory & lab attendance separately
+  lab_attendance_threshold_override?: number | null; // Custom threshold for lab (null uses course/term threshold)
+  initial_theory_attended?: number; // Opening balance: attended theory classes
+  initial_theory_conducted?: number; // Opening balance: conducted theory classes
+  initial_lab_attended?: number; // Opening balance: attended lab sessions
+  initial_lab_conducted?: number; // Opening balance: conducted lab sessions
+  min_theory_internal_marks?: number | null; // Min theory internal marks required
+  min_theory_end_sem_marks?: number | null; // Min theory end-sem marks required
+  theory_pass_marks?: number | null; // Theory passing mark %
+  min_lab_internal_marks?: number | null; // Min lab continuous/internal marks required
+  min_lab_end_sem_marks?: number | null; // Min lab practical/end-sem marks required
+  lab_pass_marks?: number | null; // Lab passing mark %
 }
 
 // ============================================================================
@@ -322,6 +334,7 @@ export interface AssessmentComponent extends BaseEntity {
   rule_params: AssessmentRuleParams | null; // Configuration for the rule
   is_end_sem: boolean; // Flag to identify end-sem component for separate passing rules
   min_pass_marks: number | null; // Separate minimum pass marks required in this component if any
+  component_type?: 'theory' | 'lab' | null; // Optional: tag whether this assessment is for theory or lab partition
 }
 
 // ============================================================================
@@ -377,6 +390,10 @@ export interface ComponentAttendanceStats {
   attended: number;
   conducted: number;
   percentage: number;
+  threshold?: number;
+  safe_bunks?: number;
+  must_attend?: number;
+  is_in_danger?: boolean;
 }
 
 export interface AttendanceStats {
@@ -389,6 +406,7 @@ export interface AttendanceStats {
   is_in_danger: boolean; // true if percentage < threshold
   theory?: ComponentAttendanceStats; // Breakdown for theory lectures
   lab?: ComponentAttendanceStats; // Breakdown for laboratory/practical sessions
+  split_attendance?: boolean; // Whether split attendance mode is active for this subject
 }
 
 export interface AttendanceProjection {

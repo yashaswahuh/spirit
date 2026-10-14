@@ -85,6 +85,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
         labAttendanceRule: c.lab_attendance_rule,
         globalLabRule: getLabAttendanceRule(),
         saturdayRule: activeTerm?.saturday_rule,
+        splitAttendance: c.split_attendance,
+        initialTheoryAttended: c.initial_theory_attended,
+        initialTheoryConducted: c.initial_theory_conducted,
+        initialLabAttended: c.initial_lab_attended,
+        initialLabConducted: c.initial_lab_conducted,
+        labThreshold: c.lab_attendance_threshold_override || undefined,
       }
     );
 

@@ -151,6 +151,72 @@ describe('Assessment Marks Engine', () => {
       expect(result.is_end_sem_eligible).toBe(false);
       expect(result.is_overall_passed).toBe(false);
     });
+
+    it('evaluates separate Theory and Lab passing and detention rules for integrated courses', () => {
+      // Zoology course with Lab + Theory
+      // Case 1: Theory attendance is safe (82% >= 75%), but Lab attendance is in danger (65% < 75%)
+      // Theory internal is passed (18 >= 15), Lab continuous internal failed (8 < 10)
+      const result = checkCourseEligibility({
+        attendancePercentage: 77.0, // overall combined looks OK
+        attendanceThreshold: 75.0,
+        splitAttendance: true,
+        theoryAttendancePercentage: 82.0,
+        theoryAttendanceThreshold: 75.0,
+        labAttendancePercentage: 65.0,
+        labAttendanceThreshold: 75.0,
+        // Passing rules
+        theoryInternalObtained: 18,
+        minTheoryInternalRequired: 15,
+        labInternalObtained: 8,
+        minLabInternalRequired: 10,
+        overallPercentage: 55,
+        passMark: 40,
+      });
+
+      // Attendance detention risk flagged because of Lab
+      expect(result.is_attendance_eligible).toBe(false);
+      expect(result.is_at_risk_of_detention).toBe(true);
+      expect(result.reasons.some(r => r.includes('Lab Detention Risk'))).toBe(true);
+
+      // Lab internal minimum failed
+      expect(result.is_internal_eligible).toBe(false);
+      expect(result.reasons.some(r => r.includes('Lab Continuous Internal'))).toBe(true);
+      expect(result.is_overall_passed).toBe(false);
+    });
+  });
+
+  describe('partitioned marks summary for integrated theory_and_lab courses', () => {
+    it('produces distinct theory and lab summaries without splitting the course', () => {
+      const components: EvaluatedComponent[] = [
+        // Theory components (60% total weight)
+        { id: 't_cat1', name: 'Theory CAT 1', max_marks: 50, obtained_marks: 40, weightage: 15, rule: 'normal', component_type: 'theory' }, // 80% -> 12 pts
+        { id: 't_cat2', name: 'Theory CAT 2', max_marks: 50, obtained_marks: 45, weightage: 15, rule: 'normal', component_type: 'theory' }, // 90% -> 13.5 pts
+        { id: 't_end', name: 'Theory End-Sem', max_marks: 100, obtained_marks: 70, weightage: 30, rule: 'normal', component_type: 'theory' }, // 70% -> 21 pts
+
+        // Lab components (40% total weight)
+        { id: 'l_cont', name: 'Lab Continuous Assessments', max_marks: 100, obtained_marks: 85, weightage: 20, rule: 'normal', component_type: 'lab' }, // 85% -> 17 pts
+        { id: 'l_end', name: 'Lab Practical End-Sem', max_marks: 50, obtained_marks: 40, weightage: 20, rule: 'normal', component_type: 'lab' }, // 80% -> 16 pts
+      ];
+
+      const summary = calculateCourseInternalMarks(components);
+
+      // Overall course summary
+      expect(summary.total_weightage_evaluated).toBe(100);
+      expect(summary.total_weighted_marks_obtained).toBe(12 + 13.5 + 21 + 17 + 16); // 79.5 marks
+      expect(summary.scaled_percentage).toBe(79.5);
+
+      // Theory partition summary
+      expect(summary.theory).toBeDefined();
+      expect(summary.theory?.total_weightage_evaluated).toBe(60);
+      expect(summary.theory?.total_weighted_marks_obtained).toBe(12 + 13.5 + 21); // 46.5 marks out of 60
+      expect(summary.theory?.scaled_percentage).toBeCloseTo((46.5 / 60) * 100, 1); // 77.5%
+
+      // Lab partition summary
+      expect(summary.lab).toBeDefined();
+      expect(summary.lab?.total_weightage_evaluated).toBe(40);
+      expect(summary.lab?.total_weighted_marks_obtained).toBe(17 + 16); // 33 marks out of 40
+      expect(summary.lab?.scaled_percentage).toBeCloseTo((33 / 40) * 100, 1); // 82.5%
+    });
   });
 });
 

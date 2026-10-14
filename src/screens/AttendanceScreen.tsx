@@ -98,6 +98,12 @@ export const AttendanceScreen: React.FC = () => {
         labAttendanceRule: course.lab_attendance_rule,
         globalLabRule: getLabAttendanceRule(),
         saturdayRule: activeTerm?.saturday_rule,
+        splitAttendance: course.split_attendance,
+        initialTheoryAttended: course.initial_theory_attended,
+        initialTheoryConducted: course.initial_theory_conducted,
+        initialLabAttended: course.initial_lab_attended,
+        initialLabConducted: course.initial_lab_conducted,
+        labThreshold: course.lab_attendance_threshold_override || undefined,
       }
     );
 
@@ -245,6 +251,12 @@ export const AttendanceScreen: React.FC = () => {
         labAttendanceRule: course.lab_attendance_rule,
         globalLabRule,
         saturdayRule: activeTerm?.saturday_rule,
+        splitAttendance: course.split_attendance,
+        initialTheoryAttended: course.initial_theory_attended,
+        initialTheoryConducted: course.initial_theory_conducted,
+        initialLabAttended: course.initial_lab_attended,
+        initialLabConducted: course.initial_lab_conducted,
+        labThreshold: course.lab_attendance_threshold_override || undefined,
       }
     );
 

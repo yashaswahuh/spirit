@@ -15,7 +15,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { db } from '../db/dexie';
-import { Course, GradeResult } from '../types';
+import { Course, GradeResult, AttendanceStats } from '../types';
 import { PageContainer } from '../components/layout/PageContainer';
 import { computeCourseAttendanceStats } from '../engine/attendance';
 import { getLabAttendanceRule } from '../utils/preferences';
@@ -74,7 +74,7 @@ export const GradesScreen: React.FC = () => {
   const defaultThreshold = currentTerm?.attendance_threshold || profile?.default_attendance_threshold || 75;
 
   // Compute attendance stats per course
-  const courseAttendanceMap = new Map<string, number>();
+  const courseAttendanceMap = new Map<string, AttendanceStats>();
   const courseChartStats = termCourses.map(c => {
     const records = attendanceRecords.filter(r => r.course_id === c.id);
     const stats = computeCourseAttendanceStats(
@@ -92,9 +92,15 @@ export const GradesScreen: React.FC = () => {
         labAttendanceRule: c.lab_attendance_rule,
         globalLabRule: getLabAttendanceRule(),
         saturdayRule: currentTerm?.saturday_rule,
+        splitAttendance: c.split_attendance,
+        initialTheoryAttended: c.initial_theory_attended,
+        initialTheoryConducted: c.initial_theory_conducted,
+        initialLabAttended: c.initial_lab_attended,
+        initialLabConducted: c.initial_lab_conducted,
+        labThreshold: c.lab_attendance_threshold_override || undefined,
       }
     );
-    courseAttendanceMap.set(c.id, stats.percentage);
+    courseAttendanceMap.set(c.id, stats);
     return {
       course: c,
       percentage: stats.percentage,
@@ -420,15 +426,29 @@ export const GradesScreen: React.FC = () => {
               const gradeResults = allGradeResults.filter(g => g.course_id === course.id);
               const latestResult = [...gradeResults].sort((a, b) => b.attempt_number - a.attempt_number)[0];
 
-              const attendancePct = courseAttendanceMap.get(course.id) ?? 100;
+              const courseStats = courseAttendanceMap.get(course.id);
+              const attendancePct = courseStats?.percentage ?? 100;
               const threshold = course.attendance_threshold_override || defaultThreshold;
-              const isDetentionRisk = attendancePct < threshold;
+              const isDetentionRisk = courseStats ? courseStats.is_in_danger : attendancePct < threshold;
 
               const marksSummary = calculateCourseMarks(components, marks);
               const endSemComp = components.find(c => c.is_end_sem);
               const endSemMark = endSemComp ? marks.find(m => m.component_id === endSemComp.id) : undefined;
               const endSemObt = endSemMark?.status === 'entered' ? endSemMark.obtained_marks : null;
               const internalObt = marksSummary.total_obtained_marks - (endSemObt || 0);
+
+              // Theory and Lab partitioned metrics for theory_and_lab courses
+              const theoryEndSemComp = components.find(c => c.is_end_sem && (c.component_type === 'theory' || !c.component_type));
+              const theoryEndSemMark = theoryEndSemComp ? marks.find(m => m.component_id === theoryEndSemComp.id) : undefined;
+              const theoryEndSemObt = theoryEndSemMark?.status === 'entered' ? theoryEndSemMark.obtained_marks : null;
+              const theoryInternalObt = marksSummary.theory ? marksSummary.theory.total_weighted_marks_obtained - (theoryEndSemObt || 0) : null;
+              const theoryPct = marksSummary.theory && marksSummary.theory.total_weightage_evaluated > 0 ? marksSummary.theory.scaled_percentage : null;
+
+              const labEndSemComp = components.find(c => c.is_end_sem && c.component_type === 'lab');
+              const labEndSemMark = labEndSemComp ? marks.find(m => m.component_id === labEndSemComp.id) : undefined;
+              const labEndSemObt = labEndSemMark?.status === 'entered' ? labEndSemMark.obtained_marks : null;
+              const labInternalObt = marksSummary.lab ? marksSummary.lab.total_weighted_marks_obtained - (labEndSemObt || 0) : null;
+              const labPct = marksSummary.lab && marksSummary.lab.total_weightage_evaluated > 0 ? marksSummary.lab.scaled_percentage : null;
 
               const eligibility = checkCourseEligibility({
                 attendancePercentage: attendancePct,
@@ -439,6 +459,24 @@ export const GradesScreen: React.FC = () => {
                 minEndSemRequired: course.min_end_sem_marks,
                 overallPercentage: marksSummary.total_max_marks > 0 ? (marksSummary.total_obtained_marks / marksSummary.total_max_marks) * 100 : null,
                 passMark: course.pass_marks ?? gradingScheme?.scheme_data?.pass_mark ?? 40,
+                // Separate theory & lab inputs
+                splitAttendance: course.split_attendance,
+                theoryAttendancePercentage: courseStats?.theory ? courseStats.theory.percentage : null,
+                theoryAttendanceThreshold: courseStats?.theory ? courseStats.theory.threshold : threshold,
+                labAttendancePercentage: courseStats?.lab ? courseStats.lab.percentage : null,
+                labAttendanceThreshold: courseStats?.lab ? courseStats.lab.threshold : (course.lab_attendance_threshold_override || threshold),
+                theoryInternalObtained: theoryInternalObt,
+                minTheoryInternalRequired: course.min_theory_internal_marks,
+                theoryEndSemObtained: theoryEndSemObt,
+                minTheoryEndSemRequired: course.min_theory_end_sem_marks,
+                theoryOverallPercentage: theoryPct,
+                theoryPassMark: course.theory_pass_marks,
+                labInternalObtained: labInternalObt,
+                minLabInternalRequired: course.min_lab_internal_marks,
+                labEndSemObtained: labEndSemObt,
+                minLabEndSemRequired: course.min_lab_end_sem_marks,
+                labOverallPercentage: labPct,
+                labPassMark: course.lab_pass_marks,
               });
 
               return (
@@ -501,14 +539,34 @@ export const GradesScreen: React.FC = () => {
                     {/* Eligibility & Attendance Warning Badges */}
                     <div className="flex flex-wrap gap-2">
                       {isDetentionRisk && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-[11px] font-bold text-amber-800 dark:text-amber-200">
+                        <span
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 text-[11px] font-bold text-amber-800 dark:text-amber-200"
+                          title={
+                            course.split_attendance && courseStats?.theory?.is_in_danger
+                              ? 'Theory attendance below required threshold'
+                              : course.split_attendance && courseStats?.lab?.is_in_danger
+                              ? 'Lab attendance below required threshold'
+                              : undefined
+                          }
+                        >
                           <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
-                          Attendance Low ({attendancePct.toFixed(1)}% &lt; {threshold}%)
+                          {course.type === 'theory_and_lab' && course.split_attendance && courseStats?.theory && courseStats?.lab ? (
+                            courseStats.theory.is_in_danger && courseStats.lab.is_in_danger
+                              ? 'Theory & Lab Attendance Low'
+                              : courseStats.theory.is_in_danger
+                              ? `Theory Attendance Low (${courseStats.theory.percentage.toFixed(0)}% < ${courseStats.theory.threshold}%)`
+                              : `Lab Attendance Low (${courseStats.lab.percentage.toFixed(0)}% < ${courseStats.lab.threshold}%)`
+                          ) : (
+                            `Attendance Low (${attendancePct.toFixed(1)}% < ${threshold}%)`
+                          )}
                         </span>
                       )}
 
                       {eligibility.reasons.length > 0 && (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-[11px] font-bold text-rose-800 dark:text-rose-200">
+                        <span
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-800 text-[11px] font-bold text-rose-800 dark:text-rose-200 cursor-help"
+                          title={eligibility.reasons.join(' • ')}
+                        >
                           <AlertCircle className="w-3.5 h-3.5 text-rose-600 flex-shrink-0" />
                           Cutoff Not Met
                         </span>
@@ -551,6 +609,22 @@ export const GradesScreen: React.FC = () => {
                             : 'No marks'}
                         </span>
                       </div>
+
+                      {/* Partitioned Theory & Lab Marks Breakdown if Integrated Course */}
+                      {course.type === 'theory_and_lab' && (marksSummary.theory || marksSummary.lab) && (
+                        <div className="pt-2 mt-2 border-t border-gray-200/60 dark:border-gray-700/60 grid grid-cols-2 gap-2 text-[10px]">
+                          <div className="p-1.5 rounded-lg bg-blue-50/70 dark:bg-blue-950/30 text-blue-900 dark:text-blue-300 font-medium">
+                            <span className="font-bold">📘 Theory:</span>{' '}
+                            {marksSummary.theory ? `${marksSummary.theory.total_obtained_marks.toFixed(1)}/${marksSummary.theory.total_max_marks.toFixed(1)}` : '0/0'}{' '}
+                            ({marksSummary.theory && marksSummary.theory.total_weightage_evaluated > 0 ? `${marksSummary.theory.scaled_percentage.toFixed(0)}%` : '0%'})
+                          </div>
+                          <div className="p-1.5 rounded-lg bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-300 font-medium">
+                            <span className="font-bold">🧪 Lab:</span>{' '}
+                            {marksSummary.lab ? `${marksSummary.lab.total_obtained_marks.toFixed(1)}/${marksSummary.lab.total_max_marks.toFixed(1)}` : '0/0'}{' '}
+                            ({marksSummary.lab && marksSummary.lab.total_weightage_evaluated > 0 ? `${marksSummary.lab.scaled_percentage.toFixed(0)}%` : '0%'})
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -635,7 +709,7 @@ export const GradesScreen: React.FC = () => {
             allComponents.some(c => c.course_id === finalGradeCourse.id && c.id === m.component_id)
           )}
           gradingScheme={gradingScheme}
-          currentAttendancePct={courseAttendanceMap.get(finalGradeCourse.id)}
+          currentAttendancePct={courseAttendanceMap.get(finalGradeCourse.id)?.percentage ?? null}
           onSaved={() => {}}
         />
       )}

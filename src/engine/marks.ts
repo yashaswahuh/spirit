@@ -17,6 +17,7 @@ export interface EvaluatedComponent {
   status?: 'entered' | 'absent' | 'not_held';
   is_end_sem?: boolean;
   min_pass_marks?: number | null;
+  component_type?: 'theory' | 'lab' | null;
 }
 
 export interface ComponentContribution {
@@ -29,6 +30,17 @@ export interface ComponentContribution {
   weighted_contribution: number; // contribution to final 100% course total
   is_dropped_or_excluded: boolean;
   status: 'entered' | 'absent' | 'not_held';
+  component_type?: 'theory' | 'lab' | null;
+}
+
+export interface PartitionMarksSummary {
+  total_max_marks: number;
+  total_obtained_marks: number;
+  total_weightage: number;
+  total_weightage_evaluated: number;
+  weighted_marks: number;
+  total_weighted_marks_obtained: number;
+  scaled_percentage: number;
 }
 
 export interface CourseMarksSummary {
@@ -36,6 +48,8 @@ export interface CourseMarksSummary {
   total_weighted_marks_obtained: number; // out of total_weightage_evaluated
   scaled_percentage: number; // out of 100% for the components evaluated
   components: ComponentContribution[];
+  theory?: PartitionMarksSummary;
+  lab?: PartitionMarksSummary;
 }
 
 /**
@@ -70,6 +84,7 @@ export function evaluateRuleGroup(
     weighted_contribution: 0,
     is_dropped_or_excluded: true,
     status: 'not_held',
+    component_type: item.component_type,
   }));
 
   if (heldItems.length === 0) {
@@ -111,6 +126,7 @@ export function evaluateRuleGroup(
         weighted_contribution: weightedContribution,
         is_dropped_or_excluded: !isSelected,
         status: s.item.status || 'entered',
+        component_type: s.item.component_type,
       };
     });
 
@@ -141,6 +157,7 @@ export function evaluateRuleGroup(
         weighted_contribution: weightedContribution,
         is_dropped_or_excluded: isDropped,
         status: s.item.status || 'entered',
+        component_type: s.item.component_type,
       };
     });
 
@@ -160,6 +177,7 @@ export function evaluateRuleGroup(
       weighted_contribution: weightedContribution,
       is_dropped_or_excluded: false,
       status: s.item.status || 'entered',
+      component_type: s.item.component_type,
     };
   });
 
@@ -201,6 +219,7 @@ export function calculateCourseInternalMarks(
         weighted_contribution: 0,
         is_dropped_or_excluded: true,
         status: 'not_held',
+        component_type: c.component_type,
       });
       continue;
     }
@@ -218,6 +237,7 @@ export function calculateCourseInternalMarks(
       weighted_contribution: contrib,
       is_dropped_or_excluded: false,
       status: c.status || 'entered',
+      component_type: c.component_type,
     });
   }
 
@@ -241,11 +261,62 @@ export function calculateCourseInternalMarks(
 
   const scaledPercentage = totalWeightage > 0 ? (totalWeightedMarks / totalWeightage) * 100 : 0.0;
 
+  // Compute separate Theory and Lab partition summaries if components have component_type
+  let theoryMax = 0, theoryObtained = 0, theoryWeight = 0, theoryWeightedMarks = 0;
+  let labMax = 0, labObtained = 0, labWeight = 0, labWeightedMarks = 0;
+  let hasTheory = false, hasLab = false;
+
+  for (const contrib of allContributions) {
+    if (contrib.component_type === 'theory') {
+      hasTheory = true;
+      if (!contrib.is_dropped_or_excluded) {
+        theoryWeight += contrib.weightage;
+        theoryWeightedMarks += contrib.weighted_contribution;
+      }
+      if (contrib.status !== 'not_held') {
+        theoryMax += contrib.max_marks;
+        theoryObtained += contrib.obtained_marks;
+      }
+    } else if (contrib.component_type === 'lab') {
+      hasLab = true;
+      if (!contrib.is_dropped_or_excluded) {
+        labWeight += contrib.weightage;
+        labWeightedMarks += contrib.weighted_contribution;
+      }
+      if (contrib.status !== 'not_held') {
+        labMax += contrib.max_marks;
+        labObtained += contrib.obtained_marks;
+      }
+    }
+  }
+
+  const theory: PartitionMarksSummary | undefined = hasTheory ? {
+    total_max_marks: theoryMax,
+    total_obtained_marks: theoryObtained,
+    total_weightage: theoryWeight,
+    total_weightage_evaluated: theoryWeight,
+    weighted_marks: theoryWeightedMarks,
+    total_weighted_marks_obtained: theoryWeightedMarks,
+    scaled_percentage: theoryWeight > 0 ? (theoryWeightedMarks / theoryWeight) * 100 : 0.0,
+  } : undefined;
+
+  const lab: PartitionMarksSummary | undefined = hasLab ? {
+    total_max_marks: labMax,
+    total_obtained_marks: labObtained,
+    total_weightage: labWeight,
+    total_weightage_evaluated: labWeight,
+    weighted_marks: labWeightedMarks,
+    total_weighted_marks_obtained: labWeightedMarks,
+    scaled_percentage: labWeight > 0 ? (labWeightedMarks / labWeight) * 100 : 0.0,
+  } : undefined;
+
   return {
     total_weightage_evaluated: totalWeightage,
     total_weighted_marks_obtained: totalWeightedMarks,
     scaled_percentage: scaledPercentage,
     components: allContributions,
+    theory,
+    lab,
   };
 }
 
@@ -306,6 +377,28 @@ export interface CourseEligibilityInput {
   minEndSemRequired?: number | null;
   overallPercentage?: number | null;
   passMark?: number | null;
+
+  // Split Theory & Lab Attendance
+  splitAttendance?: boolean;
+  theoryAttendancePercentage?: number | null;
+  theoryAttendanceThreshold?: number | null;
+  labAttendancePercentage?: number | null;
+  labAttendanceThreshold?: number | null;
+
+  // Partitioned Theory & Lab Marks Cutoffs
+  theoryInternalObtained?: number | null;
+  minTheoryInternalRequired?: number | null;
+  theoryEndSemObtained?: number | null;
+  minTheoryEndSemRequired?: number | null;
+  theoryOverallPercentage?: number | null;
+  theoryPassMark?: number | null;
+
+  labInternalObtained?: number | null;
+  minLabInternalRequired?: number | null;
+  labEndSemObtained?: number | null;
+  minLabEndSemRequired?: number | null;
+  labOverallPercentage?: number | null;
+  labPassMark?: number | null;
 }
 
 export interface CourseEligibilityResult {
@@ -319,10 +412,10 @@ export interface CourseEligibilityResult {
 
 /**
  * Validates course eligibility against institutional rules:
- * - Attendance threshold (risk of detention flag)
- * - Minimum internal marks required to be eligible for end-sem
- * - Separate minimum in the end-sem exam
- * - Overall pass mark
+ * - Attendance threshold (risk of detention flag), including separate Theory & Lab checks when split
+ * - Minimum internal marks required to be eligible for end-sem (Overall, Theory, and Lab)
+ * - Separate minimum in the end-sem exam (Overall, Theory, and Lab)
+ * - Overall pass mark & partition pass marks
  */
 export function checkCourseEligibility(
   input: CourseEligibilityInput
@@ -337,25 +430,84 @@ export function checkCourseEligibility(
     minEndSemRequired,
     overallPercentage,
     passMark = 40,
+    splitAttendance,
+    theoryAttendancePercentage,
+    theoryAttendanceThreshold,
+    labAttendancePercentage,
+    labAttendanceThreshold,
+    theoryInternalObtained,
+    minTheoryInternalRequired,
+    theoryEndSemObtained,
+    minTheoryEndSemRequired,
+    theoryOverallPercentage,
+    theoryPassMark,
+    labInternalObtained,
+    minLabInternalRequired,
+    labEndSemObtained,
+    minLabEndSemRequired,
+    labOverallPercentage,
+    labPassMark,
   } = input;
 
   // 1. Attendance eligibility
-  const isAttendanceEligible = attendancePercentage >= attendanceThreshold;
-  const isAtRiskOfDetention = !isAttendanceEligible;
-  if (isAtRiskOfDetention) {
-    reasons.push(`Attendance ${attendancePercentage.toFixed(1)}% is below required ${attendanceThreshold}% (Detention Risk)`);
+  let isAttendanceEligible = true;
+  if (splitAttendance) {
+    if (
+      theoryAttendancePercentage !== undefined &&
+      theoryAttendancePercentage !== null &&
+      theoryAttendanceThreshold !== undefined &&
+      theoryAttendanceThreshold !== null
+    ) {
+      if (theoryAttendancePercentage < theoryAttendanceThreshold) {
+        isAttendanceEligible = false;
+        reasons.push(
+          `Theory attendance ${theoryAttendancePercentage.toFixed(1)}% is below required ${theoryAttendanceThreshold}% (Theory Detention Risk)`
+        );
+      }
+    }
+    if (
+      labAttendancePercentage !== undefined &&
+      labAttendancePercentage !== null &&
+      labAttendanceThreshold !== undefined &&
+      labAttendanceThreshold !== null
+    ) {
+      if (labAttendancePercentage < labAttendanceThreshold) {
+        isAttendanceEligible = false;
+        reasons.push(
+          `Lab attendance ${labAttendancePercentage.toFixed(1)}% is below required ${labAttendanceThreshold}% (Lab Detention Risk)`
+        );
+      }
+    }
+  } else {
+    isAttendanceEligible = attendancePercentage >= attendanceThreshold;
+    if (!isAttendanceEligible) {
+      reasons.push(`Attendance ${attendancePercentage.toFixed(1)}% is below required ${attendanceThreshold}% (Detention Risk)`);
+    }
   }
+  const isAtRiskOfDetention = !isAttendanceEligible;
 
-  // 2. Minimum internal marks eligibility
+  // 2. Minimum internal marks eligibility (Overall, Theory, Lab)
   let isInternalEligible = true;
-  if (minInternalRequired !== undefined && minInternalRequired !== null && internalObtained !== undefined) {
+  if (minInternalRequired !== undefined && minInternalRequired !== null && internalObtained !== undefined && internalObtained !== null) {
     if (internalObtained < minInternalRequired) {
       isInternalEligible = false;
       reasons.push(`Internal score ${internalObtained} is below minimum requirement of ${minInternalRequired}`);
     }
   }
+  if (minTheoryInternalRequired !== undefined && minTheoryInternalRequired !== null && theoryInternalObtained !== undefined && theoryInternalObtained !== null) {
+    if (theoryInternalObtained < minTheoryInternalRequired) {
+      isInternalEligible = false;
+      reasons.push(`Theory Internal score ${theoryInternalObtained} is below minimum requirement of ${minTheoryInternalRequired}`);
+    }
+  }
+  if (minLabInternalRequired !== undefined && minLabInternalRequired !== null && labInternalObtained !== undefined && labInternalObtained !== null) {
+    if (labInternalObtained < minLabInternalRequired) {
+      isInternalEligible = false;
+      reasons.push(`Lab Continuous Internal score ${labInternalObtained} is below minimum requirement of ${minLabInternalRequired}`);
+    }
+  }
 
-  // 3. Separate end-sem minimum eligibility
+  // 3. Separate end-sem minimum eligibility (Overall, Theory, Lab)
   let isEndSemEligible = true;
   if (minEndSemRequired !== undefined && minEndSemRequired !== null && endSemObtained !== undefined && endSemObtained !== null) {
     if (endSemObtained < minEndSemRequired) {
@@ -363,13 +515,37 @@ export function checkCourseEligibility(
       reasons.push(`End-sem score ${endSemObtained} is below minimum requirement of ${minEndSemRequired}`);
     }
   }
+  if (minTheoryEndSemRequired !== undefined && minTheoryEndSemRequired !== null && theoryEndSemObtained !== undefined && theoryEndSemObtained !== null) {
+    if (theoryEndSemObtained < minTheoryEndSemRequired) {
+      isEndSemEligible = false;
+      reasons.push(`Theory End-Sem score ${theoryEndSemObtained} is below minimum requirement of ${minTheoryEndSemRequired}`);
+    }
+  }
+  if (minLabEndSemRequired !== undefined && minLabEndSemRequired !== null && labEndSemObtained !== undefined && labEndSemObtained !== null) {
+    if (labEndSemObtained < minLabEndSemRequired) {
+      isEndSemEligible = false;
+      reasons.push(`Lab Practical End-Sem score ${labEndSemObtained} is below minimum requirement of ${minLabEndSemRequired}`);
+    }
+  }
 
-  // 4. Overall passing
+  // 4. Overall & partition passing cutoffs
   let isOverallPassed = true;
   if (overallPercentage !== undefined && overallPercentage !== null && passMark !== null && passMark !== undefined) {
     if (overallPercentage < passMark) {
       isOverallPassed = false;
       reasons.push(`Overall percentage ${overallPercentage.toFixed(1)}% is below pass mark ${passMark}%`);
+    }
+  }
+  if (theoryOverallPercentage !== undefined && theoryOverallPercentage !== null && theoryPassMark !== null && theoryPassMark !== undefined) {
+    if (theoryOverallPercentage < theoryPassMark) {
+      isOverallPassed = false;
+      reasons.push(`Theory score ${theoryOverallPercentage.toFixed(1)}% is below theory pass mark ${theoryPassMark}%`);
+    }
+  }
+  if (labOverallPercentage !== undefined && labOverallPercentage !== null && labPassMark !== null && labPassMark !== undefined) {
+    if (labOverallPercentage < labPassMark) {
+      isOverallPassed = false;
+      reasons.push(`Lab score ${labOverallPercentage.toFixed(1)}% is below lab pass mark ${labPassMark}%`);
     }
   }
 
@@ -401,6 +577,7 @@ export function calculateCourseMarks(
     rule_params?: AssessmentRuleParams | null;
     is_end_sem?: boolean;
     min_pass_marks?: number | null;
+    component_type?: 'theory' | 'lab' | null;
   }>,
   marks: Array<{
     component_id: string;
@@ -422,6 +599,7 @@ export function calculateCourseMarks(
       status: mark?.status || 'not_held',
       is_end_sem: c.is_end_sem,
       min_pass_marks: c.min_pass_marks,
+      component_type: c.component_type,
     };
   });
 

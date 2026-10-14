@@ -141,71 +141,255 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
         </div>
       </div>
 
-      {/* Percentage & Status Banner (Never color alone: icon + text + color) */}
-      <div className="mt-3 flex items-baseline justify-between">
-        <div>
-          <span className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
-            {pctDisplay}
-          </span>
-          <span className="text-xs text-gray-400 dark:text-gray-500 ml-1.5 font-medium">
-            (Target: {stats.threshold}%)
-          </span>
-        </div>
-
-        {/* Status Badge */}
-        {stats.conducted === 0 ? (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            Not Started
-          </span>
-        ) : isSafe ? (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-            Safe
-          </span>
-        ) : (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
-            <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
-            In Danger
-          </span>
-        )}
-      </div>
-
-      {/* Progress Bar */}
-      <div className="w-full bg-gray-100 dark:bg-gray-800 h-2.5 rounded-full overflow-hidden mt-3">
-        <div
-          className={`h-full rounded-full transition-all duration-300 ${
-            stats.conducted === 0
-              ? 'bg-gray-300 dark:bg-gray-700'
-              : isSafe
-              ? 'bg-emerald-500'
-              : 'bg-rose-500'
-          }`}
-          style={{ width: `${Math.min(100, Math.max(0, stats.percentage))}%` }}
-        />
-      </div>
-
-      {/* Bunk / Must-Attend Insight Strip */}
-      <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-gray-800/80 flex items-center justify-between text-xs">
-        <span className="text-gray-500 dark:text-gray-400 font-medium">
-          {stats.attended} of {stats.conducted} attended
-          {course.initial_conducted ? (
-            <span className="text-[10px] text-gray-400 block font-mono">
-              (Includes {course.initial_attended}/{course.initial_conducted} portal balance)
+      {/* Percentage & Status Banner */}
+      {course.type === 'theory_and_lab' && course.split_attendance && stats.theory && stats.lab ? (
+        <div className="mt-3 space-y-2.5">
+          {/* Combined Top Header Badge */}
+          <div className="flex items-center justify-between text-xs px-0.5">
+            <span className="font-semibold text-gray-500 dark:text-gray-400">
+              Combined: <strong className="text-gray-900 dark:text-white font-mono">{pctDisplay}</strong> ({stats.attended}/{stats.conducted})
             </span>
-          ) : null}
-        </span>
+            {stats.conducted === 0 ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+                Not Started
+              </span>
+            ) : isSafe ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                Both Safe
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                <AlertTriangle className="w-3 h-3 text-rose-600 dark:text-rose-400" />
+                {stats.theory.is_in_danger && stats.lab.is_in_danger
+                  ? 'Both In Danger'
+                  : stats.theory.is_in_danger
+                  ? 'Theory In Danger'
+                  : 'Lab In Danger'}
+              </span>
+            )}
+          </div>
 
-        {isSafe ? (
-          <span className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
-            Can skip: <strong className="text-sm font-bold">{stats.safe_bunks}</strong> {stats.safe_bunks === 1 ? 'class' : 'classes'}
-          </span>
-        ) : (
-          <span className="font-semibold text-rose-700 dark:text-rose-400 flex items-center gap-1">
-            Must attend: <strong className="text-sm font-bold">{stats.must_attend === Infinity ? 'Unattainable' : stats.must_attend}</strong> {stats.must_attend === 1 ? 'class' : 'classes'}
-          </span>
-        )}
-      </div>
+          {/* Partitioned Theory & Lab Sub-Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {/* Theory Partition Card */}
+            <div
+              onClick={() => setSelectedComponent('theory')}
+              className={`p-3 rounded-2xl border transition-all cursor-pointer ${
+                selectedComponent === 'theory'
+                  ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-300 dark:border-blue-700 ring-1 ring-blue-400/50'
+                  : 'bg-gray-50/70 dark:bg-gray-800/50 border-gray-100 dark:border-gray-800 hover:border-gray-200'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1">
+                  📘 Theory
+                </span>
+                {stats.theory.conducted === 0 ? (
+                  <span className="text-[10px] text-gray-400 font-medium">Not started</span>
+                ) : !stats.theory.is_in_danger ? (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="w-2.5 h-2.5" /> Safe
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-rose-600 dark:text-rose-400">
+                    <AlertTriangle className="w-2.5 h-2.5" /> Danger
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-1 flex items-baseline justify-between">
+                <span className="text-xl font-black text-gray-900 dark:text-white tracking-tight">
+                  {stats.theory.conducted > 0 ? `${stats.theory.percentage.toFixed(1)}%` : '—'}
+                </span>
+                <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                  Target: {stats.theory.threshold}%
+                </span>
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full bg-gray-200 dark:bg-gray-700 h-1.5 rounded-full overflow-hidden mt-1.5">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${
+                    stats.theory.conducted === 0
+                      ? 'bg-gray-300'
+                      : !stats.theory.is_in_danger
+                      ? 'bg-blue-500'
+                      : 'bg-rose-500'
+                  }`}
+                  style={{ width: `${Math.min(100, Math.max(0, stats.theory.percentage))}%` }}
+                />
+              </div>
+
+              <div className="mt-2 flex items-center justify-between text-[11px]">
+                <span className="text-gray-500 dark:text-gray-400 font-mono text-[10px]">
+                  {stats.theory.attended}/{stats.theory.conducted}
+                </span>
+                {!stats.theory.is_in_danger ? (
+                  <span className="font-semibold text-emerald-700 dark:text-emerald-400 text-[10px]">
+                    Can skip: <strong>{stats.theory.safe_bunks}</strong>
+                  </span>
+                ) : (
+                  <span className="font-semibold text-rose-700 dark:text-rose-400 text-[10px]">
+                    Must attend: <strong>{stats.theory.must_attend === Infinity ? '∞' : stats.theory.must_attend}</strong>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Lab Partition Card */}
+            <div
+              onClick={() => setSelectedComponent('lab')}
+              className={`p-3 rounded-2xl border transition-all cursor-pointer ${
+                selectedComponent === 'lab'
+                  ? 'bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-700 ring-1 ring-emerald-400/50'
+                  : 'bg-gray-50/70 dark:bg-gray-800/50 border-gray-100 dark:border-gray-800 hover:border-gray-200'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1">
+                  🧪 Lab
+                </span>
+                {stats.lab.conducted === 0 ? (
+                  <span className="text-[10px] text-gray-400 font-medium">Not started</span>
+                ) : !stats.lab.is_in_danger ? (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="w-2.5 h-2.5" /> Safe
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-rose-600 dark:text-rose-400">
+                    <AlertTriangle className="w-2.5 h-2.5" /> Danger
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-1 flex items-baseline justify-between">
+                <span className="text-xl font-black text-gray-900 dark:text-white tracking-tight">
+                  {stats.lab.conducted > 0 ? `${stats.lab.percentage.toFixed(1)}%` : '—'}
+                </span>
+                <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                  Target: {stats.lab.threshold}%
+                </span>
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full bg-gray-200 dark:bg-gray-700 h-1.5 rounded-full overflow-hidden mt-1.5">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${
+                    stats.lab.conducted === 0
+                      ? 'bg-gray-300'
+                      : !stats.lab.is_in_danger
+                      ? 'bg-emerald-500'
+                      : 'bg-rose-500'
+                  }`}
+                  style={{ width: `${Math.min(100, Math.max(0, stats.lab.percentage))}%` }}
+                />
+              </div>
+
+              <div className="mt-2 flex items-center justify-between text-[11px]">
+                <span className="text-gray-500 dark:text-gray-400 font-mono text-[10px]">
+                  {stats.lab.attended}/{stats.lab.conducted}
+                </span>
+                {!stats.lab.is_in_danger ? (
+                  <span className="font-semibold text-emerald-700 dark:text-emerald-400 text-[10px]">
+                    Can skip: <strong>{stats.lab.safe_bunks}</strong>
+                  </span>
+                ) : (
+                  <span className="font-semibold text-rose-700 dark:text-rose-400 text-[10px]">
+                    Must attend: <strong>{stats.lab.must_attend === Infinity ? '∞' : stats.lab.must_attend}</strong>
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="mt-3 flex items-baseline justify-between">
+            <div>
+              <span className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+                {pctDisplay}
+              </span>
+              <span className="text-xs text-gray-400 dark:text-gray-500 ml-1.5 font-medium">
+                (Target: {stats.threshold}%)
+              </span>
+            </div>
+
+            {/* Status Badge */}
+            {stats.conducted === 0 ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Not Started
+              </span>
+            ) : isSafe ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                Safe
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                In Danger
+              </span>
+            )}
+          </div>
+
+          {/* Progress Bar */}
+          <div className="w-full bg-gray-100 dark:bg-gray-800 h-2.5 rounded-full overflow-hidden mt-3">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ${
+                stats.conducted === 0
+                  ? 'bg-gray-300 dark:bg-gray-700'
+                  : isSafe
+                  ? 'bg-emerald-500'
+                  : 'bg-rose-500'
+              }`}
+              style={{ width: `${Math.min(100, Math.max(0, stats.percentage))}%` }}
+            />
+          </div>
+
+          {/* Bunk / Must-Attend Insight Strip */}
+          <div className="mt-3 pt-2.5 border-t border-gray-100 dark:border-gray-800/80 flex items-center justify-between text-xs">
+            <span className="text-gray-500 dark:text-gray-400 font-medium">
+              {stats.attended} of {stats.conducted} attended
+              {course.initial_conducted ? (
+                <span className="text-[10px] text-gray-400 block font-mono">
+                  (Includes {course.initial_attended}/{course.initial_conducted} portal balance)
+                </span>
+              ) : null}
+            </span>
+
+            {isSafe ? (
+              <span className="font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                Can skip: <strong className="text-sm font-bold">{stats.safe_bunks}</strong> {stats.safe_bunks === 1 ? 'class' : 'classes'}
+              </span>
+            ) : (
+              <span className="font-semibold text-rose-700 dark:text-rose-400 flex items-center gap-1">
+                Must attend: <strong className="text-sm font-bold">{stats.must_attend === Infinity ? 'Unattainable' : stats.must_attend}</strong> {stats.must_attend === 1 ? 'class' : 'classes'}
+              </span>
+            )}
+          </div>
+
+          {/* Theory vs Practical Breakdown if Integrated Course and not split */}
+          {course.type === 'theory_and_lab' && stats.theory && stats.lab && (stats.theory.conducted > 0 || stats.lab.conducted > 0) && (
+            <div className="mt-2.5 p-2 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 flex items-center justify-between text-[11px]">
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-gray-700 dark:text-gray-300">📘 Theory:</span>
+                <span className="font-mono text-gray-900 dark:text-gray-100 font-semibold">
+                  {stats.theory.attended}/{stats.theory.conducted} ({stats.theory.percentage.toFixed(0)}%)
+                </span>
+              </div>
+              <span className="text-gray-300 dark:text-gray-600 font-bold">•</span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-bold text-gray-700 dark:text-gray-300">🧪 Lab:</span>
+                <span className="font-mono text-gray-900 dark:text-gray-100 font-semibold">
+                  {stats.lab.attended}/{stats.lab.conducted} ({stats.lab.percentage.toFixed(0)}%)
+                </span>
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
       {/* Semester Projection Strip */}
       {projection && projection.remainingClasses > 0 && (
@@ -216,25 +400,6 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
           <span className="font-mono font-bold text-gray-700 dark:text-gray-200">
             Best: <span className="text-emerald-600 dark:text-emerald-400">{projection.bestCase.toFixed(1)}%</span> | Worst: <span className="text-rose-600 dark:text-rose-400">{projection.worstCase.toFixed(1)}%</span>
           </span>
-        </div>
-      )}
-
-      {/* Theory vs Practical Breakdown if Integrated Course */}
-      {course.type === 'theory_and_lab' && stats.theory && stats.lab && (stats.theory.conducted > 0 || stats.lab.conducted > 0) && (
-        <div className="mt-2.5 p-2 rounded-xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 flex items-center justify-between text-[11px]">
-          <div className="flex items-center gap-1.5">
-            <span className="font-bold text-gray-700 dark:text-gray-300">📘 Theory:</span>
-            <span className="font-mono text-gray-900 dark:text-gray-100 font-semibold">
-              {stats.theory.attended}/{stats.theory.conducted} ({stats.theory.percentage.toFixed(0)}%)
-            </span>
-          </div>
-          <span className="text-gray-300 dark:text-gray-600 font-bold">•</span>
-          <div className="flex items-center gap-1.5">
-            <span className="font-bold text-gray-700 dark:text-gray-300">🧪 Lab:</span>
-            <span className="font-mono text-gray-900 dark:text-gray-100 font-semibold">
-              {stats.lab.attended}/{stats.lab.conducted} ({stats.lab.percentage.toFixed(0)}%)
-            </span>
-          </div>
         </div>
       )}
 
@@ -271,20 +436,47 @@ export const CourseAttendanceCard: React.FC<CourseAttendanceCardProps> = ({
         <div className="mt-2.5 px-3 py-1.5 rounded-xl bg-gray-50 dark:bg-gray-800/80 border border-gray-100 dark:border-gray-800 flex items-center justify-between text-xs animate-fade-in">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">Marked today:</span>
-            {todayRecords.filter(r => r.status === 'present').length > 0 && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 font-bold text-[10px]">
-                +{todayRecords.filter(r => r.status === 'present').length} Present
-              </span>
-            )}
-            {todayRecords.filter(r => r.status === 'absent').length > 0 && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 font-bold text-[10px]">
-                +{todayRecords.filter(r => r.status === 'absent').length} Missed
-              </span>
-            )}
-            {todayRecords.filter(r => r.status === 'cancelled').length > 0 && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 font-bold text-[10px]">
-                {todayRecords.filter(r => r.status === 'cancelled').length} Cancelled
-              </span>
+            {course.split_attendance && isIntegrated ? (
+              <>
+                {todayRecords.filter(r => (r.component_type === 'theory' || !r.component_type) && r.status === 'present').length > 0 && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950/70 text-blue-800 dark:text-blue-300 font-bold text-[10px]">
+                    📘 +{todayRecords.filter(r => (r.component_type === 'theory' || !r.component_type) && r.status === 'present').length} Theory
+                  </span>
+                )}
+                {todayRecords.filter(r => r.component_type === 'lab' && r.status === 'present').length > 0 && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 font-bold text-[10px]">
+                    🧪 +{todayRecords.filter(r => r.component_type === 'lab' && r.status === 'present').length} Lab
+                  </span>
+                )}
+                {todayRecords.filter(r => r.status === 'absent').length > 0 && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 font-bold text-[10px]">
+                    +{todayRecords.filter(r => r.status === 'absent').length} Missed
+                  </span>
+                )}
+                {todayRecords.filter(r => r.status === 'cancelled').length > 0 && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 font-bold text-[10px]">
+                    {todayRecords.filter(r => r.status === 'cancelled').length} Cancelled
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                {todayRecords.filter(r => r.status === 'present').length > 0 && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-300 font-bold text-[10px]">
+                    +{todayRecords.filter(r => r.status === 'present').length} Present
+                  </span>
+                )}
+                {todayRecords.filter(r => r.status === 'absent').length > 0 && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-rose-100 dark:bg-rose-950/70 text-rose-800 dark:text-rose-300 font-bold text-[10px]">
+                    +{todayRecords.filter(r => r.status === 'absent').length} Missed
+                  </span>
+                )}
+                {todayRecords.filter(r => r.status === 'cancelled').length > 0 && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/70 text-amber-800 dark:text-amber-300 font-bold text-[10px]">
+                    {todayRecords.filter(r => r.status === 'cancelled').length} Cancelled
+                  </span>
+                )}
+              </>
             )}
           </div>
           {onUndo && (

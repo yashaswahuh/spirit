@@ -25,19 +25,32 @@ export interface AssessmentTemplateDef {
     rule_params?: { n?: number; count?: number } | null;
     is_end_sem: boolean;
     min_pass_marks?: number | null;
+    component_type?: 'theory' | 'lab' | null;
   }>;
 }
 
 export const ASSESSMENT_TEMPLATES: AssessmentTemplateDef[] = [
   {
+    key: 'integrated_theory_lab_60_40',
+    name: 'Integrated Theory + Lab (60/40 Split)',
+    description: 'Theory Mid-Sems & Assignments (25%) + Theory End-Sem (35%) + Lab Continuous (20%) + Lab Practical (20%)',
+    components: [
+      { name: 'Theory Mid-Sem Exam', max_marks: 50, weightage: 15, rule: 'normal', is_end_sem: false, component_type: 'theory' },
+      { name: 'Theory Assignments', max_marks: 50, weightage: 10, rule: 'normal', is_end_sem: false, component_type: 'theory' },
+      { name: 'Theory End-Sem Exam', max_marks: 100, weightage: 35, rule: 'normal', is_end_sem: true, min_pass_marks: 35, component_type: 'theory' },
+      { name: 'Lab Continuous Evaluation & Record', max_marks: 50, weightage: 20, rule: 'normal', is_end_sem: false, component_type: 'lab' },
+      { name: 'Lab Practical Exam & Viva', max_marks: 50, weightage: 20, rule: 'normal', is_end_sem: true, min_pass_marks: 20, component_type: 'lab' },
+    ],
+  },
+  {
     key: 'standard_40_60',
     name: 'Standard 40/60 Split',
     description: '2 Mid-Sems (15% each) + Assignments (10%) + End-Sem (60%)',
     components: [
-      { name: 'Mid-Sem Exam 1', max_marks: 50, weightage: 15, rule: 'normal', is_end_sem: false },
-      { name: 'Mid-Sem Exam 2', max_marks: 50, weightage: 15, rule: 'normal', is_end_sem: false },
-      { name: 'Continuous Assignments', max_marks: 50, weightage: 10, rule: 'normal', is_end_sem: false },
-      { name: 'End-Sem Exam', max_marks: 100, weightage: 60, rule: 'normal', is_end_sem: true, min_pass_marks: 35 },
+      { name: 'Mid-Sem Exam 1', max_marks: 50, weightage: 15, rule: 'normal', is_end_sem: false, component_type: 'theory' },
+      { name: 'Mid-Sem Exam 2', max_marks: 50, weightage: 15, rule: 'normal', is_end_sem: false, component_type: 'theory' },
+      { name: 'Continuous Assignments', max_marks: 50, weightage: 10, rule: 'normal', is_end_sem: false, component_type: 'theory' },
+      { name: 'End-Sem Exam', max_marks: 100, weightage: 60, rule: 'normal', is_end_sem: true, min_pass_marks: 35, component_type: 'theory' },
     ],
   },
   {
@@ -154,6 +167,7 @@ export async function applyAssessmentTemplate(
       rule_params: item.rule_params || null,
       is_end_sem: item.is_end_sem,
       min_pass_marks: item.min_pass_marks || null,
+      component_type: item.component_type || null,
     });
   }
 }
