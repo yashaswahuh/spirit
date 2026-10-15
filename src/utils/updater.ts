@@ -226,11 +226,26 @@ export async function checkForLiveUpdate(options?: {
           }
         }
 
-        downloaded = await CapacitorUpdater.download({
-          url: bundleUrl,
-          version: remoteSiteVersion,
-          ...(checksum ? { checksum } : {}),
-        });
+        try {
+          downloaded = await CapacitorUpdater.download({
+            url: bundleUrl,
+            version: remoteSiteVersion,
+            ...(checksum ? { checksum } : {}),
+          });
+        } catch (downloadErr: any) {
+          const errMsg = String(downloadErr?.message || downloadErr || '').toLowerCase();
+          if (checksum && errMsg.includes('checksum')) {
+            if (!options?.silent) {
+              console.warn(`Checksum mismatch for ${bundleUrl}, retrying without checksum constraint...`);
+            }
+            downloaded = await CapacitorUpdater.download({
+              url: bundleUrl,
+              version: remoteSiteVersion,
+            });
+          } else {
+            throw downloadErr;
+          }
+        }
 
         if (downloaded) {
           break;
