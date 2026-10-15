@@ -12,8 +12,15 @@ export {
   CURRENT_BUILD_NUMBER,
 };
 
-export const UPDATE_MANIFEST_URL = 'https://yashaswahuh.is-a.dev/spirit/version.json';
-export const FALLBACK_MANIFEST_URL = 'https://yashaswahuh.github.io/spirit/version.json';
+export const MANIFEST_CANDIDATE_URLS = [
+  'https://raw.githubusercontent.com/yashaswahuh/spirit/main/public/version.json',
+  'https://raw.githubusercontent.com/yashaswahuh/spirit/phase-6/public/version.json',
+  'https://yashaswahuh.is-a.dev/spirit/version.json',
+  'https://raw.githubusercontent.com/yashaswahuh/spirit/main/dist/version.json',
+];
+
+export const UPDATE_MANIFEST_URL = MANIFEST_CANDIDATE_URLS[0];
+export const FALLBACK_MANIFEST_URL = 'https://yashaswahuh.is-a.dev/spirit/version.json';
 
 export interface VersionManifest {
   version: string;
@@ -22,6 +29,7 @@ export interface VersionManifest {
   build: number;
   bundleUrl: string;
   fallbackBundleUrl?: string;
+  fallbackUrls?: string[];
   checksum?: string;
   releaseNotes?: string;
   minNativeVersion?: string;
@@ -105,8 +113,7 @@ export async function initAppUpdater(): Promise<void> {
 
 /**
  * Checks for an updated version manifest and downloads the bundle.
- * Tries the custom domain https://yashaswahuh.is-a.dev/spirit/ first,
- * falling back to GitHub Pages if needed.
+ * Queries resilient raw GitHub CDN endpoints and fallback mirrors.
  */
 export async function checkForLiveUpdate(options?: {
   silent?: boolean;
@@ -123,14 +130,25 @@ export async function checkForLiveUpdate(options?: {
   }
 
   try {
-    let manifest: VersionManifest;
-    try {
-      manifest = await fetchManifestJson(UPDATE_MANIFEST_URL);
-    } catch (primaryErr) {
-      if (!options?.silent) {
-        console.warn('Primary manifest check failed, trying fallback:', primaryErr);
+    let manifest: VersionManifest | null = null;
+    let lastManifestError: any = null;
+
+    for (const manifestUrl of MANIFEST_CANDIDATE_URLS) {
+      try {
+        manifest = await fetchManifestJson(manifestUrl);
+        if (manifest && (manifest.siteVersion || manifest.version)) {
+          break;
+        }
+      } catch (err: any) {
+        lastManifestError = err;
+        if (!options?.silent) {
+          console.warn(`Manifest check failed for ${manifestUrl}:`, err?.message || err);
+        }
       }
-      manifest = await fetchManifestJson(FALLBACK_MANIFEST_URL);
+    }
+
+    if (!manifest) {
+      throw lastManifestError || new Error('Unable to reach update manifest across all endpoints');
     }
 
     // Check if remote site version is newer or has a higher build number
@@ -150,30 +168,83 @@ export async function checkForLiveUpdate(options?: {
       };
     }
 
-    // Download the new web bundle in the background with automatic dual-domain fallback
-    let downloaded: BundleInfo;
-    try {
-      downloaded = await CapacitorUpdater.download({
-        url: manifest.bundleUrl,
-        version: remoteSiteVersion,
-        checksum: manifest.checksum,
-      });
-    } catch (primaryErr) {
-      const fallbackUrl =
-        manifest.fallbackBundleUrl ||
-        manifest.bundleUrl.replace('yashaswahuh.is-a.dev', 'yashaswahuh.github.io');
-      if (fallbackUrl && fallbackUrl !== manifest.bundleUrl) {
-        if (!options?.silent) {
-          console.warn('Primary bundle download failed, falling back to backup domain:', fallbackUrl, primaryErr);
-        }
-        downloaded = await CapacitorUpdater.download({
-          url: fallbackUrl,
-          version: remoteSiteVersion,
-          checksum: manifest.checksum,
-        });
-      } else {
-        throw primaryErr;
+    // Sanitize URLs to completely prevent HTTPS-to-HTTP redirects
+    const sanitizeBundleUrl = (u: string): string => {
+      let clean = u.trim();
+      if (clean.includes('yashaswahuh.github.io/spirit')) {
+        clean = clean.replace(
+          'https://yashaswahuh.github.io/spirit',
+          'https://raw.githubusercontent.com/yashaswahuh/spirit/main/public'
+        ).replace(
+          'http://yashaswahuh.github.io/spirit',
+          'https://raw.githubusercontent.com/yashaswahuh/spirit/main/public'
+        );
       }
+      if (clean.startsWith('http://')) {
+        clean = clean.replace(/^http:\/\//, 'https://');
+      }
+      return clean;
+    };
+
+    const bundleCandidates: string[] = [];
+    if (manifest.bundleUrl) bundleCandidates.push(sanitizeBundleUrl(manifest.bundleUrl));
+    if (manifest.fallbackBundleUrl) bundleCandidates.push(sanitizeBundleUrl(manifest.fallbackBundleUrl));
+    if (Array.isArray(manifest.fallbackUrls)) {
+      for (const u of manifest.fallbackUrls) {
+        if (typeof u === 'string') bundleCandidates.push(sanitizeBundleUrl(u));
+      }
+    }
+    bundleCandidates.push('https://raw.githubusercontent.com/yashaswahuh/spirit/main/public/dist-ota.zip');
+    bundleCandidates.push('https://raw.githubusercontent.com/yashaswahuh/spirit/phase-6/public/dist-ota.zip');
+    bundleCandidates.push('https://yashaswahuh.is-a.dev/spirit/dist-ota.zip');
+
+    // Deduplicate and filter out any redirecting domains
+    const uniqueCandidates = Array.from(new Set(bundleCandidates)).filter(
+      u => u && !u.includes('github.io/spirit')
+    );
+
+    let downloaded: BundleInfo | null = null;
+    let lastDownloadError: any = null;
+
+    for (const bundleUrl of uniqueCandidates) {
+      try {
+        let checksum = manifest.checksum?.trim() || '';
+
+        // If manifest doesn't supply a checksum, dynamically compute SHA-256 before download
+        if (!checksum && typeof crypto !== 'undefined' && crypto.subtle) {
+          try {
+            const zipRes = await fetch(bundleUrl, { cache: 'no-store' });
+            if (zipRes.ok) {
+              const buf = await zipRes.arrayBuffer();
+              const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+              checksum = Array.from(new Uint8Array(hashBuf))
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('');
+            }
+          } catch (calcErr) {
+            console.warn('Checksum calculation failed:', calcErr);
+          }
+        }
+
+        downloaded = await CapacitorUpdater.download({
+          url: bundleUrl,
+          version: remoteSiteVersion,
+          ...(checksum ? { checksum } : {}),
+        });
+
+        if (downloaded) {
+          break;
+        }
+      } catch (err: any) {
+        lastDownloadError = err;
+        if (!options?.silent) {
+          console.warn(`Bundle download failed from ${bundleUrl}:`, err?.message || err);
+        }
+      }
+    }
+
+    if (!downloaded) {
+      throw lastDownloadError || new Error('Failed to download update bundle from all mirrors');
     }
 
     // Mark the bundle to be activated on the next background / app restart
