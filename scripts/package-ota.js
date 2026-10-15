@@ -82,6 +82,29 @@ export const CURRENT_BUILD_NUMBER = ${newBuild};
 fs.writeFileSync(versionFilePath, versionTsContent, 'utf-8');
 console.log(`Updated version configuration in src/version.ts and package.json.`);
 
+const publicDir = path.join(rootDir, 'public');
+const publicZipPath = path.join(publicDir, 'dist-ota.zip');
+const publicManifestPath = path.join(publicDir, 'version.json');
+
+// In CI environment: preserve the committed public bundle and checksum if already matching newSiteVersion
+if (process.env.CI && fs.existsSync(publicZipPath) && fs.existsSync(publicManifestPath)) {
+  try {
+    const existingManifest = JSON.parse(fs.readFileSync(publicManifestPath, 'utf-8'));
+    if (existingManifest.version === newSiteVersion || existingManifest.siteVersion === newSiteVersion) {
+      console.log(`[CI] Using existing pre-packaged OTA bundle and manifest from public/ (checksum: ${existingManifest.checksum})`);
+      if (!fs.existsSync(distDir)) {
+        fs.mkdirSync(distDir, { recursive: true });
+      }
+      fs.copyFileSync(publicZipPath, path.join(distDir, 'dist-ota.zip'));
+      fs.copyFileSync(publicManifestPath, path.join(distDir, 'version.json'));
+      console.log(`=== OTA packaging complete via committed public bundle: Site v${newSiteVersion} ===\n`);
+      process.exit(0);
+    }
+  } catch (err) {
+    console.warn('[CI] Failed reading existing public bundle, regenerating:', err);
+  }
+}
+
 // 3. Build mobile-specific web bundle with base="/" into dist-ota
 console.log('Compiling mobile OTA bundle with base="/" ...');
 execSync('npx vite build --base=/ --outDir=dist-ota', {
@@ -123,7 +146,6 @@ const zipSizeKb = (fs.statSync(zipPath).size / 1024).toFixed(1);
 console.log(`Created OTA zip archive: ${zipPath} (${zipSizeKb} KB)`);
 console.log(`Bundle SHA-256 Checksum: ${checksum}`);
 
-const publicDir = path.join(rootDir, 'public');
 if (!fs.existsSync(publicDir)) {
   fs.mkdirSync(publicDir, { recursive: true });
 }
@@ -151,8 +173,6 @@ fs.writeFileSync(manifestPath, manifestJson, 'utf-8');
 console.log(`Generated OTA version manifest: ${manifestPath}`);
 
 // Mirror OTA zip & manifest to public/ so GitHub serves them directly via raw.githubusercontent.com on git push
-const publicZipPath = path.join(publicDir, 'dist-ota.zip');
-const publicManifestPath = path.join(publicDir, 'version.json');
 fs.copyFileSync(zipPath, publicZipPath);
 fs.writeFileSync(publicManifestPath, manifestJson, 'utf-8');
 console.log(`Mirrored OTA zip & manifest to public/ for direct raw.githubusercontent.com CDN access.`);
