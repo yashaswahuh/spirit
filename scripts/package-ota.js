@@ -123,22 +123,39 @@ const zipSizeKb = (fs.statSync(zipPath).size / 1024).toFixed(1);
 console.log(`Created OTA zip archive: ${zipPath} (${zipSizeKb} KB)`);
 console.log(`Bundle SHA-256 Checksum: ${checksum}`);
 
-// 5. Generate version.json manifest in dist/
+const publicDir = path.join(rootDir, 'public');
+if (!fs.existsSync(publicDir)) {
+  fs.mkdirSync(publicDir, { recursive: true });
+}
+
+// 5. Generate version.json manifest with reliable raw GitHub and is-a.dev endpoints (no github.io HTTP redirect)
 const manifest = {
   version: newSiteVersion,
   siteVersion: newSiteVersion,
   appVersion: appVersion,
   build: newBuild,
-  bundleUrl: 'https://yashaswahuh.is-a.dev/spirit/dist-ota.zip',
-  fallbackBundleUrl: 'https://yashaswahuh.github.io/spirit/dist-ota.zip',
+  bundleUrl: 'https://raw.githubusercontent.com/yashaswahuh/spirit/main/public/dist-ota.zip',
+  fallbackBundleUrl: 'https://yashaswahuh.is-a.dev/spirit/dist-ota.zip',
+  fallbackUrls: [
+    'https://yashaswahuh.is-a.dev/spirit/dist-ota.zip',
+    'https://raw.githubusercontent.com/yashaswahuh/spirit/phase-6/public/dist-ota.zip',
+  ],
   checksum,
   releaseNotes: `Spirit Site v${newSiteVersion} (App v${appVersion}) - Official live OTA release with automated version tracking, PDF attendance reports, and native storage integration.`,
   updatedAt: new Date().toISOString(),
 };
 
+const manifestJson = JSON.stringify(manifest, null, 2) + '\n';
 const manifestPath = path.join(distDir, 'version.json');
-fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n', 'utf-8');
+fs.writeFileSync(manifestPath, manifestJson, 'utf-8');
 console.log(`Generated OTA version manifest: ${manifestPath}`);
+
+// Mirror OTA zip & manifest to public/ so GitHub serves them directly via raw.githubusercontent.com on git push
+const publicZipPath = path.join(publicDir, 'dist-ota.zip');
+const publicManifestPath = path.join(publicDir, 'version.json');
+fs.copyFileSync(zipPath, publicZipPath);
+fs.writeFileSync(publicManifestPath, manifestJson, 'utf-8');
+console.log(`Mirrored OTA zip & manifest to public/ for direct raw.githubusercontent.com CDN access.`);
 
 // 6. Clean up temporary dist-ota directory
 try {

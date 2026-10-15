@@ -8,10 +8,10 @@ import {
 } from '../updater';
 
 describe('Live OTA Updater Engine', () => {
-  it('exports correct app version v1.0.1 and site version v1.0.5', () => {
+  it('exports correct app version v1.0.1 and site version v1.0.6', () => {
     expect(CURRENT_APP_VERSION).toBe('1.0.1');
-    expect(CURRENT_SITE_VERSION).toBe('1.0.5');
-    expect(CURRENT_BUILD_NUMBER).toBe(1005);
+    expect(CURRENT_SITE_VERSION).toBe('1.0.6');
+    expect(CURRENT_BUILD_NUMBER).toBe(1006);
     expect(isUpdatePendingRestart()).toBe(false);
   });
 
@@ -19,9 +19,9 @@ describe('Live OTA Updater Engine', () => {
     const res = await checkForLiveUpdate({ silent: true });
     expect(res.hasUpdate).toBe(false);
     expect(res.currentAppVersion).toBe('1.0.1');
-    expect(res.currentSiteVersion).toBe('1.0.5');
+    expect(res.currentSiteVersion).toBe('1.0.6');
     expect(res.currentVersion).toBe('1.0.1');
-    expect(res.latestVersion).toBe('1.0.5');
+    expect(res.latestVersion).toBe('1.0.6');
   });
 });
 
