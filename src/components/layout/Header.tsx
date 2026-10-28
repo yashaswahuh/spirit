@@ -1,5 +1,5 @@
 import React from 'react';
-import { Moon, Sun } from 'lucide-react';
+import { Moon, Sun, CheckSquare } from 'lucide-react';
 
 interface HeaderProps {
   title: string;
@@ -8,6 +8,8 @@ interface HeaderProps {
   onToggleTheme: () => void;
   rightAction?: React.ReactNode;
   onOpenSemesterSwitcher?: () => void;
+  onOpenTasks?: () => void;
+  pendingTasksCount?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -17,6 +19,8 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleTheme,
   rightAction,
   onOpenSemesterSwitcher,
+  onOpenTasks,
+  pendingTasksCount,
 }) => {
   return (
     <header className="sticky top-0 z-30 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 px-4 py-3 flex items-center justify-between">
@@ -30,7 +34,7 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={onOpenSemesterSwitcher}
-              className="text-xs text-gray-500 dark:text-gray-400 font-medium hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1 transition-colors text-left"
+              className="text-xs text-gray-500 dark:text-gray-400 font-medium hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-1 transition-colors text-left cursor-pointer"
               title="Change active semester"
             >
               <span>{subtitle}</span>
@@ -44,9 +48,27 @@ export const Header: React.FC<HeaderProps> = ({
 
       <div className="flex items-center gap-2">
         {rightAction}
+
+        {onOpenTasks && (
+          <button
+            type="button"
+            onClick={onOpenTasks}
+            className="relative p-2 rounded-xl text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-white bg-gray-100 dark:bg-gray-800 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
+            aria-label="Tasks and Exams"
+            title="Tasks & Exams"
+          >
+            <CheckSquare className="w-4 h-4" />
+            {pendingTasksCount !== undefined && pendingTasksCount > 0 && (
+              <span className="absolute -top-1 -right-1 px-1.5 py-0.2 rounded-full text-[9px] font-black bg-indigo-600 text-white min-w-[16px] text-center shadow-xs">
+                {pendingTasksCount}
+              </span>
+            )}
+          </button>
+        )}
+
         <button
           onClick={onToggleTheme}
-          className="p-2 rounded-xl text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white bg-gray-100 dark:bg-gray-800 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center"
+          className="p-2 rounded-xl text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white bg-gray-100 dark:bg-gray-800 transition-colors min-h-[36px] min-w-[36px] flex items-center justify-center cursor-pointer"
           aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
         >
           {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-600" />}

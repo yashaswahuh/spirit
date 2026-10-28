@@ -9,7 +9,9 @@ import {
   UserX,
   BookOpen,
   FlaskConical,
+  Calendar,
 } from 'lucide-react';
+import { TasksTrackerModal } from '../tasks/TasksTrackerModal';
 import { db } from '../../db/dexie';
 import { Course, AssessmentComponent, Mark, AssessmentRuleType } from '../../types';
 import { ResponsiveDialog } from '../layout/ResponsiveDialog';
@@ -67,6 +69,7 @@ export const CourseMarksModal: React.FC<CourseMarksModalProps> = ({
   const [isEndSem, setIsEndSem] = useState<boolean>(false);
   const [minPassMarks, setMinPassMarks] = useState<string>('');
   const [componentType, setComponentType] = useState<'theory' | 'lab'>('theory');
+  const [isTasksModalOpen, setIsTasksModalOpen] = useState(false);
 
   // Live evaluation
   const evaluatedItems: EvaluatedComponent[] = components.map(c => {
@@ -438,6 +441,16 @@ export const CourseMarksModal: React.FC<CourseMarksModalProps> = ({
                         </button>
                       </div>
 
+                      {/* Schedule Exam / Task Button */}
+                      <button
+                        type="button"
+                        onClick={() => setIsTasksModalOpen(true)}
+                        className="p-1 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        title={`Schedule "${comp.name}" in Tasks & Exams`}
+                      >
+                        <Calendar className="w-3.5 h-3.5" />
+                      </button>
+
                       {/* Edit & Delete Action Buttons */}
                       <button
                         type="button"
@@ -637,6 +650,15 @@ export const CourseMarksModal: React.FC<CourseMarksModalProps> = ({
           </form>
         )}
       </div>
+
+      {isTasksModalOpen && (
+        <TasksTrackerModal
+          isOpen={isTasksModalOpen}
+          onClose={() => setIsTasksModalOpen(false)}
+          courses={[course]}
+          initialCourseIdFilter={course.id}
+        />
+      )}
     </ResponsiveDialog>
   );
 };

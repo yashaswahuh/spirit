@@ -20,6 +20,7 @@ import {
   PeriodTiming,
   Course,
   LabAttendanceRule,
+  Task,
 } from '../../types';
 
 describe('Timetable Engine Unit Tests', () => {
@@ -1051,6 +1052,192 @@ describe('Timetable Engine Unit Tests', () => {
       expect(maxConducted).toBe(14);
     });
   });
+  describe('Exam Day Regular Classes Policies', () => {
+    const version: TimetableVersion = {
+      id: 'v1',
+      user_id: 'u1',
+      term_id: 't1',
+      name: 'V1',
+      effective_from: '2026-01-01',
+      created_at: '',
+      updated_at: '',
+      deleted_at: null,
+    };
+
+    const slotMorning: TimetableSlot = {
+      id: 's1',
+      user_id: 'u1',
+      course_id: 'c1',
+      version_id: 'v1',
+      weekday: 1, // Monday
+      start_time: '09:00',
+      end_time: '10:00',
+      room: '101',
+      component_type: 'theory',
+      weight: 1,
+      attendance_weight: 1,
+      created_at: '',
+      updated_at: '',
+      deleted_at: null,
+    };
+
+    const slotExamTime: TimetableSlot = {
+      id: 's2',
+      user_id: 'u1',
+      course_id: 'c2',
+      version_id: 'v1',
+      weekday: 1, // Monday
+      start_time: '14:00',
+      end_time: '15:00',
+      room: '102',
+      component_type: 'theory',
+      weight: 1,
+      attendance_weight: 1,
+      created_at: '',
+      updated_at: '',
+      deleted_at: null,
+    };
+
+    const slotAfternoon: TimetableSlot = {
+      id: 's3',
+      user_id: 'u1',
+      course_id: 'c3',
+      version_id: 'v1',
+      weekday: 1, // Monday
+      start_time: '15:00',
+      end_time: '16:00',
+      room: '103',
+      component_type: 'theory',
+      weight: 1,
+      attendance_weight: 1,
+      created_at: '',
+      updated_at: '',
+      deleted_at: null,
+    };
+
+    it('cancels overlapping classes during exam hours (cancel_overlapping)', () => {
+      const examTask: Task = {
+        id: 't-exam-1',
+        user_id: 'u1',
+        title: 'Computer Networks Mid-Sem',
+        type: 'mid_sem',
+        due_at: '2026-01-05T14:00:00',
+        end_time: '15:00',
+        exam_class_mode: 'cancel_overlapping',
+        course_id: 'c2',
+        done: false,
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+
+      const res = resolveDaySchedule({
+        date: '2026-01-05', // Monday
+        versions: [version],
+        slots: [slotMorning, slotExamTime, slotAfternoon],
+        calendarEvents: [],
+        tasks: [examTask],
+      });
+
+      expect(res.is_exam_day).toBe(true);
+      expect(res.exam_class_mode).toBe('cancel_overlapping');
+      // The 14:00-15:00 class is cancelled, while 09:00-10:00 and 15:00-16:00 remain
+      expect(res.slots).toHaveLength(2);
+      expect(res.slots.map(s => s.start_time)).toEqual(['09:00', '15:00']);
+      expect(res.slots.find(s => s.slot_id === 's2')).toBeUndefined();
+    });
+
+    it('suspends all classes when exam_class_mode is suspend_all', () => {
+      const examTask: Task = {
+        id: 't-exam-2',
+        user_id: 'u1',
+        title: 'Final Examination Day',
+        type: 'end_sem',
+        due_at: '2026-01-05T10:00:00',
+        end_time: '13:00',
+        exam_class_mode: 'suspend_all',
+        course_id: 'c1',
+        done: false,
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+
+      const res = resolveDaySchedule({
+        date: '2026-01-05',
+        versions: [version],
+        slots: [slotMorning, slotExamTime, slotAfternoon],
+        calendarEvents: [],
+        tasks: [examTask],
+      });
+
+      expect(res.is_exam_day).toBe(true);
+      expect(res.exam_class_mode).toBe('suspend_all');
+      expect(res.slots).toHaveLength(0);
+      expect(res.total_periods).toBe(0);
+    });
+
+    it('substitutes overlapping slot with exam slot when substitute_exam', () => {
+      const examTask: Task = {
+        id: 't-exam-3',
+        user_id: 'u1',
+        title: 'Chemistry Lab Quiz',
+        type: 'quiz',
+        due_at: '2026-01-05T14:00:00',
+        end_time: '15:00',
+        exam_class_mode: 'substitute_exam',
+        venue: 'Room 304',
+        course_id: 'c2',
+        done: false,
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+
+      const res = resolveDaySchedule({
+        date: '2026-01-05',
+        versions: [version],
+        slots: [slotMorning, slotExamTime, slotAfternoon],
+        calendarEvents: [],
+        tasks: [examTask],
+      });
+
+      expect(res.is_exam_day).toBe(true);
+      expect(res.slots).toHaveLength(3);
+      const substituted = res.slots.find(s => s.start_time === '14:00');
+      expect(substituted).toBeDefined();
+      expect(substituted?.is_exam_slot).toBe(true);
+      expect(substituted?.exam_title).toBe('Chemistry Lab Quiz');
+      expect(substituted?.room).toBe('Room 304');
+    });
+
+    it('keeps all regular classes running when keep_all is selected', () => {
+      const examTask: Task = {
+        id: 't-exam-4',
+        user_id: 'u1',
+        title: 'Evening Certification Exam',
+        type: 'exam',
+        due_at: '2026-01-05T14:00:00',
+        end_time: '15:00',
+        exam_class_mode: 'keep_all',
+        course_id: null,
+        done: false,
+        created_at: '',
+        updated_at: '',
+        deleted_at: null,
+      };
+
+      const res = resolveDaySchedule({
+        date: '2026-01-05',
+        versions: [version],
+        slots: [slotMorning, slotExamTime, slotAfternoon],
+        calendarEvents: [],
+        tasks: [examTask],
+      });
+
+      expect(res.is_exam_day).toBe(true);
+      expect(res.slots).toHaveLength(3);
+      expect(res.slots.map(s => s.start_time)).toEqual(['09:00', '14:00', '15:00']);
+    });
+  });
 });
-
-

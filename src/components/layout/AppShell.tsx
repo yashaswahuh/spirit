@@ -1,4 +1,6 @@
 import React from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../../db/dexie';
 import { Sidebar } from './Sidebar';
 import { BottomNav, NavTab } from './BottomNav';
 import { Header } from './Header';
@@ -26,6 +28,10 @@ export const AppShell: React.FC<AppShellProps> = ({
   termName,
   onOpenSemesterSwitcher,
 }) => {
+  const pendingTasksCount = useLiveQuery(
+    () => db.task.filter(t => t.deleted_at === null && !t.done).count()
+  ) || 0;
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black font-sans antialiased text-gray-900 dark:text-gray-100 flex flex-col lg:flex-row">
       {/* 1. Desktop Left Sidebar (Visible at >= 1024px) */}
@@ -36,6 +42,7 @@ export const AppShell: React.FC<AppShellProps> = ({
         onToggleTheme={onToggleTheme}
         termName={termName}
         onOpenSemesterSwitcher={onOpenSemesterSwitcher}
+        pendingTasksCount={pendingTasksCount}
       />
 
       {/* 2. Main Area (Mobile / Tablet / Desktop) */}
@@ -48,6 +55,8 @@ export const AppShell: React.FC<AppShellProps> = ({
             isDark={isDark}
             onToggleTheme={onToggleTheme}
             onOpenSemesterSwitcher={onOpenSemesterSwitcher}
+            onOpenTasks={activeTab !== 'tasks' ? () => onTabChange('tasks') : undefined}
+            pendingTasksCount={pendingTasksCount}
           />
         </div>
 
@@ -58,7 +67,11 @@ export const AppShell: React.FC<AppShellProps> = ({
 
         {/* Mobile / Tablet Bottom Navigation (Hidden at >= 1024px) */}
         <div className="lg:hidden">
-          <BottomNav activeTab={activeTab} onTabChange={onTabChange} />
+          <BottomNav
+            activeTab={activeTab}
+            onTabChange={onTabChange}
+            pendingTasksCount={pendingTasksCount}
+          />
         </div>
       </div>
     </div>

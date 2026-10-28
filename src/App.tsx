@@ -16,6 +16,7 @@ const AttendanceScreen = React.lazy(() => import('./screens/AttendanceScreen').t
 const TimetableScreen = React.lazy(() => import('./screens/TimetableScreen').then(m => ({ default: m.TimetableScreen })));
 const GradesScreen = React.lazy(() => import('./screens/GradesScreen').then(m => ({ default: m.GradesScreen })));
 const MoreScreen = React.lazy(() => import('./screens/MoreScreen').then(m => ({ default: m.MoreScreen })));
+const TasksScreen = React.lazy(() => import('./screens/TasksScreen').then(m => ({ default: m.TasksScreen })));
 import {
   ThemePreference,
   getThemePreference,
@@ -71,7 +72,7 @@ const MainApp: React.FC = () => {
 
   // Determine current active tab from hash path
   const currentPath = location.pathname.replace(/^\//, '') || 'home';
-  const validTabs: NavTab[] = ['home', 'attendance', 'timetable', 'grades', 'more'];
+  const validTabs: NavTab[] = ['home', 'attendance', 'timetable', 'tasks', 'grades', 'more'];
   const activeTab: NavTab = validTabs.includes(currentPath as NavTab)
     ? (currentPath as NavTab)
     : 'home';
@@ -87,6 +88,8 @@ const MainApp: React.FC = () => {
         return { title: 'Attendance', subtitle: activeTerm?.name };
       case 'timetable':
         return { title: 'Timetable', subtitle: 'Weekly Schedule' };
+      case 'tasks':
+        return { title: 'Tasks & Exams', subtitle: 'Assignments & Deadlines' };
       case 'grades':
         return { title: 'Grades', subtitle: 'Academic Performance' };
       case 'more':
@@ -127,10 +130,27 @@ const MainApp: React.FC = () => {
       >
         <React.Suspense fallback={<LoadingSpinner message="Loading..." size="lg" className="min-h-[50vh]" />}>
           <Routes>
-            <Route path="/" element={<HomeScreen onNavigateToAttendance={() => handleTabChange('attendance')} />} />
-            <Route path="/home" element={<HomeScreen onNavigateToAttendance={() => handleTabChange('attendance')} />} />
+            <Route
+              path="/"
+              element={
+                <HomeScreen
+                  onNavigateToAttendance={() => handleTabChange('attendance')}
+                  onNavigateToTasks={() => handleTabChange('tasks')}
+                />
+              }
+            />
+            <Route
+              path="/home"
+              element={
+                <HomeScreen
+                  onNavigateToAttendance={() => handleTabChange('attendance')}
+                  onNavigateToTasks={() => handleTabChange('tasks')}
+                />
+              }
+            />
             <Route path="/attendance" element={<AttendanceScreen />} />
             <Route path="/timetable" element={<TimetableScreen />} />
+            <Route path="/tasks" element={<TasksScreen />} />
             <Route path="/grades" element={<GradesScreen />} />
             <Route
               path="/more"

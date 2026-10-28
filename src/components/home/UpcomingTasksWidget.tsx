@@ -1,118 +1,227 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { CheckSquare, MapPin, ChevronRight } from 'lucide-react';
+import { CheckSquare, MapPin, ChevronRight, Plus } from 'lucide-react';
 import { db } from '../../db/dexie';
 import { Course } from '../../types';
 import { toggleTaskDone } from '../../db/repositories/task.repo';
 import { TasksTrackerModal } from '../tasks/TasksTrackerModal';
 import { useDateFormat, formatDate } from '../../utils/preferences';
+import {
+  getTaskDueStatus,
+  isExamType,
+  getTaskTypeLabel,
+  calculateTaskStats,
+} from '../../engine/tasks';
 
 interface UpcomingTasksWidgetProps {
   courses: Course[];
+  onOpenFullTracker?: () => void;
 }
 
-export const UpcomingTasksWidget: React.FC<UpcomingTasksWidgetProps> = ({ courses }) => {
+export const UpcomingTasksWidget: React.FC<UpcomingTasksWidgetProps> = ({ courses, onOpenFullTracker }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'all' | 'exams' | 'assignments'>('all');
+  const [filterTab, setFilterTab] = useState<'all' | 'exams' | 'assignments'>('all');
   const dateFormat = useDateFormat();
+
   const tasks = useLiveQuery(() => db.task.filter(t => t.deleted_at === null).toArray()) || [];
+  const courseMap = useMemo(() => new Map(courses.map(c => [c.id, c])), [courses]);
 
-  // Sort pending tasks by due date
-  const pendingTasks = tasks
-    .filter(t => !t.done)
-    .sort((a, b) => {
-      if (!a.due_at) return 1;
-      if (!b.due_at) return -1;
-      return new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
-    })
-    .slice(0, 4);
+  // Statistics
+  const stats = useMemo(() => calculateTaskStats(tasks), [tasks]);
 
-  const getDueBadge = (dueAt: string | null) => {
-    if (!dueAt) return { label: 'No date', color: 'text-gray-400 bg-gray-100 dark:bg-gray-800' };
+  // Filter pending tasks
+  const pendingTasks = useMemo(() => {
+    return tasks
+      .filter(t => {
+        if (t.done) return false;
+        if (filterTab === 'exams') return isExamType(t.type);
+        if (filterTab === 'assignments') return !isExamType(t.type);
+        return true;
+      })
+      .sort((a, b) => {
+        if (!a.due_at) return 1;
+        if (!b.due_at) return -1;
+        return new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
+      })
+      .slice(0, 5);
+  }, [tasks, filterTab]);
 
-    const due = new Date(dueAt).getTime();
-    const now = Date.now();
-    const diffMs = due - now;
-    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const handleOpenModal = (mode: 'all' | 'exams' | 'assignments' = 'all') => {
+    setModalMode(mode);
+    setIsModalOpen(true);
+  };
 
-    if (diffMs < 0) {
-      const overdue = Math.abs(diffDays);
-      return {
-        label: overdue === 0 ? 'Due Today' : `${overdue}d overdue`,
-        color: 'text-rose-700 bg-rose-50 dark:bg-rose-950/60 dark:text-rose-300 font-bold',
-      };
-    } else if (diffDays === 0) {
-      return { label: 'Today', color: 'text-amber-800 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300 font-bold' };
-    } else if (diffDays === 1) {
-      return { label: 'Tomorrow', color: 'text-amber-800 bg-amber-50 dark:bg-amber-950/60 dark:text-amber-300' };
+  const handleViewAll = () => {
+    if (onOpenFullTracker) {
+      onOpenFullTracker();
     } else {
-      return { label: `In ${diffDays}d`, color: 'text-indigo-700 bg-indigo-50 dark:bg-indigo-950/60 dark:text-indigo-300 font-medium' };
+      handleOpenModal('all');
     }
   };
 
   return (
     <>
       <div className="bg-white dark:bg-gray-900 rounded-3xl p-5 sm:p-6 border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <CheckSquare className="w-4 h-4 text-indigo-600" />
-            <h3 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">
-              Upcoming Deadlines & Exams
-            </h3>
+        {/* Header Strip */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center flex-shrink-0">
+              <CheckSquare className="w-4 h-4" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wider flex items-center gap-1.5 truncate">
+                <span>Deadlines & Exams</span>
+                {stats.overdue > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                    {stats.overdue} overdue
+                  </span>
+                )}
+              </h3>
+              <p className="text-[11px] text-gray-400 font-medium truncate">
+                {stats.pending} pending ({stats.upcomingExams} exams)
+              </p>
+            </div>
           </div>
+
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button
+              type="button"
+              onClick={() => handleOpenModal('all')}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-400 text-xs font-bold transition-colors cursor-pointer"
+              title="Add task or exam"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleViewAll}
+              className="text-xs text-gray-500 hover:text-indigo-600 dark:text-gray-400 dark:hover:text-indigo-400 font-bold flex items-center p-1.5 cursor-pointer"
+              title="View all tasks & exams"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Chips on Widget */}
+        <div className="flex items-center gap-1.5 text-[11px]">
           <button
             type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-0.5"
+            onClick={() => setFilterTab('all')}
+            className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+              filterTab === 'all'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-gray-50 dark:bg-gray-800 text-gray-500 hover:text-gray-900 dark:hover:text-white'
+            }`}
           >
-            <span>View All ({tasks.filter(t => !t.done).length})</span>
-            <ChevronRight className="w-3 h-3" />
+            All ({stats.pending})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterTab('exams')}
+            className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+              filterTab === 'exams'
+                ? 'bg-amber-600 text-white shadow-xs'
+                : 'bg-gray-50 dark:bg-gray-800 text-gray-500 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            Exams ({stats.upcomingExams})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterTab('assignments')}
+            className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+              filterTab === 'assignments'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'bg-gray-50 dark:bg-gray-800 text-gray-500 hover:text-gray-900 dark:hover:text-white'
+            }`}
+          >
+            Tasks ({stats.pendingAssignments})
           </button>
         </div>
 
+        {/* Content list */}
         {pendingTasks.length === 0 ? (
-          <div className="p-4 text-center bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-gray-100 dark:border-gray-800 space-y-1">
-            <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
-              No pending tasks or exams!
+          <div className="text-center py-6 border border-dashed border-gray-100 dark:border-gray-800 rounded-2xl space-y-1">
+            <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+              No pending {filterTab === 'exams' ? 'exams' : filterTab === 'assignments' ? 'tasks' : 'items'} 🎉
+            </p>
+            <p className="text-[11px] text-gray-400">
+              Stay ahead! Add assignments, quizzes, and mid-sems here.
             </p>
             <button
               type="button"
-              onClick={() => setIsModalOpen(true)}
-              className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+              onClick={() => handleOpenModal('all')}
+              className="mt-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline inline-block cursor-pointer"
             >
-              + Add assignment or exam
+              + Add First {filterTab === 'exams' ? 'Exam' : 'Task'}
             </button>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100 dark:divide-gray-800/60">
+          <div className="divide-y divide-gray-100 dark:divide-gray-800/80">
             {pendingTasks.map(task => {
-              const badge = getDueBadge(task.due_at);
-              const course = courses.find(c => c.id === task.course_id);
+              const course = task.course_id ? courseMap.get(task.course_id) : null;
+              const status = getTaskDueStatus(task.due_at, task.done);
+              const isExam = isExamType(task.type);
 
               return (
-                <div key={task.id} className="py-2.5 flex items-center justify-between gap-3 group">
-                  <div className="flex items-center gap-2.5 min-w-0">
+                <div
+                  key={task.id}
+                  className="py-2.5 flex items-start justify-between gap-3 group transition-colors"
+                >
+                  <div className="flex items-start gap-2.5 min-w-0 flex-1">
                     <button
                       type="button"
-                      onClick={() => toggleTaskDone(task.id, true)}
-                      className="w-5 h-5 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-indigo-600 dark:hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 flex items-center justify-center transition-all cursor-pointer flex-shrink-0 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none"
-                      aria-label={`Mark "${task.title}" as completed`}
-                    />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-gray-900 dark:text-white truncate">
+                      onClick={() => toggleTaskDone(task.id, task.done)}
+                      className="mt-0.5 w-4 h-4 rounded-md border border-gray-300 dark:border-gray-600 hover:border-indigo-600 flex items-center justify-center transition-colors flex-shrink-0 cursor-pointer"
+                      title="Mark complete"
+                    >
+                      {task.done && <span className="w-2.5 h-2.5 bg-indigo-600 rounded-sm" />}
+                    </button>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span
+                          className={`text-xs sm:text-sm font-bold truncate ${
+                            task.done
+                              ? 'line-through text-gray-400 dark:text-gray-500'
+                              : 'text-gray-900 dark:text-white'
+                          }`}
+                        >
                           {task.title}
                         </span>
-                        <span className="text-[10px] text-gray-400 uppercase font-mono">
-                          • {task.type.replace('_', ' ')}
-                          {task.due_at && ` • ${formatDate(task.due_at, dateFormat)}`}
+
+                        <span
+                          className={`text-[9.5px] uppercase font-black px-1.5 py-0.2 rounded-md ${
+                            isExam
+                              ? 'bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300'
+                              : 'bg-indigo-100 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-300'
+                          }`}
+                        >
+                          {getTaskTypeLabel(task.type)}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 text-[10px] text-gray-400 font-medium">
+
+                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-gray-400 font-medium truncate">
                         {course && (
-                          <span className="truncate max-w-[120px] font-semibold text-indigo-600 dark:text-indigo-400">
+                          <span className="flex items-center gap-1 truncate">
+                            <span
+                              className="w-2 h-2 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: course.color || '#6366f1' }}
+                            />
                             {course.code || course.name}
                           </span>
                         )}
+
+                        {task.due_at && (
+                          <span>
+                            {formatDate(new Date(task.due_at), dateFormat)}
+                          </span>
+                        )}
+
                         {task.venue && (
                           <span className="flex items-center gap-0.5 truncate max-w-[100px]">
                             <MapPin className="w-2.5 h-2.5" />
@@ -123,8 +232,11 @@ export const UpcomingTasksWidget: React.FC<UpcomingTasksWidgetProps> = ({ course
                     </div>
                   </div>
 
-                  <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold flex-shrink-0 ${badge.color}`}>
-                    {badge.label}
+                  <span
+                    className={`px-2 py-0.5 rounded-lg text-[10px] font-bold flex-shrink-0 cursor-pointer ${status.color}`}
+                    onClick={handleViewAll}
+                  >
+                    {status.shortLabel}
                   </span>
                 </div>
               );
@@ -138,6 +250,7 @@ export const UpcomingTasksWidget: React.FC<UpcomingTasksWidgetProps> = ({ course
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           courses={courses}
+          initialMode={modalMode}
         />
       )}
     </>

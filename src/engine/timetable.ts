@@ -16,7 +16,10 @@ import {
   SaturdayRule,
   PeriodTiming,
   LabAttendanceRule,
+  Task,
+  ExamClassMode,
 } from '../types';
+import { isExamType } from './tasks';
 
 /**
  * Resolves the attendance weight for a slot, taking into account:
@@ -110,6 +113,11 @@ export interface EffectiveSlot {
   override_action?: 'cancel' | 'substitute' | 'extra' | 'reschedule';
   override_id?: string;
   note?: string;
+  is_exam_slot?: boolean;
+  exam_id?: string;
+  exam_title?: string;
+  is_cancelled_for_exam?: boolean;
+  cancel_reason?: string;
 }
 
 export interface DayScheduleResolution {
@@ -123,6 +131,8 @@ export interface DayScheduleResolution {
   effective_weekday: Weekday;
   is_exam_day: boolean;
   exam_note: string | null;
+  exam_tasks?: Task[];
+  exam_class_mode?: ExamClassMode;
   slots: EffectiveSlot[];
   total_periods: number;
 }
@@ -147,6 +157,18 @@ export function timeToMinutes(timeStr: string): number {
   if (!timeStr || !timeStr.includes(':')) return 0;
   const [h, m] = timeStr.split(':').map(Number);
   return (h || 0) * 60 + (m || 0);
+}
+
+export function isTimeOverlapping(startA: string, endA: string, startB: string, endB: string): boolean {
+  return timeToMinutes(startA) < timeToMinutes(endB) && timeToMinutes(endA) > timeToMinutes(startB);
+}
+
+export function addMinutesToTime(timeStr: string, minutesToAdd: number): string {
+  const mins = timeToMinutes(timeStr) + minutesToAdd;
+  const wrapped = mins % (24 * 60);
+  const h = Math.floor(wrapped / 60).toString().padStart(2, '0');
+  const m = (wrapped % 60).toString().padStart(2, '0');
+  return `${h}:${m}`;
 }
 
 /**
@@ -300,6 +322,7 @@ export interface ResolveDayScheduleParams {
   saturdayRule?: SaturdayRule;
   courses?: Course[];
   labAttendanceRule?: LabAttendanceRule;
+  tasks?: Task[];
 }
 
 /**
@@ -512,6 +535,80 @@ export function resolveDaySchedule(params: ResolveDayScheduleParams): DaySchedul
     }
   }
 
+  // Check active exam tasks on this date and apply exam class policies
+  const activeExamTasks = (params.tasks || []).filter(
+    t => !t.deleted_at && isExamType(t.type) && t.due_at && t.due_at.slice(0, 10) === date
+  );
+
+  let examClassMode: ExamClassMode | undefined = undefined;
+
+  if (activeExamTasks.length > 0) {
+    // If any exam has suspend_all, all regular classes are suspended for the full exam day
+    const suspendAllExam = activeExamTasks.find(e => e.exam_class_mode === 'suspend_all');
+    if (suspendAllExam) {
+      examClassMode = 'suspend_all';
+      return {
+        date,
+        weekday: regularWeekday,
+        is_working_day: isWorkingDay,
+        is_holiday: false,
+        holiday_note: null,
+        is_swap_day: isSwapDay,
+        swap_source_weekday: swapSourceWeekday,
+        effective_weekday: effectiveWeekday,
+        is_exam_day: true,
+        exam_note: activeExamTasks.map(e => e.title).join(', '),
+        exam_tasks: activeExamTasks,
+        exam_class_mode: 'suspend_all',
+        slots: [],
+        total_periods: 0,
+      };
+    }
+
+    // Process overlapping exams (default mode is cancel_overlapping)
+    for (const exam of activeExamTasks) {
+      const mode: ExamClassMode = exam.exam_class_mode || 'cancel_overlapping';
+      examClassMode = mode;
+
+      if (mode === 'keep_all') {
+        continue;
+      }
+
+      const examStartTime = exam.due_at && exam.due_at.includes('T')
+        ? exam.due_at.slice(11, 16)
+        : '09:00';
+      const examEndTime = exam.end_time || addMinutesToTime(examStartTime, 60);
+
+      if (mode === 'cancel_overlapping') {
+        effectiveSlots = effectiveSlots.filter(
+          s => !isTimeOverlapping(s.start_time, s.end_time, examStartTime, examEndTime)
+        );
+      } else if (mode === 'substitute_exam') {
+        effectiveSlots = effectiveSlots.filter(
+          s => !isTimeOverlapping(s.start_time, s.end_time, examStartTime, examEndTime)
+        );
+        effectiveSlots.push({
+          slot_id: null,
+          course_id: exam.course_id || '',
+          start_time: examStartTime,
+          end_time: examEndTime,
+          room: exam.venue || null,
+          faculty: null,
+          component_type: 'theory',
+          weight: 1,
+          attendance_weight: 1,
+          period_name: exam.title,
+          is_override: true,
+          override_action: 'substitute',
+          is_exam_slot: true,
+          exam_id: exam.id,
+          exam_title: exam.title,
+          note: `Exam: ${exam.title}`,
+        });
+      }
+    }
+  }
+
   // Sort chronologically by start time
   effectiveSlots.sort((a, b) => a.start_time.localeCompare(b.start_time));
 
@@ -526,8 +623,10 @@ export function resolveDaySchedule(params: ResolveDayScheduleParams): DaySchedul
     is_swap_day: isSwapDay,
     swap_source_weekday: swapSourceWeekday,
     effective_weekday: effectiveWeekday,
-    is_exam_day: !!examEvent,
-    exam_note: examEvent?.note || null,
+    is_exam_day: !!examEvent || activeExamTasks.length > 0,
+    exam_note: examEvent?.note || (activeExamTasks.length > 0 ? activeExamTasks.map(e => e.title).join(', ') : null),
+    exam_tasks: activeExamTasks,
+    exam_class_mode: examClassMode,
     slots: effectiveSlots,
     total_periods: totalPeriods,
   };

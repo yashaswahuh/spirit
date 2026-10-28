@@ -5,6 +5,7 @@ import {
   Calendar,
   GraduationCap,
   MoreHorizontal,
+  CheckSquare,
   Sun,
   Moon,
 } from 'lucide-react';
@@ -18,6 +19,7 @@ export interface SidebarProps {
   onToggleTheme: () => void;
   termName?: string;
   onOpenSemesterSwitcher?: () => void;
+  pendingTasksCount?: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -27,11 +29,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleTheme,
   termName,
   onOpenSemesterSwitcher,
+  pendingTasksCount,
 }) => {
   const navItems = [
     { id: 'home' as NavTab, label: 'Home', icon: Home, description: 'Dashboard & Today' },
     { id: 'attendance' as NavTab, label: 'Attendance', icon: CheckCircle2, description: 'Subjects & Safe Bunks' },
     { id: 'timetable' as NavTab, label: 'Timetable', icon: Calendar, description: 'Weekly Schedule' },
+    {
+      id: 'tasks' as NavTab,
+      label: 'Tasks & Exams',
+      icon: CheckSquare,
+      description: 'Assignments & Deadlines',
+      badge: pendingTasksCount,
+    },
     { id: 'grades' as NavTab, label: 'Grades', icon: GraduationCap, description: 'GPA & Performance' },
     { id: 'more' as NavTab, label: 'More', icon: MoreHorizontal, description: 'Settings & Storage' },
   ];
@@ -100,7 +110,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   }`}
                 />
                 <div className="text-left min-w-0 flex-1">
-                  <span className="block leading-none">{item.label}</span>
+                  <div className="flex items-center justify-between">
+                    <span className="block leading-none">{item.label}</span>
+                    {item.badge !== undefined && item.badge > 0 && (
+                      <span className="px-2 py-0.2 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200">
+                        {item.badge}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[11px] text-gray-400 dark:text-gray-500 font-normal leading-tight mt-0.5 block truncate">
                     {item.description}
                   </span>
@@ -119,22 +136,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
         >
           <span className="flex items-center gap-2">
-            {isDark ? (
-              <Sun className="w-4 h-4 text-amber-400" />
-            ) : (
-              <Moon className="w-4 h-4 text-indigo-600" />
-            )}
-            <span>{isDark ? 'Light Theme' : 'Dark Theme'}</span>
+            {isDark ? <Moon className="w-4 h-4 text-indigo-400" /> : <Sun className="w-4 h-4 text-amber-500" />}
+            <span>{isDark ? 'Dark Mode' : 'Light Mode'}</span>
           </span>
-          <span className="text-[10px] uppercase font-bold text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md">
-            {isDark ? 'Dark' : 'Light'}
+          <span className="text-[11px] text-gray-400 font-mono">
+            {isDark ? 'ON' : 'OFF'}
           </span>
         </button>
-
-        <div className="mt-3 px-3.5 text-[11px] text-gray-400 dark:text-gray-500 flex items-center justify-between">
-          <span>Local-First (Dexie)</span>
-          <span className="font-semibold text-emerald-600 dark:text-emerald-400">Offline</span>
-        </div>
       </div>
     </aside>
   );

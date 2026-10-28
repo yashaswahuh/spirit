@@ -1,15 +1,15 @@
 {
-  "version": "1.0.6",
-  "siteVersion": "1.0.6",
+  "version": "1.0.7",
+  "siteVersion": "1.0.7",
   "appVersion": "1.0.1",
-  "build": 1006,
+  "build": 1007,
   "bundleUrl": "https://raw.githubusercontent.com/yashaswahuh/spirit/main/public/dist-ota.zip",
   "fallbackBundleUrl": "https://yashaswahuh.is-a.dev/spirit/dist-ota.zip",
   "fallbackUrls": [
     "https://yashaswahuh.is-a.dev/spirit/dist-ota.zip",
     "https://raw.githubusercontent.com/yashaswahuh/spirit/phase-6/public/dist-ota.zip"
   ],
-  "checksum": "2743a56f849be12151c6a075afd092ee7561e1fadec37cc241a5b14eb654b3a4",
-  "releaseNotes": "Spirit Site v1.0.6 (App v1.0.1) - Official live OTA release with automated version tracking, PDF attendance reports, and native storage integration.",
-  "updatedAt": "2026-10-15T03:15:19.652Z"
+  "checksum": "3d6f9d8b84de05bcf99b27774b676343507a36a5d5e0e9ab7ca03faa534e994f",
+  "releaseNotes": "Spirit Site v1.0.7 (App v1.0.1) - Official live OTA release with automated version tracking, PDF attendance reports, and native storage integration.",
+  "updatedAt": "2026-10-28T14:48:35.994Z"
 }

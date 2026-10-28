@@ -6,6 +6,7 @@ import { Course, AttendanceStatus } from '../types';
 import { computeCourseAttendanceStats, countUnmarkedClasses } from '../engine/attendance';
 import { countRemainingScheduledClasses, calculateAttendanceProjection } from '../engine/projection';
 import { CourseAttendanceCard } from '../components/attendance/CourseAttendanceCard';
+import { TasksTrackerModal } from '../components/tasks/TasksTrackerModal';
 import { SubjectModal } from '../components/attendance/SubjectModal';
 import { DayPickerView } from '../components/attendance/DayPickerView';
 import { CatchUpModal } from '../components/attendance/CatchUpModal';
@@ -28,6 +29,9 @@ export const AttendanceScreen: React.FC = () => {
   const versions = useLiveQuery(() => db.timetable_version.filter(v => v.deleted_at === null).toArray()) || [];
   const overrides = useLiveQuery(() => db.timetable_override.filter(o => o.deleted_at === null).toArray()) || [];
   const calendarEvents = useLiveQuery(() => db.calendar_event.filter(e => e.deleted_at === null).toArray()) || [];
+  const tasks = useLiveQuery(() => db.task.filter(t => t.deleted_at === null).toArray()) || [];
+  const [isTasksModalOpen, setIsTasksModalOpen] = useState(false);
+  const [tasksCourseFilter, setTasksCourseFilter] = useState<string | null>(null);
 
   // Tab View: Subjects Grid vs Date-Picker Day View
   const [activeTab, setActiveTab] = useState<'subjects' | 'day_log'>('subjects');
@@ -632,6 +636,11 @@ export const AttendanceScreen: React.FC = () => {
                     hasTimetable={courseSlots.length > 0}
                     projection={projection}
                     labAttendancePoints={subjectAttendancePoints}
+                    onViewTasks={() => {
+                      setTasksCourseFilter(course.id);
+                      setIsTasksModalOpen(true);
+                    }}
+                    pendingTasksCount={tasks.filter(t => t.course_id === course.id && !t.done).length}
                     onMark={(status, component) => handleMarkCourse(course.id, status, component)}
                     onUndo={() => handleUndoCourseMark(course.id)}
                     onEdit={() => {
@@ -703,6 +712,15 @@ export const AttendanceScreen: React.FC = () => {
             setClearInitialCourseId(null);
           }}
           initialCourseId={clearInitialCourseId}
+        />
+      )}
+
+      {isTasksModalOpen && (
+        <TasksTrackerModal
+          isOpen={isTasksModalOpen}
+          onClose={() => setIsTasksModalOpen(false)}
+          courses={courses}
+          initialCourseIdFilter={tasksCourseFilter}
         />
       )}
 

@@ -188,9 +188,13 @@ export function generateTasksIcs(params: {
     const timeStr = task.due_at.length >= 16 ? task.due_at.slice(11, 16) : '09:00';
     const dtStart = formatIcalDateTime(dateStr, timeStr);
     
-    // Default duration: 1 hour or 2-3 hours for exam
-    const endHour = (parseInt(timeStr.slice(0, 2), 10) + (task.type === 'exam' || task.type === 'mid_sem' || task.type === 'end_sem' ? 3 : 1)).toString().padStart(2, '0');
-    const dtEnd = formatIcalDateTime(dateStr, `${endHour}:${timeStr.slice(3, 5)}`);
+    // Default duration: 1 hour for task, 3 hours for exam
+    const startDate = new Date(`${dateStr}T${timeStr}:00`);
+    const durationHours = (task.type === 'exam' || task.type === 'mid_sem' || task.type === 'end_sem' || task.type === 'lab_exam') ? 3 : 1;
+    const endDate = new Date(startDate.getTime() + durationHours * 3600000);
+    const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+    const endTimeStr = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
+    const dtEnd = formatIcalDateTime(endDateStr, endTimeStr);
 
     const descParts: string[] = [];
     if (task.notes) descParts.push(task.notes);

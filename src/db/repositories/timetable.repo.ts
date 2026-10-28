@@ -9,6 +9,8 @@ import {
   TimetableVersion,
   TimetableOverride,
   Weekday,
+  Task,
+  ExamClassMode,
 } from '../../types';
 import {
   timetableSlotSchema,
@@ -264,13 +266,14 @@ export async function deleteTimetableOverride(id: string): Promise<void> {
 export async function getEffectiveDaySchedule(dateStr?: string): Promise<DayScheduleResolution> {
   const date = dateStr || new Date().toISOString().slice(0, 10);
 
-  const [versions, slots, calendarEvents, overrides, terms, courses] = await Promise.all([
+  const [versions, slots, calendarEvents, overrides, terms, courses, tasks] = await Promise.all([
     db.timetable_version.filter(v => v.deleted_at === null).toArray(),
     db.timetable_slot.filter(s => s.deleted_at === null).toArray(),
     db.calendar_event.filter(e => e.deleted_at === null).toArray(),
     db.timetable_override.where('date').equals(date).filter(o => o.deleted_at === null).toArray(),
     db.term.filter(t => t.deleted_at === null).toArray(),
     db.course.filter(c => c.deleted_at === null).toArray(),
+    db.task.filter(t => t.deleted_at === null).toArray(),
   ]);
 
   const activeTerm = terms.find(t => t.status === 'ongoing') || terms[0];
@@ -286,6 +289,7 @@ export async function getEffectiveDaySchedule(dateStr?: string): Promise<DaySche
     saturdayRule: activeTerm?.saturday_rule || 'second_saturday_off',
     courses,
     labAttendanceRule: getLabAttendanceRule(),
+    tasks,
   });
 }
 
@@ -295,6 +299,10 @@ export async function getTodayTimetableSlots(): Promise<{
   holidayNote?: string;
   isSwapDay: boolean;
   swapNote?: string;
+  isExamDay: boolean;
+  examNote?: string;
+  examTasks: Task[];
+  examClassMode?: ExamClassMode;
   effectiveWeekday: Weekday;
 }> {
   const schedule = await getEffectiveDaySchedule();
@@ -311,6 +319,9 @@ export async function getTodayTimetableSlots(): Promise<{
     weight: s.weight,
     attendance_weight: s.attendance_weight,
     period_name: s.period_name,
+    is_exam_slot: s.is_exam_slot,
+    exam_id: s.exam_id,
+    exam_title: s.exam_title,
     created_at: '',
     updated_at: '',
     deleted_at: null,
@@ -322,6 +333,10 @@ export async function getTodayTimetableSlots(): Promise<{
     holidayNote: schedule.holiday_note || undefined,
     isSwapDay: schedule.is_swap_day,
     swapNote: schedule.is_swap_day ? `Following day ${schedule.effective_weekday} timetable` : undefined,
+    isExamDay: schedule.is_exam_day,
+    examNote: schedule.exam_note || undefined,
+    examTasks: schedule.exam_tasks || [],
+    examClassMode: schedule.exam_class_mode,
     effectiveWeekday: schedule.effective_weekday,
   };
 }

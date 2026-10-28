@@ -241,15 +241,36 @@ export const gradeResultSchema = baseEntitySchema.extend({
   is_passing: z.boolean().default(true),
 });
 
+export const taskPrioritySchema = z.enum(['low', 'medium', 'high', 'urgent']);
+
 export const taskSchema = baseEntitySchema.extend({
   title: z.string().min(1),
-  type: z.enum(['assignment', 'quiz', 'mid_sem', 'end_sem', 'exam', 'project', 'other']).default('other'),
+  type: z.enum([
+    'assignment',
+    'quiz',
+    'mid_sem',
+    'end_sem',
+    'exam',
+    'project',
+    'lab_exam',
+    'presentation',
+    'other',
+  ]).default('other'),
   due_at: z.string().nullable().optional(),
-  course_id: z.string().uuid().nullable().optional(),
+  course_id: z.string().nullable().optional(),
   done: z.boolean().default(false),
   syllabus: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   venue: z.string().nullable().optional(),
+  priority: taskPrioritySchema.nullable().optional(),
+  weightage: z.number().nullable().optional(),
+  max_marks: z.number().nullable().optional(),
+  obtained_marks: z.number().nullable().optional(),
+  seat_number: z.string().nullable().optional(),
+  calendar_event_id: z.string().nullable().optional(),
+  reminder_offset: z.number().nullable().optional(),
+  end_time: z.string().nullable().optional(),
+  exam_class_mode: z.enum(['cancel_overlapping', 'substitute_exam', 'suspend_all', 'keep_all']).nullable().optional(),
 });
 
 export const backupPayloadSchema = z.object({

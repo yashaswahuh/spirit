@@ -104,7 +104,18 @@ export type AttendanceStatus =
 
 export type AssessmentRuleType = 'normal' | 'best_of_N' | 'drop_lowest';
 
-export type TaskType = 'assignment' | 'quiz' | 'mid_sem' | 'end_sem' | 'exam' | 'project' | 'other';
+export type TaskType =
+  | 'assignment'
+  | 'quiz'
+  | 'mid_sem'
+  | 'end_sem'
+  | 'exam'
+  | 'project'
+  | 'lab_exam'
+  | 'presentation'
+  | 'other';
+
+export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 
 // ============================================================================
 // 1. PROFILE
@@ -265,6 +276,11 @@ export interface TimetableSlot extends BaseEntity {
   weight?: number; // Period weight (default 1; e.g. 2 or 3 for 2-3 hour lab)
   attendance_weight?: number | null; // How many periods this counts for attendance (null = same as weight)
   period_name?: string | null; // Optional label like "Period 1"
+  is_exam_slot?: boolean;
+  exam_id?: string;
+  exam_title?: string;
+  is_cancelled_for_exam?: boolean;
+  cancel_reason?: string;
 }
 
 // ============================================================================
@@ -363,18 +379,29 @@ export interface GradeResult extends BaseEntity {
 }
 
 // ============================================================================
-// 12. TASK
+// 12. TASK & EXAM POLICIES
 // ============================================================================
+
+export type ExamClassMode = 'cancel_overlapping' | 'substitute_exam' | 'suspend_all' | 'keep_all';
 
 export interface Task extends BaseEntity {
   title: string; // e.g. "Submit DSA Assignment 2"
-  type: TaskType; // 'assignment' | 'quiz' | 'mid_sem' | 'end_sem' | 'exam' | 'project' | 'other'
-  due_at: string | null; // ISO 8601 timestamp string or YYYY-MM-DD
+  type: TaskType;
+  due_at: string | null; // ISO 8601 timestamp string or YYYY-MM-DDTHH:mm:ss
+  end_time?: string | null; // HH:mm end time for exams (e.g. "15:00")
   course_id: string | null; // Foreign key to course.id (null for general tasks)
   done: boolean; // true if completed
   syllabus?: string | null;
   notes?: string | null;
   venue?: string | null;
+  priority?: TaskPriority | null;
+  weightage?: number | null;
+  max_marks?: number | null;
+  obtained_marks?: number | null;
+  seat_number?: string | null;
+  calendar_event_id?: string | null;
+  reminder_offset?: number | null;
+  exam_class_mode?: ExamClassMode | null; // Policy for regular classes on exam day
 }
 
 // ============================================================================

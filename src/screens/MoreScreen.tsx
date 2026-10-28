@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Sparkles,
@@ -111,6 +112,7 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
   onThemePrefChange,
   onResetApp,
 }) => {
+  const navigate = useNavigate();
   const { t } = useI18n();
   const profile = useLiveQuery(() => db.profile.filter(p => p.deleted_at === null).first());
   const program = useLiveQuery(() => db.program.filter(p => p.deleted_at === null).first());
@@ -711,19 +713,34 @@ export const MoreScreen: React.FC<MoreScreenProps> = ({
 
           {/* Tasks & Deadlines Manager Card */}
           <div className="bg-white dark:bg-gray-900 p-5 sm:p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-3">
-            <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-              <CheckSquare className="w-3.5 h-3.5 text-indigo-600" />
-              Tasks & Exams Tracker
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                <CheckSquare className="w-3.5 h-3.5 text-indigo-600" />
+                Tasks & Exams Tracker
+              </h3>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400">
+                {tasks.filter(t => !t.done).length} pending
+              </span>
+            </div>
             <p className="text-xs text-gray-400">
-              Manage assignments, quizzes, mid-sems, syllabus, exam venues, and countdowns.
+              Track assignments, quizzes, mid-sems, syllabus, exam venues, and countdowns.
             </p>
-            <button
-              onClick={() => setIsTasksOpen(true)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-500 text-gray-800 dark:text-white font-semibold text-xs sm:text-sm transition-colors min-h-[44px]"
-            >
-              Open Tasks & Exams Manager
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsTasksOpen(true)}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-colors min-h-[44px] cursor-pointer"
+              >
+                Open Manager Dialog
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/tasks')}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-500 text-gray-800 dark:text-white font-semibold text-xs transition-colors min-h-[44px] cursor-pointer"
+              >
+                Full Screen View
+              </button>
+            </div>
           </div>
         </div>
 

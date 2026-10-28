@@ -1,18 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { AlertTriangle, CheckCircle2, ShieldCheck, ArrowRight, BookOpen, Clock, CalendarCheck, Sparkles } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ShieldCheck, ArrowRight, BookOpen, Clock, CalendarCheck, Sparkles, CheckSquare } from 'lucide-react';
 import { db } from '../db/dexie';
-import type { TimetableSlot, Course } from '../types';
+import type { TimetableSlot, Course, Task, ExamClassMode } from '../types';
 import { computeCourseAttendanceStats, countUnmarkedClasses } from '../engine/attendance';
 import { canISkipTomorrow } from '../engine/whatif';
 import { getTodayTimetableSlots } from '../db/repositories/timetable.repo';
 import { markAttendance, deleteAttendanceRecord, reconcileSaturdayAttendanceRecords } from '../db/repositories/attendance.repo';
+import { updateExamClassMode } from '../db/repositories/task.repo';
 import { resolveSlotAttendanceWeight } from '../engine/timetable';
 import { getLabAttendanceRule, useDateFormat, formatDate } from '../utils/preferences';
 import { hasDemoData, clearDemoData, seedDemoData } from '../db/repositories/setup.repo';
 import { TodayClassesSection } from '../components/home/TodayClassesSection';
 import { CanISkipTomorrowCard } from '../components/home/CanISkipTomorrowCard';
 import { UpcomingTasksWidget } from '../components/home/UpcomingTasksWidget';
+import { isExamType } from '../engine/tasks';
 import { CatchUpModal } from '../components/attendance/CatchUpModal';
 import { WhatIfModal } from '../components/attendance/WhatIfModal';
 import { BackupReminderBanner } from '../components/safety/BackupReminderBanner';
@@ -22,9 +24,10 @@ import { PageContainer } from '../components/layout/PageContainer';
 
 interface HomeScreenProps {
   onNavigateToAttendance: () => void;
+  onNavigateToTasks?: () => void;
 }
 
-export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }) => {
+export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance, onNavigateToTasks }) => {
   const profile = useLiveQuery(() => db.profile.filter(p => p.deleted_at === null).first());
   const activeTerm = useLiveQuery(() => db.term.filter(t => t.deleted_at === null && t.status === 'ongoing').first());
   const courses = useLiveQuery(() => db.course.filter(c => c.deleted_at === null).toArray()) || [];
@@ -34,6 +37,36 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
   const overrides = useLiveQuery(() => db.timetable_override.filter(o => o.deleted_at === null).toArray()) || [];
   const calendarEvents = useLiveQuery(() => db.calendar_event.filter(e => e.deleted_at === null).toArray()) || [];
   const isDemoMode = useLiveQuery(() => hasDemoData()) ?? false;
+  const tasks = useLiveQuery(() => db.task.filter(t => t.deleted_at === null).toArray()) || [];
+  const pendingTasks = useMemo(() => tasks.filter(t => !t.done), [tasks]);
+
+  const urgentTaskOrExam = useMemo(() => {
+    const overdue = pendingTasks.find(t => {
+      if (!t.due_at) return false;
+      return new Date(t.due_at).getTime() < Date.now();
+    });
+    if (overdue) {
+      return {
+        title: overdue.title,
+        message: `Overdue ${isExamType(overdue.type) ? 'exam' : 'task'}! Needs immediate attention.`,
+        isExam: isExamType(overdue.type),
+      };
+    }
+    const soon = pendingTasks.find(t => {
+      if (!t.due_at) return false;
+      const diff = new Date(t.due_at).getTime() - Date.now();
+      return diff > 0 && diff <= 48 * 3600 * 1000;
+    });
+    if (soon) {
+      const isExam = isExamType(soon.type);
+      return {
+        title: soon.title,
+        message: `${isExam ? 'Exam' : 'Deadline'} scheduled within 48 hours!`,
+        isExam,
+      };
+    }
+    return null;
+  }, [pendingTasks]);
   const [clearingDemo, setClearingDemo] = useState(false);
 
   // Modals state
@@ -47,6 +80,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
   const [holidayNote, setHolidayNote] = useState<string | undefined>();
   const [isSwapDay, setIsSwapDay] = useState(false);
   const [swapNote, setSwapNote] = useState<string | undefined>();
+  const [isExamDay, setIsExamDay] = useState(false);
+  const [examNote, setExamNote] = useState<string | undefined>();
+  const [examTasks, setExamTasks] = useState<Task[]>([]);
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const recordsToday = records.filter(r => r.date === todayStr);
@@ -58,8 +94,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
       setHolidayNote(res.holidayNote);
       setIsSwapDay(res.isSwapDay);
       setSwapNote(res.swapNote);
+      setIsExamDay(res.isExamDay);
+      setExamNote(res.examNote);
+      setExamTasks(res.examTasks);
     });
-  }, [records, courses]);
+  }, [records, courses, tasks]);
+
+  const handleUpdateExamClassMode = async (examId: string, mode: ExamClassMode) => {
+    await updateExamClassMode(examId, mode);
+    const res = await getTodayTimetableSlots();
+    setTodaySlots(res.slots);
+    setIsHoliday(res.isHoliday);
+    setHolidayNote(res.holidayNote);
+    setIsSwapDay(res.isSwapDay);
+    setSwapNote(res.swapNote);
+    setIsExamDay(res.isExamDay);
+    setExamNote(res.examNote);
+    setExamTasks(res.examTasks);
+  };
 
   // Overall attendance calculation across all courses with opening balances
   let totalAttended = 0;
@@ -209,11 +261,26 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900/40">
             <Clock className="w-3.5 h-3.5" />
             {todaySlots.length} Classes Today
           </span>
+
+          {onNavigateToTasks && (
+            <button
+              type="button"
+              onClick={onNavigateToTasks}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-semibold bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-900/40 transition-colors cursor-pointer"
+            >
+              <CheckSquare className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              <span>
+                {pendingTasks.length > 0
+                  ? `${pendingTasks.length} ${pendingTasks.length === 1 ? 'Task / Exam' : 'Tasks & Exams'}`
+                  : '+ Task / Exam'}
+              </span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -240,6 +307,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
             className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex-shrink-0 min-h-[36px]"
           >
             {clearingDemo ? 'Clearing...' : 'Clear Demo'}
+          </button>
+        </div>
+      )}
+
+      {/* Urgent Task or Exam Alert */}
+      {urgentTaskOrExam && onNavigateToTasks && (
+        <div className="p-3.5 sm:p-4 bg-amber-500/10 dark:bg-amber-950/30 rounded-3xl border border-amber-300/80 dark:border-amber-800/60 flex items-center justify-between gap-3 shadow-xs animate-fade-in">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-2xl bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300 flex items-center justify-center flex-shrink-0">
+              <CheckSquare className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white truncate">
+                {urgentTaskOrExam.title}
+              </h4>
+              <p className="text-[11px] sm:text-xs text-amber-700 dark:text-amber-300 truncate">
+                {urgentTaskOrExam.message}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onNavigateToTasks}
+            className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex-shrink-0 cursor-pointer"
+          >
+            Open Tasks
           </button>
         </div>
       )}
@@ -383,6 +476,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
             holidayNote={holidayNote}
             isSwapDay={isSwapDay}
             swapNote={swapNote}
+            isExamDay={isExamDay}
+            examNote={examNote}
+            examTasks={examTasks}
+            onUpdateExamClassMode={handleUpdateExamClassMode}
             onMarkAttendance={handleMarkToday}
           />
         </div>
@@ -390,7 +487,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigateToAttendance }
         {/* Right Column: Tasks/Exams & Subject Health Breakdown */}
         <div className="lg:col-span-5 xl:col-span-5 space-y-6">
           {/* Upcoming Tasks & Exams Widget */}
-          <UpcomingTasksWidget courses={courses} />
+          <UpcomingTasksWidget courses={courses} onOpenFullTracker={onNavigateToTasks} />
 
           {/* Subject Health Card */}
           <div className="bg-white dark:bg-gray-900 rounded-3xl p-5 sm:p-6 border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
