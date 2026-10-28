@@ -6,22 +6,22 @@ import {
   checkForLiveUpdate,
   isUpdatePendingRestart,
 } from '../updater';
+import pkg from '../../../package.json';
 
 describe('Live OTA Updater Engine', () => {
-  it('exports correct app version v1.0.1 and site version v1.0.6', () => {
-    expect(CURRENT_APP_VERSION).toBe('1.0.1');
-    expect(CURRENT_SITE_VERSION).toBe('1.0.6');
-    expect(CURRENT_BUILD_NUMBER).toBe(1006);
+  it('exports matching version information in sync with package.json', () => {
+    expect(CURRENT_APP_VERSION).toBe(pkg.version);
+    expect(CURRENT_SITE_VERSION).toBe(pkg.siteVersion);
+    expect(CURRENT_BUILD_NUMBER).toBe(pkg.build);
     expect(isUpdatePendingRestart()).toBe(false);
   });
 
   it('safely handles non-native / node environment without throwing', async () => {
     const res = await checkForLiveUpdate({ silent: true });
     expect(res.hasUpdate).toBe(false);
-    expect(res.currentAppVersion).toBe('1.0.1');
-    expect(res.currentSiteVersion).toBe('1.0.6');
-    expect(res.currentVersion).toBe('1.0.1');
-    expect(res.latestVersion).toBe('1.0.6');
+    expect(res.currentAppVersion).toBe(CURRENT_APP_VERSION);
+    expect(res.currentSiteVersion).toBe(CURRENT_SITE_VERSION);
+    expect(res.currentVersion).toBe(CURRENT_APP_VERSION);
+    expect(res.latestVersion).toBe(CURRENT_SITE_VERSION);
   });
 });
-
